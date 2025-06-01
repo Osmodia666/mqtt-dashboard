@@ -1,5 +1,5 @@
 export const mqttConfig = {
-  host: 'ws://192.168.1.10:9001',
+  host: 'wss://192.168.1.10:9001',
   username: 'christopher',
   password: 'v6Vrhy6u4reJsng',
 }
