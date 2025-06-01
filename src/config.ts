@@ -1,5 +1,5 @@
 export const mqttConfig = {
-  host: 'wss://cyberdyne.chickenkiller.com:8884',
+  host: 'wss://cyberdyne.chickenkiller.com:1884',
   username: 'christopher',
   password: 'v6Vrhy6u4reJsng',
 }
