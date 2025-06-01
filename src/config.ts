@@ -1,7 +1,7 @@
 export const mqttConfig = {
-  host: 'wss://your-broker-url:port',
-  username: 'yourUsername',
-  password: 'yourPassword',
+  host: 'wss://192.168.1.10:1883',
+  username: 'christopher',
+  password: 'v6Vrhy6u4reJsng',
 }
 
 export const topics = [
