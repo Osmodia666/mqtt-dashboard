@@ -18,7 +18,7 @@ export const topics = [
   { topic: 'sonoff.0.Stromzähler.grid_Verbrauch_aktuell', label: 'Verbrauch aktuell', type: 'number', unit: 'W' },
   { topic: 'sonoff.0.Stromzähler.grid_Verbrauch_gesamt', label: 'Verbrauch gesamt', type: 'number', unit: 'kWh' },
   { topic: 'mqtt.0.Gaszaehler.stand', label: 'Gaszähler Stand', type: 'number', unit: 'm³' },
-  { topic: 'ds18b20.0.sensors.10-0008025fe5c7', label: 'Wassertemperatur', type: 'number', unit: '°C' },
+  { topic: 'ds18b20.0.sensors.10-0008025fe5c7', label: 'Âussentemperatur', type: 'number', unit: '°C' },
   { topic: 'mqtt.0.Pool_temp.temperatur', label: 'Pool Temperatur', type: 'number', unit: '°C' },
   { topic: 'rpi2.0.temperature.soc_temp', label: 'Raspberry Pi Temperatur', type: 'number', unit: '°C' },
   { topic: 'sonoff.0.Stromzähler.grid_Spannung_L1', label: 'Spannung L1', type: 'number', unit: 'V' },
