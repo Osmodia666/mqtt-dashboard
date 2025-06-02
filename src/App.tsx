@@ -20,13 +20,26 @@ function App() {
     const interval = setInterval(flush, 300)
 
     client.on('connect', () => {
+      console.log('✅ MQTT verbunden')
       const topicList = topics.map(({ topic }) => topic)
-      client.subscribe(topicList)
+      client.subscribe(topicList, (err) => {
+        if (err) console.error('❌ Subscribe error:', err)
+        else console.log('📡 Subscribed to topics:', topicList)
+      })
+    })
+
+    client.on('reconnect', () => {
+      console.log('🔁 Reconnecting...')
+    })
+
+    client.on('error', (err) => {
+      console.error('❌ MQTT Fehler:', err)
     })
 
     client.on('message', (topic, message) => {
       messageQueue.current[topic] = message.toString()
       setLastUpdate(new Date().toLocaleTimeString())
+      console.log('📨 Message:', topic, message.toString())
     })
 
     return () => clearInterval(interval)
@@ -34,7 +47,10 @@ function App() {
 
   const toggleBoolean = (topic: string, current: string) => {
     const next = current === 'true' ? 'false' : 'true'
-    client.publish(topic, next)
+    console.log('⚡ publish', topic, '→', next)
+    client.publish(topic, next, (err) => {
+      if (err) console.error('❌ Publish-Fehler:', err)
+    })
   }
 
   return (
