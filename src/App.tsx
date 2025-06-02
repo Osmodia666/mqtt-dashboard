@@ -14,9 +14,16 @@ function App() {
 
   useEffect(() => {
     const flush = () => {
-      setValues((prev) => ({ ...prev, ...messageQueue.current }))
+      const updates = { ...messageQueue.current }
       messageQueue.current = {}
+
+      if (Object.keys(updates).length > 0) {
+        console.log('🧠 flush', updates)
+        setValues((prev) => ({ ...prev, ...updates }))
+        setLastUpdate(new Date().toLocaleTimeString())
+      }
     }
+
     const interval = setInterval(flush, 300)
 
     client.on('connect', () => {
@@ -38,7 +45,6 @@ function App() {
 
     client.on('message', (topic, message) => {
       messageQueue.current[topic] = message.toString()
-      setLastUpdate(new Date().toLocaleTimeString())
       console.log('📨 Message:', topic, message.toString())
     })
 
