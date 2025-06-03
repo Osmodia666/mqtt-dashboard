@@ -1,4 +1,3 @@
-// src/config.ts
 export const mqttConfig = {
   host: 'wss://cyberdyne.chickenkiller.com:8884',
   username: 'christopher',
@@ -6,30 +5,36 @@ export const mqttConfig = {
 }
 
 export const topics = [
-  { topic: 'mqtt.0.cmnd.Poolpumpe.POWER', label: 'Poolpumpe', type: 'boolean', favorite: true },
-  { topic: 'mqtt.0.Balkonkraftwerk.ENERGY_Power_0', label: 'Balkonkraftwerk Power', type: 'number', unit: 'W', favorite: true },
-  { topic: 'mqtt.0.cmnd.Teichpumpe.POWER', label: 'Teichpumpe', type: 'boolean' },
-  { topic: 'mqtt.0.cmnd.Doppelsteckdose.POWER', label: 'Doppelsteckdose', type: 'boolean' },
-  { topic: 'mqtt.0.Beleuchtung.POWER', label: 'Beleuchtung', type: 'boolean' },
-  { topic: 'mqtt.0.cmnd.Steckdose_1.POWER', label: 'Steckdose 1', type: 'boolean' },
-  { topic: 'mqtt.0.cmnd.Steckdose_2.POWER', label: 'Steckdose 2', type: 'boolean' },
-  { topic: 'mqtt.0.cmnd.Ender_3_Pro.POWER', label: 'Ender 3 Pro', type: 'boolean' },
-  { topic: 'mqtt.0.Sidewinder X1.POWER1', label: 'Sidewinder X1', type: 'boolean' },
-  { topic: 'mqtt.0.Stromzähler.Verbrauch_aktuell', label: 'Verbrauch aktuell', type: 'number', unit: 'W' },
-  { topic: 'mqtt.0.Stromzähler.Verbrauch_gesamt', label: 'Verbrauch gesamt', type: 'number', unit: 'kWh' },
-  { topic: 'mqtt.0.Gaszaehler.stand', label: 'Gaszähler Stand', type: 'number', unit: 'm³' },
-  { topic: 'ds18b20.0.sensors.10-0008025fe5c7', label: 'Âussentemperatur', type: 'number', unit: '°C' },
-  { topic: 'mqtt.0.Pool_temp.temperatur', label: 'Pool Temperatur', type: 'number', unit: '°C' },
-  { topic: 'rpi2.0.temperature.soc_temp', label: 'Raspberry Pi Temperatur', type: 'number', unit: '°C' },
-  { topic: 'mqtt.0.Stromzähler.grid_Spannung_L1', label: 'Spannung L1', type: 'number', unit: 'V' },
-  { topic: 'mqtt.0.Stromzähler.Strom_L1', label: 'Strom L1', type: 'number', unit: 'A' },
-  { topic: 'mqtt.0.Stromzähler.Wirkleistung_L1', label: 'Leistung L1', type: 'number', unit: 'W' },
-  { topic: 'mqtt.0.Stromzähler.grid_Spannung_L2', label: 'Spannung L2', type: 'number', unit: 'V' },
-  { topic: 'mqtt.0.Stromzähler.Strom_L2', label: 'Strom L2', type: 'number', unit: 'A' },
-  { topic: 'mqtt.0.Stromzähler.Wirkleistung_L2', label: 'Leistung L2', type: 'number', unit: 'W' },
-  { topic: 'mqtt.0.Stromzähler.grid_Spannung_L3', label: 'Spannung L3', type: 'number', unit: 'V' },
-  { topic: 'mqtt.0.Stromzähler.Strom_L3', label: 'Strom L3', type: 'number', unit: 'A' },
-  { topic: 'mqtt.0.Stromzähler.Wirkleistung_L3', label: 'Leistung L3', type: 'number', unit: 'W' },
-  { topic: 'mqtt.0.homeassistant.sensor.BalkonkraftwerkEnergyPToday0.config', label: 'Ertrag heute', type: 'number', unit: 'kWh' },
-  { topic: 'mqtt.0.Balkonkraftwerk.ENERGY_EnergyPYesterday_0', label: 'Ertrag gestern', type: 'number', unit: 'kWh' }
+  {
+    label: 'Ender 3 Pro',
+    type: 'boolean',
+    statusTopic: 'stat/Ender_3_Pro/POWER',
+    publishTopic: 'cmnd/Ender_3_Pro/POWER',
+    favorite: true,
+  },
+  {
+    label: 'Steckdose 2',
+    type: 'boolean',
+    statusTopic: 'stat/Steckdose_2/POWER',
+    publishTopic: 'cmnd/Steckdose_2/POWER',
+  },
+  {
+    label: 'Teichpumpe',
+    type: 'boolean',
+    statusTopic: 'stat/Teichpumpe/POWER',
+    publishTopic: 'cmnd/Teichpumpe/POWER',
+  },
+  {
+    label: 'Gaszähler Stand',
+    type: 'number',
+    unit: 'm³',
+    statusTopic: 'mqtt.0.Gaszaehler.stand', // dieser bleibt
+  },
+  {
+    label: 'Balkonkraftwerk Power',
+    type: 'number',
+    unit: 'W',
+    statusTopic: 'mqtt.0.Balkonkraftwerk.ENERGY_Power_0',
+    favorite: true,
+  },
 ]
