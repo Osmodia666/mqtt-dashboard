@@ -28,7 +28,6 @@ function App() {
 
     client.on('connect', () => {
       console.log('✅ MQTT verbunden')
-
       const allStatusTopics = topics
         .map((t) => 'statusTopic' in t ? t.statusTopic : t.topic)
         .filter(Boolean)
@@ -56,7 +55,7 @@ function App() {
   }, [])
 
   const toggleBoolean = (publishTopic: string, current: string) => {
-    const next = current === 'true' ? 'false' : 'true'
+    const next = current?.toUpperCase() === 'ON' ? 'OFF' : 'ON'
     console.log('⚡ publish', publishTopic, '→', next)
     client.publish(publishTopic, next, (err) => {
       if (err) console.error('❌ Publish-Fehler:', err)
@@ -69,7 +68,7 @@ function App() {
       <div className="grid grid-cols-1 xs:grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {topics.map(({ label, type, unit, favorite, statusTopic, publishTopic, topic }) => {
           const key = statusTopic ?? topic
-          const currentValue = values[key]
+          const currentValue = values[key]?.toUpperCase()
 
           return (
             <div key={key} className={`bg-gray-100 dark:bg-gray-800 rounded-2xl shadow p-4 border-2 ${favorite ? 'border-yellow-400' : 'border-transparent'}`}>
@@ -77,19 +76,19 @@ function App() {
 
               {type === 'boolean' && (
                 <button
-                  className={`px-4 py-2 rounded-xl text-white ${currentValue === 'true' ? 'bg-green-500' : 'bg-red-500'}`}
+                  className={`px-4 py-2 rounded-xl text-white ${currentValue === 'ON' ? 'bg-green-500' : 'bg-red-500'}`}
                   onClick={() => toggleBoolean(publishTopic ?? key, currentValue)}
                 >
-                  {currentValue === 'true' ? 'AN' : 'AUS'}
+                  {currentValue === 'ON' ? 'AN' : 'AUS'}
                 </button>
               )}
 
               {type === 'number' && (
-                <p className="text-3xl">{currentValue ?? '...'} {unit}</p>
+                <p className="text-3xl">{values[key] ?? '...'} {unit}</p>
               )}
 
               {type === 'string' && (
-                <p className="text-xl">{currentValue ?? '...'}</p>
+                <p className="text-xl">{values[key] ?? '...'}</p>
               )}
             </div>
           )
