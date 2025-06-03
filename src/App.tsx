@@ -46,10 +46,30 @@ function App() {
       console.error('❌ MQTT Fehler:', err)
     })
 
-    client.on('message', (topic, message) => {
-      messageQueue.current[topic] = message.toString()
-      console.log('📨 Message:', topic, message.toString())
-    })
+   client.on('message', (topic, message) => {
+  try {
+    const text = message.toString()
+    const parsed = JSON.parse(text)
+
+    const flatten = (obj: any, prefix = ''): Record<string, string> =>
+      Object.entries(obj).reduce((acc, [key, val]) => {
+        const newKey = prefix ? `${prefix}.${key}` : key
+        if (typeof val === 'object' && val !== null) {
+          Object.assign(acc, flatten(val, newKey))
+        } else {
+          acc[`${topic}.${newKey}`] = String(val)
+        }
+        return acc
+      }, {} as Record<string, string>)
+
+    Object.assign(messageQueue.current, flatten(parsed))
+    console.log('📨 JSON decoded:', flatten(parsed))
+  } catch {
+    messageQueue.current[topic] = message.toString()
+    console.log('📨 Plain message:', topic, message.toString())
+  }
+})
+
 
     return () => clearInterval(interval)
   }, [])
