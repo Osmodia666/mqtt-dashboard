@@ -28,10 +28,14 @@ function App() {
 
     client.on('connect', () => {
       console.log('✅ MQTT verbunden')
-      const topicList = topics.map(({ topic }) => topic)
-      client.subscribe(topicList, (err) => {
+
+      const allStatusTopics = topics
+        .map((t) => 'statusTopic' in t ? t.statusTopic : t.topic)
+        .filter(Boolean)
+
+      client.subscribe(allStatusTopics, (err) => {
         if (err) console.error('❌ Subscribe error:', err)
-        else console.log('📡 Subscribed to topics:', topicList)
+        else console.log('📡 Subscribed to topics:', allStatusTopics)
       })
     })
 
@@ -51,10 +55,10 @@ function App() {
     return () => clearInterval(interval)
   }, [])
 
-  const toggleBoolean = (topic: string, current: string) => {
+  const toggleBoolean = (publishTopic: string, current: string) => {
     const next = current === 'true' ? 'false' : 'true'
-    console.log('⚡ publish', topic, '→', next)
-    client.publish(topic, next, (err) => {
+    console.log('⚡ publish', publishTopic, '→', next)
+    client.publish(publishTopic, next, (err) => {
       if (err) console.error('❌ Publish-Fehler:', err)
     })
   }
@@ -63,25 +67,33 @@ function App() {
     <main className="min-h-screen p-4 bg-white dark:bg-gray-900 text-black dark:text-white transition-colors duration-300">
       <header className="mb-4 text-sm text-gray-500 dark:text-gray-400">Letztes Update: {lastUpdate || 'Lade...'}</header>
       <div className="grid grid-cols-1 xs:grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {topics.map(({ topic, label, type, unit, favorite }) => (
-          <div key={topic} className={`bg-gray-100 dark:bg-gray-800 rounded-2xl shadow p-4 border-2 ${favorite ? 'border-yellow-400' : 'border-transparent'}`}>
-            <h2 className="text-xl font-semibold mb-2">{label}</h2>
-            {type === 'boolean' && (
-              <button
-                className={`px-4 py-2 rounded-xl text-white ${values[topic] === 'true' ? 'bg-green-500' : 'bg-red-500'}`}
-                onClick={() => toggleBoolean(topic, values[topic])}
-              >
-                {values[topic] === 'true' ? 'AN' : 'AUS'}
-              </button>
-            )}
-            {type === 'number' && (
-              <p className="text-3xl">{values[topic] ?? '...'} {unit}</p>
-            )}
-            {type === 'string' && (
-              <p className="text-xl">{values[topic] ?? '...'}</p>
-            )}
-          </div>
-        ))}
+        {topics.map(({ label, type, unit, favorite, statusTopic, publishTopic, topic }) => {
+          const key = statusTopic ?? topic
+          const currentValue = values[key]
+
+          return (
+            <div key={key} className={`bg-gray-100 dark:bg-gray-800 rounded-2xl shadow p-4 border-2 ${favorite ? 'border-yellow-400' : 'border-transparent'}`}>
+              <h2 className="text-xl font-semibold mb-2">{label}</h2>
+
+              {type === 'boolean' && (
+                <button
+                  className={`px-4 py-2 rounded-xl text-white ${currentValue === 'true' ? 'bg-green-500' : 'bg-red-500'}`}
+                  onClick={() => toggleBoolean(publishTopic ?? key, currentValue)}
+                >
+                  {currentValue === 'true' ? 'AN' : 'AUS'}
+                </button>
+              )}
+
+              {type === 'number' && (
+                <p className="text-3xl">{currentValue ?? '...'} {unit}</p>
+              )}
+
+              {type === 'string' && (
+                <p className="text-xl">{currentValue ?? '...'}</p>
+              )}
+            </div>
+          )
+        })}
       </div>
     </main>
   )
