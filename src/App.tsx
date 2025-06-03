@@ -63,8 +63,19 @@ function App() {
   }
 
   return (
-    <main className="min-h-screen p-4 bg-white dark:bg-gray-900 text-black dark:text-white transition-colors duration-300">
-      <header className="mb-4 text-sm text-gray-500 dark:text-gray-400">Letztes Update: {lastUpdate || 'Lade...'}</header>
+    <main className="min-h-screen p-4 bg-white dark:bg-gray-900 text-black dark:text-white transition-colors duration-300 relative">
+      {/* ✅ MQTT Status-LED oben rechts */}
+      <div className="absolute top-2 right-4">
+        <div
+          className={`w-3 h-3 rounded-full ${client.connected ? 'bg-green-500' : 'bg-red-500'}`}
+          title={client.connected ? 'MQTT verbunden' : 'MQTT getrennt'}
+        />
+      </div>
+
+      <header className="mb-4 text-sm text-gray-500 dark:text-gray-400">
+        Letztes Update: {lastUpdate || 'Lade...'}
+      </header>
+
       <div className="grid grid-cols-1 xs:grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {topics.map(({ label, type, unit, favorite, statusTopic, publishTopic, topic }) => {
           const key = statusTopic ?? topic
@@ -93,6 +104,18 @@ function App() {
             </div>
           )
         })}
+      </div>
+
+      {/* 📜 Letzte empfangene Werte */}
+      <div className="mt-8">
+        <h3 className="text-lg font-bold mb-2">🔎 Letzte MQTT-Werte</h3>
+        <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-xl text-sm max-h-64 overflow-y-auto">
+          {Object.entries(values).slice(-10).reverse().map(([topic, value]) => (
+            <div key={topic}>
+              <span className="font-mono text-blue-600 dark:text-blue-400">{topic}</span>: <span className="font-mono">{value}</span>
+            </div>
+          ))}
+        </div>
       </div>
     </main>
   )
