@@ -8,8 +8,8 @@ export const topics = [
   {
     label: 'Ender 3 Pro',
     type: 'boolean',
-    statusTopic: 'stat/Ender_3_Pro/POWER',
-    publishTopic: 'cmnd/Ender_3_Pro/POWER',
+    statusTopic: 'mqtt.0.stat.Ender_3_Pro.POWER1',
+    publishTopic: 'mqtt.0.cmnd.Ender_3_Pro.POWER',
     favorite: true,
   },
   {
