@@ -8,8 +8,8 @@ export const topics = [
   {
     label: 'Ender 3 Pro',
     type: 'boolean',
-    statusTopic: 'stat/Ender_3_Pro.POWER1',
-    publishTopic: 'cmnd/Ender_3_Pro.POWER',
+    statusTopic: 'stat/Ender_3_Pro/POWER1',
+    publishTopic: 'cmnd/Ender_3_Pro/POWER',
     favorite: true,
   },
   {
@@ -28,7 +28,7 @@ export const topics = [
     label: 'Gaszähler Stand',
     type: 'number',
     unit: 'm³',
-    statusTopic: 'mqtt.0.Gaszaehler.stand', // dieser bleibt
+    statusTopic: 'Gaszaehler/stand', // dieser bleibt
   },
   {
     label: 'Balkonkraftwerk Power',
