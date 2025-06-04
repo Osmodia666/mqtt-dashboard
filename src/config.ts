@@ -31,12 +31,6 @@ export const topics = [
     statusTopic: 'Gaszaehler/stand', // dieser bleibt
   },
 {
-    label: 'Spannung L1',
-    type: 'number',
-    unit: 'V',
-    statusTopic: 'tele/Stromzähler/SENSOR.grid.Spannung_L1', 
-  },
-  
   {
     label: 'Balkonkraftwerk Power',
     type: 'number',
