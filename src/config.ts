@@ -12,6 +12,13 @@ export const topics = [
     publishTopic: 'cmnd/Ender_3_Pro/POWER',
     favorite: true,
   },
+   {
+    label: 'Ender 3 Pro',
+    type: 'boolean',
+    statusTopic: 'stat/Ender_3_Pro/POWER1',
+    publishTopic: 'cmnd/Ender_3_Pro/POWER',
+    favorite: true,
+   },
   {
     label: 'Steckdose 2',
     type: 'boolean',
