@@ -48,29 +48,40 @@ function App() {
       console.error('❌ MQTT Fehler:', err)
     })
 
-    client.on('message', (topic, message) => {
-      try {
-        const text = message.toString()
-        const parsed = JSON.parse(text)
+client.on('message', (topic, message) => {
+  try {
+    const payload = message.toString()
+    const json = JSON.parse(payload)
 
-        const flatten = (obj: any, prefix = ''): Record<string, string> =>
-          Object.entries(obj).reduce((acc, [key, val]) => {
-            const newKey = prefix ? `${prefix}.${key}` : key
-            if (typeof val === 'object' && val !== null) {
-              Object.assign(acc, flatten(val, newKey))
-            } else {
-              acc[`${topic}.${newKey}`] = String(val)
-            }
-            return acc
-          }, {} as Record<string, string>)
+    // Flattener-Funktion (rekursiv)
+    const flatten = (obj: any, prefix = ''): Record<string, string> =>
+      Object.entries(obj).reduce((acc, [key, val]) => {
+        const newKey = prefix ? `${prefix}.${key}` : key
+        if (typeof val === 'object' && val !== null) {
+          Object.assign(acc, flatten(val, newKey))
+        } else {
+          acc[newKey] = String(val)
+        }
+        return acc
+      }, {})
 
-        Object.assign(messageQueue.current, flatten(parsed))
-        console.log('📨 JSON Message:', flatten(parsed))
-      } catch {
-        messageQueue.current[topic] = message.toString()
-        console.log('📨 Plain Message:', topic, message.toString())
-      }
-    })
+    const flat = flatten(json)
+
+    for (const [key, val] of Object.entries(flat)) {
+      // Kombiniere Topic + JSON-Schlüssel
+      const combinedKey = `${topic}.${key}`
+      messageQueue.current[combinedKey] = val
+    }
+
+    console.log('📨 JSON via', topic, flat)
+
+  } catch {
+    // fallback: einfacher Text
+    messageQueue.current[topic] = message.toString()
+    console.log('📨 Plain Message:', topic, message.toString())
+  }
+})
+
 
     return () => clearInterval(interval)
   }, [])
