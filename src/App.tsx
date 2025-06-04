@@ -27,18 +27,18 @@ function App() {
     const interval = setInterval(flush, 300)
 
     client.on('connect', () => {
-      console.log('✅ MQTT verbunden')
+      console.log('✅ MQTT verbunden!')
       const allTopics = topics
         .map(t => ('statusTopic' in t ? t.statusTopic : t.topic))
         .filter(Boolean)
       client.subscribe(allTopics, (err) => {
-        if (err) console.error('❌ Subscribe error:', err)
+        if (err) console.error('❌ Subscribe error!:', err)
         else console.log('📡 Subscribed to topics:', allTopics)
       })
     })
 
     client.on('reconnect', () => console.log('🔁 Reconnecting...'))
-    client.on('error', err => console.error('❌ MQTT Fehler:', err))
+    client.on('error', err => console.error('❌ MQTT Fehler!:', err))
 
     client.on('message', (topic, message) => {
   const payload = message.toString()
