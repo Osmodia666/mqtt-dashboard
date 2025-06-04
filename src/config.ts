@@ -61,6 +61,6 @@ export const topics = [
   type: 'number',
   unit: 'W',
   statusTopic: 'tele/Stromzähler/SENSOR.grid.power_L1'
-}
+},
 
 ]
