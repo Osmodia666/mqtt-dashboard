@@ -60,5 +60,5 @@ export const topics = [
     type: 'number',
     unit: 'W',
     statusTopic: 'Balkonkraftwerk/ENERGY_Power_0',
-  }
+  },
 ]
