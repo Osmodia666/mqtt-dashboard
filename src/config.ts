@@ -44,7 +44,7 @@ export const topics = [
     statusTopic: 'mqtt.0.Balkonkraftwerk.ENERGY_Power_0',
     favorite: true,
   },
-  {
+{
   label: 'Spannung L1',
   type: 'number',
   unit: 'V',
@@ -62,5 +62,4 @@ export const topics = [
   unit: 'W',
   statusTopic: 'tele/Stromzähler/SENSOR.grid.power_L1'
 },
-
 ]
