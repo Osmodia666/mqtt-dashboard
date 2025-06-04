@@ -46,13 +46,12 @@ export const topics = [
     label: 'Leistung L1', 
     type: 'number', 
     unit: 'W', 
-    statusTopic: 'tele/Stromzähler/SENSOR.grid.power_L1' }
+    statusTopic: 'tele/Stromzähler/SENSOR.grid.power_L1',
     },
   {
     label: 'Balkonkraftwerk Power',
     type: 'number',
     unit: 'W',
     statusTopic: 'Balkonkraftwerk/ENERGY_Power_0',
-    favorite: true,
   }
 ]
