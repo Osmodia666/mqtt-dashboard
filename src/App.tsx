@@ -36,6 +36,8 @@ function App() {
         if (err) console.error('❌ Subscribe error:', err)
         else console.log('📡 Subscribed to topics:', allStatusTopics)
       })
+
+      flush() // direkt nach Verbindungsaufbau flush starten
     })
 
     client.on('reconnect', () => {
@@ -46,30 +48,29 @@ function App() {
       console.error('❌ MQTT Fehler:', err)
     })
 
-client.on('message', (topic, message) => {
-  try {
-    const raw = message.toString()
-    const json = JSON.parse(raw)
+    client.on('message', (topic, message) => {
+      try {
+        const text = message.toString()
+        const parsed = JSON.parse(text)
 
-    const flatten = (obj: any, prefix = ''): Record<string, string> =>
-      Object.entries(obj).reduce((acc, [key, val]) => {
-        const newKey = prefix ? `${prefix}.${key}` : key
-        if (typeof val === 'object' && val !== null) {
-          Object.assign(acc, flatten(val, newKey))
-        } else {
-          acc[`${topic}.${newKey}`] = String(val)
-        }
-        return acc
-      }, {} as Record<string, string>)
+        const flatten = (obj: any, prefix = ''): Record<string, string> =>
+          Object.entries(obj).reduce((acc, [key, val]) => {
+            const newKey = prefix ? `${prefix}.${key}` : key
+            if (typeof val === 'object' && val !== null) {
+              Object.assign(acc, flatten(val, newKey))
+            } else {
+              acc[`${topic}.${newKey}`] = String(val)
+            }
+            return acc
+          }, {} as Record<string, string>)
 
-    const flat = flatten(json)
-    Object.assign(messageQueue.current, flat)
-    console.log('📨 JSON Message:', flat)
-  } catch (e) {
-    messageQueue.current[topic] = message.toString()
-    console.log('📨 Plain Message:', topic, message.toString())
-  }
-})
+        Object.assign(messageQueue.current, flatten(parsed))
+        console.log('📨 JSON Message:', flatten(parsed))
+      } catch {
+        messageQueue.current[topic] = message.toString()
+        console.log('📨 Plain Message:', topic, message.toString())
+      }
+    })
 
     return () => clearInterval(interval)
   }, [])
@@ -84,17 +85,14 @@ client.on('message', (topic, message) => {
 
   return (
     <main className="min-h-screen p-4 bg-white dark:bg-gray-900 text-black dark:text-white transition-colors duration-300 relative">
-      {/* ✅ MQTT Status-LED oben rechts */}
       <div className="absolute top-2 right-4">
         <div
           className={`w-3 h-3 rounded-full ${client.connected ? 'bg-green-500' : 'bg-red-500'}`}
-          title={client.connected ? 'MQTT verbunden' : 'MQTT getrennt'}
+          title={client.connected ? 'MQTT verbunden!' : 'MQTT getrennt!'}
         />
       </div>
 
-      <header className="mb-4 text-sm text-gray-500 dark:text-gray-400">
-        Letztes Update: {lastUpdate || 'Lade...'}
-      </header>
+      <header className="mb-4 text-sm text-gray-500 dark:text-gray-400">Letztes Update: {lastUpdate || 'Lade...'}</header>
 
       <div className="grid grid-cols-1 xs:grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {topics.map(({ label, type, unit, favorite, statusTopic, publishTopic, topic }) => {
@@ -115,7 +113,19 @@ client.on('message', (topic, message) => {
               )}
 
               {type === 'number' && (
-                <p className="text-3xl">{values[key] ?? '...'} {unit}</p>
+                <div>
+                  <p className="text-3xl">{values[key] ?? '...'} {unit}</p>
+                  {label.match(/(strom|leistung)/i) && (
+                    <div className="w-full h-2 bg-gray-300 dark:bg-gray-700 rounded overflow-hidden mt-2">
+                      <div
+                        className="h-full bg-blue-500 dark:bg-blue-400"
+                        style={{
+                          width: `${Math.min(100, Number(values[key]) || 0)}%`
+                        }}
+                      />
+                    </div>
+                  )}
+                </div>
               )}
 
               {type === 'string' && (
@@ -126,7 +136,6 @@ client.on('message', (topic, message) => {
         })}
       </div>
 
-      {/* 📜 Letzte empfangene Werte */}
       <div className="mt-8">
         <h3 className="text-lg font-bold mb-2">🔎 Letzte MQTT-Werte</h3>
         <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-xl text-sm max-h-64 overflow-y-auto">
