@@ -88,7 +88,7 @@ function App() {
       <div className="absolute top-2 right-4">
         <div
           className={`w-3 h-3 rounded-full ${client.connected ? 'bg-green-500' : 'bg-red-500'}`}
-          title={client.connected ? 'MQTT verbunden!' : 'MQTT getrennt!'}
+          title={client.connected ? 'MQTT verbunden' : 'MQTT getrennt'}
         />
       </div>
 
