@@ -18,18 +18,20 @@ function App() {
       const updates = { ...messageQueue.current }
       messageQueue.current = {}
       if (Object.keys(updates).length > 0) {
-        console.log('🧠 flush', updates)
         setValues((prev) => ({ ...prev, ...updates }))
         setLastUpdate(new Date().toLocaleTimeString())
+        console.log('🧠 flush', updates)
       }
     }
 
     const interval = setInterval(flush, 300)
 
     client.on('connect', () => {
-      console.log('✅ MQTT verbunden!')
-      const allTopics = topics.map(t => t.statusTopic ?? t.topic).filter(Boolean)
-      client.subscribe(allTopics, err => {
+      console.log('✅ MQTT verbunden')
+      const allTopics = topics
+        .map(t => ('statusTopic' in t ? t.statusTopic : t.topic))
+        .filter(Boolean)
+      client.subscribe(allTopics, (err) => {
         if (err) console.error('❌ Subscribe error:', err)
         else console.log('📡 Subscribed to topics:', allTopics)
       })
@@ -40,33 +42,14 @@ function App() {
 
     client.on('message', (topic, message) => {
       const payload = message.toString()
-      try {
-        const json = JSON.parse(payload)
-        const flatten = (obj: any, prefix = ''): Record<string, string> =>
-          Object.entries(obj).reduce((acc, [key, val]) => {
-            const newKey = prefix ? `${prefix}.${key}` : key
-            if (typeof val === 'object' && val !== null) {
-              Object.assign(acc, flatten(val, newKey))
-            } else {
-              acc[newKey] = String(val)
-            }
-            return acc
-          }, {})
-
-        const flat = flatten(json)
-        for (const [key, val] of Object.entries(flat)) {
-          const combinedKey = `${topic}.${key}`
-          messageQueue.current[combinedKey] = val
-        }
-
-        console.log('📨 JSON:', topic, flat)
-      } catch {
-        messageQueue.current[topic] = payload
-        console.log('📨 Text:', topic, payload)
-      }
+      messageQueue.current[topic] = payload
+      console.log('📨 Message:', topic, payload)
     })
 
-    return () => clearInterval(interval)
+    return () => {
+      clearInterval(interval)
+      client.end()
+    }
   }, [])
 
   const toggleBoolean = (publishTopic: string, current: string) => {
@@ -118,17 +101,6 @@ function App() {
             </div>
           )
         })}
-      </div>
-
-      <div className="mt-8">
-        <h3 className="text-lg font-bold mb-2">🔎 Letzte MQTT-Werte</h3>
-        <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-xl text-sm max-h-64 overflow-y-auto">
-          {Object.entries(values).slice(-10).reverse().map(([topic, value]) => (
-            <div key={topic}>
-              <span className="font-mono text-blue-600 dark:text-blue-400">{topic}</span>: <span className="font-mono">{value}</span>
-            </div>
-          ))}
-        </div>
       </div>
     </main>
   )
