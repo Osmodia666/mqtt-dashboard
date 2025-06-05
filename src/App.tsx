@@ -38,6 +38,13 @@ function App() {
 
     client.on('message', (topic, message) => {
       const payload = message.toString()
+
+      // 🔎 Sonderbehandlung für einfache Werte
+      if (topic === 'Gaszaehler/stand' || topic === 'Pool_temp/temperatur') {
+        messageQueue.current[topic] = payload
+        return
+      }
+
       try {
         const json = JSON.parse(payload)
         const flatten = (obj: any, prefix = ''): Record<string, string> =>
@@ -50,6 +57,7 @@ function App() {
             }
             return acc
           }, {})
+
         const flat = flatten(json)
         for (const [key, val] of Object.entries(flat)) {
           const combinedKey = `${topic}.${key}`
@@ -80,6 +88,7 @@ function App() {
 
   return (
     <main className="min-h-screen p-4 bg-white dark:bg-gray-900 text-black dark:text-white relative">
+      {/* MQTT Status */}
       <div className="absolute top-2 right-4">
         <div
           className={`w-3 h-3 rounded-full ${client.connected ? 'bg-green-500' : 'bg-red-500'}`}
