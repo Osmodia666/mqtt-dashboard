@@ -8,9 +8,12 @@ const client = mqtt.connect(mqttConfig.host, {
   password: mqttConfig.password,
 })
 
+type MinMax = Record<string, { min: number; max: number }>
+
 function App() {
   const [values, setValues] = useState<Record<string, string>>({})
   const [lastUpdate, setLastUpdate] = useState<string>('')
+  const [minMax, setMinMax] = useState<MinMax>({})
   const messageQueue = useRef<Record<string, string>>({})
 
   useEffect(() => {
@@ -18,7 +21,24 @@ function App() {
       const updates = { ...messageQueue.current }
       messageQueue.current = {}
       if (Object.keys(updates).length > 0) {
-        setValues((prev) => ({ ...prev, ...updates }))
+        setValues(prev => {
+          const updated = { ...prev, ...updates }
+
+          const newMinMax: MinMax = { ...minMax }
+          for (const [key, val] of Object.entries(updates)) {
+            const num = parseFloat(val)
+            if (!isNaN(num)) {
+              const existing = newMinMax[key] ?? { min: num, max: num }
+              newMinMax[key] = {
+                min: Math.min(existing.min, num),
+                max: Math.max(existing.max, num),
+              }
+            }
+          }
+
+          setMinMax(newMinMax)
+          return updated
+        })
         setLastUpdate(new Date().toLocaleTimeString())
       }
     }
@@ -38,13 +58,6 @@ function App() {
 
     client.on('message', (topic, message) => {
       const payload = message.toString()
-
-      // 🔎 Sonderbehandlung für einfache Werte
-      if (topic === 'Gaszaehler/stand' || topic === 'Pool_temp/temperatur') {
-        messageQueue.current[topic] = payload
-        return
-      }
-
       try {
         const json = JSON.parse(payload)
         const flatten = (obj: any, prefix = ''): Record<string, string> =>
@@ -69,32 +82,26 @@ function App() {
     })
 
     return () => clearInterval(interval)
-  }, [])
+  }, [minMax])
 
   const toggleBoolean = (publishTopic: string, current: string) => {
     const next = current?.toUpperCase() === 'ON' ? 'OFF' : 'ON'
     client.publish(publishTopic, next)
   }
 
-  const renderBar = (val: string, max: number = 100) => {
-    const num = parseFloat(val)
-    const pct = Math.min(100, (num / max) * 100)
-    return (
-      <div className="w-full h-2 bg-gray-300 rounded">
-        <div className="h-2 bg-blue-500 rounded" style={{ width: `${pct}%` }} />
-      </div>
-    )
-  }
+  const progressBar = (value: number, max = 100, color = 'bg-blue-500') => (
+    <div className="w-full bg-gray-300 rounded-full h-2.5 mt-2">
+      <div
+        className={`${color} h-2.5 rounded-full transition-all`}
+        style={{ width: `${Math.min(100, (value / max) * 100)}%` }}
+      />
+    </div>
+  )
 
   return (
-    <main className="min-h-screen p-4 bg-white dark:bg-gray-900 text-black dark:text-white relative">
-      {/* MQTT Status */}
-      <div className="absolute top-2 right-4">
-        <div
-          className={`w-3 h-3 rounded-full ${client.connected ? 'bg-green-500' : 'bg-red-500'}`}
-          title={client.connected ? 'MQTT verbunden' : 'MQTT getrennt'}
-        />
-      </div>
+    <main className="min-h-screen p-4 bg-white dark:bg-gray-900 text-black dark:text-white transition-colors duration-300">
+      {/* Verbindungsanzeige */}
+      <div className="fixed top-2 right-2 w-3 h-3 rounded-full" title={client.connected ? 'MQTT verbunden' : 'Getrennt'} style={{ background: client.connected ? 'green' : 'red' }} />
 
       <header className="mb-4 text-sm text-gray-500 dark:text-gray-400">
         Letztes Update: {lastUpdate || 'Lade...'}
@@ -104,36 +111,40 @@ function App() {
         {topics.map(({ label, type, unit, favorite, statusTopic, publishTopic, topic }) => {
           const key = statusTopic ?? topic
           const raw = values[key]
-          const val = raw?.toUpperCase()
+          const value = raw?.toUpperCase()
+          const num = parseFloat(raw)
+          const isNumber = type === 'number' && !isNaN(num)
+          const range = minMax[key] ?? { min: num, max: num }
 
-          const highlightClass =
-            label.includes('Verbrauch aktuell') ? 'bg-yellow-100 dark:bg-yellow-900' :
-            label.includes('Balkonkraftwerk') ? 'bg-green-100 dark:bg-green-900' :
-            'bg-gray-100 dark:bg-gray-800'
+          let bgColor = ''
+          if (label.includes('Verbrauch')) bgColor = 'bg-yellow-100 dark:bg-yellow-900'
+          if (label.includes('Balkonkraftwerk')) bgColor = 'bg-green-100 dark:bg-green-900'
 
           return (
-            <div key={key} className={`${highlightClass} rounded-2xl shadow p-4 border-2 ${favorite ? 'border-yellow-400' : 'border-transparent'}`}>
+            <div key={key} className={`rounded-2xl shadow p-4 border-2 ${bgColor} ${favorite ? 'border-yellow-400' : 'border-transparent'}`}>
               <h2 className="text-xl font-semibold mb-2">{label}</h2>
 
               {type === 'boolean' && (
                 <button
-                  className={`px-4 py-2 rounded-xl text-white ${val === 'ON' ? 'bg-green-500' : 'bg-red-500'}`}
-                  onClick={() => toggleBoolean(publishTopic ?? key, val)}
+                  className={`px-4 py-2 rounded-xl text-white ${value === 'ON' ? 'bg-green-500' : 'bg-red-500'}`}
+                  onClick={() => toggleBoolean(publishTopic ?? key, value)}
                 >
-                  {val === 'ON' ? 'AN' : 'AUS'}
+                  {value === 'ON' ? 'AN' : 'AUS'}
                 </button>
               )}
 
-              {type === 'number' && (
+              {isNumber && (
                 <>
                   <p className="text-3xl">{raw ?? '...'} {unit}</p>
-                  {unit === '°C' && raw && renderBar(raw, 40)}
-                  {unit === 'W' && raw && renderBar(raw, 3000)}
+                  {progressBar(num, range.max > 0 ? range.max : 100)}
+                  <div className="text-xs mt-1 text-gray-500 dark:text-gray-400">
+                    Min: {range.min?.toFixed(1)} {unit} | Max: {range.max?.toFixed(1)} {unit}
+                  </div>
                 </>
               )}
 
               {type === 'string' && (
-                <p className="text-xl">{raw ?? '...'}</p>
+                <p className="text-xl">{value ?? '...'}</p>
               )}
             </div>
           )
