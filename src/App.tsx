@@ -28,12 +28,9 @@ function App() {
 
     client.on('connect', () => {
       console.log('✅ MQTT verbunden!')
-      const allTopics = topics
-        .map(t => ('statusTopic' in t ? t.statusTopic : t.topic))
-        .filter(Boolean)
-      client.subscribe(allTopics, (err) => {
+      client.subscribe('#', err => {
         if (err) console.error('❌ Subscribe error:', err)
-        else console.log('📡 Subscribed to topics:', allTopics)
+        else console.log('📡 Subscribed to all topics')
       })
     })
 
