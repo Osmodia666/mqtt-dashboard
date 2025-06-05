@@ -139,6 +139,11 @@ export const topics = [
     type: 'number',
     unit: 'W',
     statusTopic: 'Balkonkraftwerk/ENERGY_Power_0',
-    favorite: true,
+  },
+  {
+   label: 'Raspberry Pi Temperatur:',
+    type: 'number',
+    unit: '°C',
+    statusTopic: 'rpi2.0.temperature.soc_temp',
   },
 ]
