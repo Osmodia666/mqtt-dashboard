@@ -22,6 +22,7 @@ function App() {
         setLastUpdate(new Date().toLocaleTimeString())
       }
     }
+
     const interval = setInterval(flush, 300)
 
     client.on('connect', () => {
@@ -38,7 +39,6 @@ function App() {
 
     client.on('message', (topic, message) => {
       const payload = message.toString()
-
       try {
         const json = JSON.parse(payload)
         const flatten = (obj: any, prefix = ''): Record<string, string> =>
@@ -77,7 +77,14 @@ function App() {
   }
 
   return (
-    <main className="min-h-screen p-4 bg-white dark:bg-gray-900 text-black dark:text-white transition-colors duration-300">
+    <main className="min-h-screen p-4 bg-white dark:bg-gray-900 text-black dark:text-white transition-colors duration-300 relative">
+      <div className="absolute top-2 right-4">
+        <div
+          className={`w-3 h-3 rounded-full ${client.connected ? 'bg-green-500' : 'bg-red-500'}`}
+          title={client.connected ? 'MQTT verbunden' : 'MQTT getrennt'}
+        />
+      </div>
+
       <header className="mb-4 text-sm text-gray-500 dark:text-gray-400">
         Letztes Update: {lastUpdate || 'Lade...'}
       </header>
@@ -99,9 +106,11 @@ function App() {
                   {value === 'ON' ? 'AN' : 'AUS'}
                 </button>
               )}
+
               {type === 'number' && (
                 <p className="text-3xl">{values[key] ?? '...'} {unit}</p>
               )}
+
               {type === 'string' && (
                 <p className="text-xl">{values[key] ?? '...'}</p>
               )}
