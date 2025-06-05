@@ -75,7 +75,7 @@ export const topics = [
     statusTopic: 'tele/Stromzähler/SENSOR.grid.Eingespeist_gesamt',
   },  
   {
-    label: 'Gaszähler Stand',
+    label: 'Gaszähler Stand:',
     type: 'number',
     unit: 'm³',
     statusTopic: 'Gaszaehler/stand',
@@ -139,11 +139,5 @@ export const topics = [
     type: 'number',
     unit: 'W',
     statusTopic: 'Balkonkraftwerk/ENERGY_Power_0',
-  },
-  {
-   label: 'Raspberry Pi Temperatur:',
-    type: 'number',
-    unit: '°C',
-    statusTopic: 'rpi2.0.temperature.soc_temp',
   },
 ]
