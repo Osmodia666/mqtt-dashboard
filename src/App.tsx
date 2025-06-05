@@ -40,13 +40,12 @@ function App() {
     client.on('reconnect', () => console.log('🔁 Reconnecting...'))
     client.on('error', err => console.error('❌ MQTT Fehler!:', err))
 
-    client.on('message', (topic, message) => {
+client.on('message', (topic, message) => {
   const payload = message.toString()
 
   try {
     const json = JSON.parse(payload)
 
-    // JSON flach machen
     const flatten = (obj: any, prefix = ''): Record<string, string> =>
       Object.entries(obj).reduce((acc, [key, val]) => {
         const newKey = prefix ? `${prefix}.${key}` : key
@@ -59,11 +58,18 @@ function App() {
       }, {})
 
     const flat = flatten(json)
-
     for (const [key, val] of Object.entries(flat)) {
       const combinedKey = `${topic}.${key}`
       messageQueue.current[combinedKey] = val
     }
+
+    console.log('📨 JSON:', topic, flat)
+  } catch (e) {
+    messageQueue.current[topic] = payload
+    console.log('📨 Text:', topic, payload)
+  }
+})
+
 
     console.log('📨 JSON:', topic, flat)
   } catch {
