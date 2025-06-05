@@ -17,6 +17,7 @@ function App() {
     const flush = () => {
       const updates = { ...messageQueue.current }
       messageQueue.current = {}
+
       if (Object.keys(updates).length > 0) {
         console.log('🧠 flush', updates)
         setValues((prev) => ({ ...prev, ...updates }))
@@ -32,52 +33,29 @@ function App() {
         .map(t => ('statusTopic' in t ? t.statusTopic : t.topic))
         .filter(Boolean)
       client.subscribe(allTopics, (err) => {
-        if (err) console.error('❌ Subscribe error!:', err)
+        if (err) console.error('❌ Subscribe error:', err)
         else console.log('📡 Subscribed to topics:', allTopics)
       })
     })
 
     client.on('reconnect', () => console.log('🔁 Reconnecting...'))
-    client.on('error', err => console.error('❌ MQTT Fehler!:', err))
+    client.on('error', err => console.error('❌ MQTT Fehler:', err))
 
-client.on('message', (topic, message) => {
-  const payload = message.toString()
+    client.on('message', (topic, message) => {
+      const payload = message.toString()
 
-  try {
-    const json = JSON.parse(payload)
-
-    const flatten = (obj: any, prefix = ''): Record<string, string> =>
-      Object.entries(obj).reduce((acc, [key, val]) => {
-        const newKey = prefix ? `${prefix}.${key}` : key
-        if (typeof val === 'object' && val !== null) {
-          Object.assign(acc, flatten(val, newKey))
-        } else {
-          acc[newKey] = String(val)
-        }
-        return acc
-      }, {})
-
-    const flat = flatten(json)
-    for (const [key, val] of Object.entries(flat)) {
-      const combinedKey = `${topic}.${key}`
-      messageQueue.current[combinedKey] = val
-    }
-
-    console.log('📨 JSON:', topic, flat)
-  } catch (e) {
-    messageQueue.current[topic] = payload
-    console.log('📨 Text:', topic, payload)
-  }
-})
-
-
-    console.log('📨 JSON:', topic, flat)
-  } catch {
-    messageQueue.current[topic] = payload
-    console.log('📨 Text:', topic, payload)
-  }
-})
-
+      try {
+        const json = JSON.parse(payload)
+        const flatten = (obj: any, prefix = ''): Record<string, string> =>
+          Object.entries(obj).reduce((acc, [key, val]) => {
+            const newKey = prefix ? `${prefix}.${key}` : key
+            if (typeof val === 'object' && val !== null) {
+              Object.assign(acc, flatten(val, newKey))
+            } else {
+              acc[newKey] = String(val)
+            }
+            return acc
+          }, {})
 
         const flat = flatten(json)
         for (const [key, val] of Object.entries(flat)) {
