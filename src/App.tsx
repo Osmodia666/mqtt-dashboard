@@ -28,9 +28,10 @@ function App() {
 
     client.on('connect', () => {
       console.log('✅ MQTT verbunden!')
-      client.subscribe('#', err => {
+      const allTopics = topics.map(t => t.statusTopic ?? t.topic).filter(Boolean)
+      client.subscribe(allTopics, err => {
         if (err) console.error('❌ Subscribe error:', err)
-        else console.log('📡 Subscribed to all topics')
+        else console.log('📡 Subscribed to topics:', allTopics)
       })
     })
 
@@ -39,7 +40,6 @@ function App() {
 
     client.on('message', (topic, message) => {
       const payload = message.toString()
-
       try {
         const json = JSON.parse(payload)
         const flatten = (obj: any, prefix = ''): Record<string, string> =>
@@ -79,6 +79,13 @@ function App() {
 
   return (
     <main className="min-h-screen p-4 bg-white dark:bg-gray-900 text-black dark:text-white transition-colors duration-300">
+      <div className="absolute top-2 right-4">
+        <div
+          className={`w-3 h-3 rounded-full ${client.connected ? 'bg-green-500' : 'bg-red-500'}`}
+          title={client.connected ? 'MQTT verbunden' : 'MQTT getrennt'}
+        />
+      </div>
+
       <header className="mb-4 text-sm text-gray-500 dark:text-gray-400">
         Letztes Update: {lastUpdate || 'Lade...'}
       </header>
@@ -111,6 +118,17 @@ function App() {
             </div>
           )
         })}
+      </div>
+
+      <div className="mt-8">
+        <h3 className="text-lg font-bold mb-2">🔎 Letzte MQTT-Werte</h3>
+        <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-xl text-sm max-h-64 overflow-y-auto">
+          {Object.entries(values).slice(-10).reverse().map(([topic, value]) => (
+            <div key={topic}>
+              <span className="font-mono text-blue-600 dark:text-blue-400">{topic}</span>: <span className="font-mono">{value}</span>
+            </div>
+          ))}
+        </div>
       </div>
     </main>
   )
