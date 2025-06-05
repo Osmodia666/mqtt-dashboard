@@ -1,3 +1,4 @@
+// src/config.ts
 export const mqttConfig = {
   host: 'wss://cyberdyne.chickenkiller.com:8884',
   username: 'christopher',
@@ -12,13 +13,6 @@ export const topics = [
     publishTopic: 'cmnd/Ender_3_Pro/POWER',
     favorite: true,
   },
-   {
-    label: 'Ender 3 Pro',
-    type: 'boolean',
-    statusTopic: 'stat/Ender_3_Pro/POWER1',
-    publishTopic: 'cmnd/Ender_3_Pro/POWER',
-    favorite: true,
-   },
   {
     label: 'Steckdose 2',
     type: 'boolean',
@@ -50,15 +44,16 @@ export const topics = [
     statusTopic: 'tele/Stromzähler/SENSOR.grid.Strom_L1',
   },
   {
-    label: 'Leistung L1', 
-    type: 'number', 
-    unit: 'W', 
+    label: 'Leistung L1',
+    type: 'number',
+    unit: 'W',
     statusTopic: 'tele/Stromzähler/SENSOR.grid.power_L1',
-    },
+  },
   {
     label: 'Balkonkraftwerk Power',
     type: 'number',
     unit: 'W',
     statusTopic: 'Balkonkraftwerk/ENERGY_Power_0',
-  }
+    favorite: true,
+  },
 ]
