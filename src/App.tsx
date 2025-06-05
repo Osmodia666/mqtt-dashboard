@@ -12,6 +12,7 @@ function App() {
   const [values, setValues] = useState<Record<string, string>>({})
   const [lastUpdate, setLastUpdate] = useState<string>('')
   const messageQueue = useRef<Record<string, string>>({})
+  const [connected, setConnected] = useState<boolean>(false)
 
   useEffect(() => {
     const flush = () => {
@@ -27,6 +28,7 @@ function App() {
     const interval = setInterval(flush, 300)
 
     client.on('connect', () => {
+      setConnected(true)
       console.log('✅ MQTT verbunden!')
       client.subscribe('#', err => {
         if (err) console.error('❌ Subscribe error:', err)
@@ -34,17 +36,19 @@ function App() {
       })
     })
 
-    client.on('reconnect', () => console.log('🔁 Reconnecting...'))
+    client.on('reconnect', () => {
+      console.log('🔁 Reconnecting...')
+    })
+
+    client.on('close', () => {
+      setConnected(false)
+      console.log('🔌 Verbindung getrennt')
+    })
+
     client.on('error', err => console.error('❌ MQTT Fehler:', err))
 
     client.on('message', (topic, message) => {
       const payload = message.toString()
-
-      if (topic === 'Pool_temp/temperatur' || topic === 'Gaszaehler/stand') {
-        messageQueue.current[topic] = payload
-        console.log('📨 Direkt:', topic, payload)
-        return
-      }
 
       try {
         const json = JSON.parse(payload)
@@ -84,7 +88,15 @@ function App() {
   }
 
   return (
-    <main className="min-h-screen p-4 bg-white dark:bg-gray-900 text-black dark:text-white transition-colors duration-300">
+    <main className="min-h-screen p-4 bg-white dark:bg-gray-900 text-black dark:text-white transition-colors duration-300 relative">
+      {/* Verbindungsstatus LED */}
+      <div className="absolute top-2 right-4">
+        <div
+          className={`w-3 h-3 rounded-full ${connected ? 'bg-green-500' : 'bg-red-500'}`}
+          title={connected ? 'MQTT verbunden' : 'MQTT getrennt'}
+        />
+      </div>
+
       <header className="mb-4 text-sm text-gray-500 dark:text-gray-400">
         Letztes Update: {lastUpdate || 'Lade...'}
       </header>
