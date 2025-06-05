@@ -18,7 +18,6 @@ function App() {
       const updates = { ...messageQueue.current }
       messageQueue.current = {}
       if (Object.keys(updates).length > 0) {
-        console.log('🧠 flush', updates)
         setValues((prev) => ({ ...prev, ...updates }))
         setLastUpdate(new Date().toLocaleTimeString())
       }
@@ -39,7 +38,6 @@ function App() {
 
     client.on('message', (topic, message) => {
       const payload = message.toString()
-
       try {
         const json = JSON.parse(payload)
         const flatten = (obj: any, prefix = ''): Record<string, string> =>
@@ -52,17 +50,13 @@ function App() {
             }
             return acc
           }, {})
-
         const flat = flatten(json)
         for (const [key, val] of Object.entries(flat)) {
           const combinedKey = `${topic}.${key}`
           messageQueue.current[combinedKey] = val
         }
-
-        console.log('📨 JSON:', topic, flat)
       } catch {
         messageQueue.current[topic] = payload
-        console.log('📨 Text:', topic, payload)
       }
     })
 
@@ -71,15 +65,21 @@ function App() {
 
   const toggleBoolean = (publishTopic: string, current: string) => {
     const next = current?.toUpperCase() === 'ON' ? 'OFF' : 'ON'
-    console.log('⚡ publish', publishTopic, '→', next)
-    client.publish(publishTopic, next, err => {
-      if (err) console.error('❌ Publish-Fehler:', err)
-    })
+    client.publish(publishTopic, next)
+  }
+
+  const renderBar = (val: string, max: number = 100) => {
+    const num = parseFloat(val)
+    const pct = Math.min(100, (num / max) * 100)
+    return (
+      <div className="w-full h-2 bg-gray-300 rounded">
+        <div className="h-2 bg-blue-500 rounded" style={{ width: `${pct}%` }} />
+      </div>
+    )
   }
 
   return (
-    <main className="min-h-screen p-4 bg-white dark:bg-gray-900 text-black dark:text-white transition-colors duration-300 relative">
-      {/* 🔴🟢 Verbindungs-LED */}
+    <main className="min-h-screen p-4 bg-white dark:bg-gray-900 text-black dark:text-white relative">
       <div className="absolute top-2 right-4">
         <div
           className={`w-3 h-3 rounded-full ${client.connected ? 'bg-green-500' : 'bg-red-500'}`}
@@ -94,37 +94,37 @@ function App() {
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {topics.map(({ label, type, unit, favorite, statusTopic, publishTopic, topic }) => {
           const key = statusTopic ?? topic
-          const value = values[key]?.toUpperCase()
+          const raw = values[key]
+          const val = raw?.toUpperCase()
 
-          const bgHighlight =
+          const highlightClass =
             label.includes('Verbrauch aktuell') ? 'bg-yellow-100 dark:bg-yellow-900' :
             label.includes('Balkonkraftwerk') ? 'bg-green-100 dark:bg-green-900' :
             'bg-gray-100 dark:bg-gray-800'
 
           return (
-            <div
-              key={key}
-              className={`${bgHighlight} rounded-2xl shadow p-4 border-2 ${
-                favorite ? 'border-yellow-400' : 'border-transparent'
-              }`}
-            >
+            <div key={key} className={`${highlightClass} rounded-2xl shadow p-4 border-2 ${favorite ? 'border-yellow-400' : 'border-transparent'}`}>
               <h2 className="text-xl font-semibold mb-2">{label}</h2>
 
               {type === 'boolean' && (
                 <button
-                  className={`px-4 py-2 rounded-xl text-white ${value === 'ON' ? 'bg-green-500' : 'bg-red-500'}`}
-                  onClick={() => toggleBoolean(publishTopic ?? key, value)}
+                  className={`px-4 py-2 rounded-xl text-white ${val === 'ON' ? 'bg-green-500' : 'bg-red-500'}`}
+                  onClick={() => toggleBoolean(publishTopic ?? key, val)}
                 >
-                  {value === 'ON' ? 'AN' : 'AUS'}
+                  {val === 'ON' ? 'AN' : 'AUS'}
                 </button>
               )}
 
               {type === 'number' && (
-                <p className="text-3xl">{values[key] ?? '...'} {unit}</p>
+                <>
+                  <p className="text-3xl">{raw ?? '...'} {unit}</p>
+                  {unit === '°C' && raw && renderBar(raw, 40)}
+                  {unit === 'W' && raw && renderBar(raw, 3000)}
+                </>
               )}
 
               {type === 'string' && (
-                <p className="text-xl">{values[key] ?? '...'}</p>
+                <p className="text-xl">{raw ?? '...'}</p>
               )}
             </div>
           )
