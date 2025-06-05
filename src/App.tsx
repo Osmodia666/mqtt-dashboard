@@ -20,36 +20,52 @@ function App() {
       if (Object.keys(updates).length > 0) {
         setValues((prev) => ({ ...prev, ...updates }))
         setLastUpdate(new Date().toLocaleTimeString())
-        console.log('🧠 flush', updates)
       }
     }
-
     const interval = setInterval(flush, 300)
 
     client.on('connect', () => {
       console.log('✅ MQTT verbunden')
-      const allTopics = topics
-        .map(t => ('statusTopic' in t ? t.statusTopic : t.topic))
-        .filter(Boolean)
+      const allTopics = topics.map(t => t.statusTopic ?? t.topic).filter(Boolean)
       client.subscribe(allTopics, (err) => {
         if (err) console.error('❌ Subscribe error:', err)
-        else console.log('📡 Subscribed to topics:', allTopics)
+        else console.log('📡 Subscribed to:', allTopics)
       })
     })
 
-    client.on('reconnect', () => console.log('🔁 Reconnecting...'))
     client.on('error', err => console.error('❌ MQTT Fehler:', err))
+    client.on('reconnect', () => console.log('🔁 Reconnecting...'))
 
     client.on('message', (topic, message) => {
       const payload = message.toString()
-      messageQueue.current[topic] = payload
-      console.log('📨 Message:', topic, payload)
+
+      try {
+        const json = JSON.parse(payload)
+        const flatten = (obj: any, prefix = ''): Record<string, string> =>
+          Object.entries(obj).reduce((acc, [k, v]) => {
+            const key = prefix ? `${prefix}.${k}` : k
+            if (v && typeof v === 'object') {
+              Object.assign(acc, flatten(v, key))
+            } else {
+              acc[key] = String(v)
+            }
+            return acc
+          }, {})
+
+        const flat = flatten(json)
+        for (const [k, v] of Object.entries(flat)) {
+          const combined = `${topic}.${k}`
+          messageQueue.current[combined] = v
+        }
+
+        console.log('📨 JSON:', topic, flat)
+      } catch {
+        messageQueue.current[topic] = payload
+        console.log('📨 Text:', topic, payload)
+      }
     })
 
-    return () => {
-      clearInterval(interval)
-      client.end()
-    }
+    return () => clearInterval(interval)
   }, [])
 
   const toggleBoolean = (publishTopic: string, current: string) => {
@@ -62,13 +78,6 @@ function App() {
 
   return (
     <main className="min-h-screen p-4 bg-white dark:bg-gray-900 text-black dark:text-white transition-colors duration-300">
-      <div className="absolute top-2 right-4">
-        <div
-          className={`w-3 h-3 rounded-full ${client.connected ? 'bg-green-500' : 'bg-red-500'}`}
-          title={client.connected ? 'MQTT verbunden' : 'MQTT getrennt'}
-        />
-      </div>
-
       <header className="mb-4 text-sm text-gray-500 dark:text-gray-400">
         Letztes Update: {lastUpdate || 'Lade...'}
       </header>
@@ -90,11 +99,9 @@ function App() {
                   {value === 'ON' ? 'AN' : 'AUS'}
                 </button>
               )}
-
               {type === 'number' && (
                 <p className="text-3xl">{values[key] ?? '...'} {unit}</p>
               )}
-
               {type === 'string' && (
                 <p className="text-xl">{values[key] ?? '...'}</p>
               )}
