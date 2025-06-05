@@ -121,12 +121,19 @@ function App() {
           if (label.includes('Balkonkraftwerk')) bgColor = 'bg-green-100 dark:bg-green-900'
 
           return (
-            <div key={key} className={`rounded-2xl shadow p-4 border-2 ${bgColor} ${favorite ? 'border-yellow-400' : 'border-transparent'}`}>
+            <div
+              key={key}
+              className={`rounded-2xl shadow p-4 border-2 ${bgColor} ${
+                favorite ? 'border-yellow-400' : 'border-gray-700'
+              }`}
+            >
               <h2 className="text-xl font-semibold mb-2">{label}</h2>
 
               {type === 'boolean' && (
                 <button
-                  className={`px-4 py-2 rounded-xl text-white ${value === 'ON' ? 'bg-green-500' : 'bg-red-500'}`}
+                  className={`px-4 py-2 rounded-xl text-white ${
+                    value === 'ON' ? 'bg-green-500' : 'bg-red-500'
+                  }`}
                   onClick={() => toggleBoolean(publishTopic ?? key, value)}
                 >
                   {value === 'ON' ? 'AN' : 'AUS'}
