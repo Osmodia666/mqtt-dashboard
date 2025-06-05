@@ -59,7 +59,7 @@ export const topics = [
   {
     label: 'Pool Temperatur:',
     type: 'number',
-    unit: 'C',
+    unit: '°C',
     statusTopic: 'Pool_temp/temperatur',
   },
    {
