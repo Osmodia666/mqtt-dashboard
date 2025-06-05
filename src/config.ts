@@ -57,7 +57,7 @@ export const topics = [
     publishTopic: 'cmnd/Poolpumpe/POWER',
   },
   {
-    label: 'Pooltemperatur:',
+    label: 'Pool Temperatur:',
     type: 'number',
     unit: 'C',
     statusTopic: 'Pool_temp/temperatur',
