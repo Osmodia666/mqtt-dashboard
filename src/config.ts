@@ -13,6 +13,19 @@ export const topics = [
     publishTopic: 'cmnd/Ender_3_Pro/POWER',
     favorite: true,
   },
+    {
+    label: 'Sidewinder X1',
+    type: 'boolean',
+    statusTopic: 'stat/Sidewinde_X1/POWER1',
+    publishTopic: 'cmnd/Sidewinder_X1/POWER',
+    favorite: true,
+  },
+    {
+    label: 'Steckdose 1',
+    type: 'boolean',
+    statusTopic: 'stat/Steckdose_1/POWER',
+    publishTopic: 'cmnd/Steckdose_1/POWER',
+  },
   {
     label: 'Steckdose 2',
     type: 'boolean',
@@ -24,6 +37,12 @@ export const topics = [
     type: 'boolean',
     statusTopic: 'stat/Teichpumpe/POWER',
     publishTopic: 'cmnd/Teichpumpe/POWER',
+  },
+    {
+    label: 'Poolpumpe',
+    type: 'boolean',
+    statusTopic: 'stat/Poolpumpe/POWER',
+    publishTopic: 'cmnd/Poolpumpe/POWER',
   },
   {
     label: 'Gaszähler Stand',
@@ -37,19 +56,55 @@ export const topics = [
     unit: 'V',
     statusTopic: 'tele/Stromzähler/SENSOR.grid.Spannung_L1',
   },
-  {
+   {
     label: 'Strom L1',
     type: 'number',
     unit: 'A',
     statusTopic: 'tele/Stromzähler/SENSOR.grid.Strom_L1',
   },
-  {
+    {
     label: 'Leistung L1',
     type: 'number',
     unit: 'W',
     statusTopic: 'tele/Stromzähler/SENSOR.grid.power_L1',
   },
   {
+    label: 'Spannung L2',
+    type: 'number',
+    unit: 'V',
+    statusTopic: 'tele/Stromzähler/SENSOR.grid.Spannung_L2',
+  },
+   {
+    label: 'Strom L2',
+    type: 'number',
+    unit: 'A',
+    statusTopic: 'tele/Stromzähler/SENSOR.grid.Strom_L2',
+  },
+    {
+    label: 'Leistung L2',
+    type: 'number',
+    unit: 'W',
+    statusTopic: 'tele/Stromzähler/SENSOR.grid.power_L2',
+  },
+  {
+    label: 'Spannung L3',
+    type: 'number',
+    unit: 'V',
+    statusTopic: 'tele/Stromzähler/SENSOR.grid.Spannung_L3',
+  },
+   {
+    label: 'Strom L3',
+    type: 'number',
+    unit: 'A',
+    statusTopic: 'tele/Stromzähler/SENSOR.grid.Strom_L3',
+  },
+    {
+    label: 'Leistung L3',
+    type: 'number',
+    unit: 'W',
+    statusTopic: 'tele/Stromzähler/SENSOR.grid.power_L3',
+  },
+   {
     label: 'Balkonkraftwerk Power',
     type: 'number',
     unit: 'W',
