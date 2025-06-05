@@ -17,7 +17,6 @@ function App() {
     const flush = () => {
       const updates = { ...messageQueue.current }
       messageQueue.current = {}
-
       if (Object.keys(updates).length > 0) {
         console.log('🧠 flush', updates)
         setValues((prev) => ({ ...prev, ...updates }))
