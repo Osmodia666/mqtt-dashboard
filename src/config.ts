@@ -45,6 +45,24 @@ export const topics = [
     publishTopic: 'cmnd/Poolpumpe/POWER',
   },
   {
+    label: 'Pooltemperatur:',
+    type: 'number',
+    unit: 'C',
+    statusTopic: 'Pool_temp.temperatur',
+  },
+   {
+    label: 'Verbrauch aktuell:',
+    type: 'number',
+    unit: 'W',
+    statusTopic: 'tele/Stromzähler/SENSOR.grid.Verbrauch_aktuell',
+  },
+ {
+    label: 'Eingespeist aktuell:',
+    type: 'number',
+    unit: 'kWh',
+    statusTopic: 'tele/Stromzähler/SENSOR.grid.Eingespeist_gesamt',
+  },  
+  {
     label: 'Gaszähler Stand',
     type: 'number',
     unit: 'm³',
