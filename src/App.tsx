@@ -96,6 +96,15 @@ function App() {
     client.publish(publishTopic, next)
   }
 
+  const getBarColor = (label: string, value: number) => {
+    if (label.includes('Verbrauch aktuell')) {
+      if (value >= 2000) return 'bg-red-600'
+      if (value >= 500) return 'bg-yellow-400'
+      return 'bg-green-500'
+    }
+    return 'bg-blue-500'
+  }
+
   const progressBar = (value: number, max = 100, color = 'bg-blue-500') => (
     <div className="w-full bg-gray-300 rounded-full h-2 mt-2 overflow-hidden">
       <div
@@ -125,6 +134,8 @@ function App() {
           if (label.includes('Balkonkraftwerk')) bgColor = 'bg-green-100 dark:bg-green-900'
           else if (label.includes('Verbrauch aktuell')) bgColor = 'bg-yellow-100 dark:bg-yellow-900'
 
+          const barColor = getBarColor(label, num)
+
           return (
             <div key={key} className={`rounded-2xl shadow p-4 border-2 ${bgColor} ${favorite ? 'border-yellow-400' : 'border-gray-500'}`}>
               <h2 className="text-xl font-semibold mb-2">{label}</h2>
@@ -141,7 +152,7 @@ function App() {
               {isNumber && (
                 <>
                   <p className="text-3xl">{raw ?? '...'} {unit}</p>
-                  {progressBar(num, range.max > 0 ? range.max : 100, 'bg-blue-600')}
+                  {progressBar(num, range.max > 0 ? range.max : 100, barColor)}
                   {showMinMax && (
                     <div className="text-xs mt-1 text-gray-500 dark:text-gray-400">
                       Min: {range.min.toFixed(1)} {unit} | Max: {range.max.toFixed(1)} {unit}
