@@ -16,7 +16,7 @@ export const topics = [
     {
     label: 'Sidewinder X1',
     type: 'boolean',
-    statusTopic: 'stat/Sidewinde_X1/POWER1',
+    statusTopic: 'stat/Sidewinder_X1/POWER1',
     publishTopic: 'cmnd/Sidewinder_X1/POWER',
     favorite: true,
   },
