@@ -68,6 +68,13 @@ export const topics = [
     unit: 'W',
     statusTopic: 'tele/Stromzähler/SENSOR.grid.Verbrauch_aktuell',
   },
+  
+   {
+    label: 'Balkonkraftwerk Power',
+    type: 'number',
+    unit: 'W',
+    statusTopic: 'homeassistant.sensor.BalkonkraftwerkPower0',
+  },
  {
     label: 'Eingespeist aktuell:',
     type: 'number',
@@ -133,11 +140,5 @@ export const topics = [
     type: 'number',
     unit: 'W',
     statusTopic: 'tele/Stromzähler/SENSOR.grid.power_L3',
-  },
-   {
-    label: 'Balkonkraftwerk Power',
-    type: 'number',
-    unit: 'W',
-    statusTopic: 'Balkonkraftwerk/ENERGY_Power_0',
   },
 ]
