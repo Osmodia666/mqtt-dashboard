@@ -9,14 +9,14 @@ export const topics = [
   {
     label: 'Ender 3 Pro',
     type: 'boolean',
-    statusTopic: 'stat/Ender_3_Pro/POWER',
+    statusTopic: 'stat/Ender_3_Pro/POWER1',
     publishTopic: 'cmnd/Ender_3_Pro/POWER1',
     favorite: true,
   },
     {
     label: 'Sidewinder X1',
     type: 'boolean',
-    statusTopic: 'stat/Sidewinder_X1/POWER',
+    statusTopic: 'stat/Sidewinder_X1/POWER1',
     publishTopic: 'cmnd/Sidewinder_X1/POWER1',
     favorite: true,
   },
