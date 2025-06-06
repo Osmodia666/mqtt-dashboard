@@ -84,13 +84,21 @@ function App() {
             return acc
           }, {})
 
-        const flat = flatten(json)
-        for (const [key, val] of Object.entries(flat)) {
-          messageQueue.current[`${topic}.${key}`] = val
-        }
-      } catch {
-        messageQueue.current[topic] = payload
-      }
+       const flat = flatten(json)
+if (topic.includes('/RESULT')) {
+  for (const [key, val] of Object.entries(flat)) {
+    if (key.startsWith('POWER')) {
+      const inferredStatusTopic = topic.replace('/RESULT', `/${key}`)
+      messageQueue.current[inferredStatusTopic] = String(val)
+    }
+  }
+} else {
+  for (const [key, val] of Object.entries(flat)) {
+    const combinedKey = `${topic}.${key}`
+    messageQueue.current[combinedKey] = val
+  }
+}
+
     })
 
     return () => clearInterval(interval)
