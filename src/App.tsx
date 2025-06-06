@@ -28,7 +28,7 @@ function App() {
 
           for (const [key, val] of Object.entries(updates)) {
             const num = parseFloat(val)
-            if (!isNaN(num)) {
+            if (!isNaN(num) && !key.includes('Gaszaehler') && !key.includes('Eingespeist')) {
               const current = nextMinMax[key] ?? { min: num, max: num }
               nextMinMax[key] = {
                 min: Math.min(current.min, num),
@@ -117,6 +117,7 @@ function App() {
           const raw = values[key]
           const value = raw?.toUpperCase()
           const num = parseFloat(raw)
+          const showMinMax = !key.includes('Gaszaehler') && !key.includes('Eingespeist')
           const range = minMax[key] ?? { min: num, max: num }
           const isNumber = type === 'number' && !isNaN(num)
 
@@ -141,9 +142,11 @@ function App() {
                 <>
                   <p className="text-3xl">{raw ?? '...'} {unit}</p>
                   {progressBar(num, range.max > 0 ? range.max : 100, 'bg-blue-600')}
-                  <div className="text-xs mt-1 text-gray-500 dark:text-gray-400">
-                    Min: {range.min.toFixed(1)} {unit} | Max: {range.max.toFixed(1)} {unit}
-                  </div>
+                  {showMinMax && (
+                    <div className="text-xs mt-1 text-gray-500 dark:text-gray-400">
+                      Min: {range.min.toFixed(1)} {unit} | Max: {range.max.toFixed(1)} {unit}
+                    </div>
+                  )}
                 </>
               )}
 
