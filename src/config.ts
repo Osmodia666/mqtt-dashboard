@@ -70,10 +70,10 @@ export const topics = [
   },
   
    {
-    label: 'Balkonkraftwerk Power',
+    label: 'Balkonkraftwerk Erzeugung:',
     type: 'number',
     unit: 'W',
-    statusTopic: 'homeassistant.sensor.BalkonkraftwerkPower0',
+    statusTopic: 'tele/Balkonkraftwerk/SENSOR.ENERGY.EnergyPToday.0',
   },
  {
     label: 'Eingespeist aktuell:',
