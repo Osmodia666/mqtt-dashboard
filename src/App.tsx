@@ -84,21 +84,24 @@ function App() {
             return acc
           }, {})
 
-       const flat = flatten(json)
-if (topic.includes('/RESULT')) {
-  for (const [key, val] of Object.entries(flat)) {
-    if (key.startsWith('POWER')) {
-      const inferredStatusTopic = topic.replace('/RESULT', `/${key}`)
-      messageQueue.current[inferredStatusTopic] = String(val)
-    }
-  }
-} else {
-  for (const [key, val] of Object.entries(flat)) {
-    const combinedKey = `${topic}.${key}`
-    messageQueue.current[combinedKey] = val
-  }
-}
+        const flat = flatten(json)
 
+        if (topic.includes('/RESULT')) {
+          for (const [key, val] of Object.entries(flat)) {
+            if (key.startsWith('POWER')) {
+              const inferredStatusTopic = topic.replace('/RESULT', `/${key}`)
+              messageQueue.current[inferredStatusTopic] = String(val)
+            }
+          }
+        } else {
+          for (const [key, val] of Object.entries(flat)) {
+            const combinedKey = `${topic}.${key}`
+            messageQueue.current[combinedKey] = val
+          }
+        }
+      } catch {
+        messageQueue.current[topic] = payload
+      }
     })
 
     return () => clearInterval(interval)
@@ -138,7 +141,7 @@ if (topic.includes('/RESULT')) {
     return (
       <div
         key={key}
-        className={`rounded-2xl shadow p-4 border-2 ${bgColor} ${
+        className={`rounded-2xl shadow p-4 border-2 border-gray-600 ${bgColor} ${
           favorite ? 'border-yellow-400' : 'border-gray-600'
         }`}
       >
