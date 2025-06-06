@@ -76,7 +76,7 @@ export const topics = [
     statusTopic: 'tele/Balkonkraftwerk/SENSOR.ENERGY.EnergyPToday.0',
   },
  {
-    label: 'Eingespeist aktuell:',
+    label: 'Eingespeist [gesamt]:',
     type: 'number',
     unit: 'kWh',
     statusTopic: 'tele/Stromzähler/SENSOR.grid.Eingespeist_gesamt',
