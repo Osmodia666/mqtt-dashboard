@@ -1,4 +1,4 @@
-// src/App.tsx
+
 import { useEffect, useState, useRef } from 'react'
 import mqtt from 'mqtt'
 import { mqttConfig, topics } from './config'
@@ -141,7 +141,7 @@ function App() {
     return (
       <div
         key={key}
-        className={`rounded-2xl shadow p-4 border-2 border-gray-600 ${bgColor} ${
+        className={`rounded-2xl shadow p-4 border-2 ${bgColor} ${
           favorite ? 'border-yellow-400' : 'border-gray-600'
         }`}
       >
@@ -184,7 +184,6 @@ function App() {
         Letztes Update: {lastUpdate || 'Lade...'}
       </header>
 
-      {/* Geräte ohne L1–L3 */}
       <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         {topics
           .filter(t => !t.label.match(/L[123]/))
