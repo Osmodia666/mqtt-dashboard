@@ -8,8 +8,11 @@ const client = mqtt.connect(mqttConfig.host, {
   password: mqttConfig.password,
 })
 
+type MinMax = Record<string, { min: number; max: number }>
+
 function App() {
   const [values, setValues] = useState<Record<string, string>>({})
+  const [minMax, setMinMax] = useState<MinMax>({})
   const [lastUpdate, setLastUpdate] = useState<string>('')
   const messageQueue = useRef<Record<string, string>>({})
 
@@ -17,9 +20,27 @@ function App() {
     const flush = () => {
       const updates = { ...messageQueue.current }
       messageQueue.current = {}
+
       if (Object.keys(updates).length > 0) {
-        console.log('🧠 flush', updates)
-        setValues((prev) => ({ ...prev, ...updates }))
+        setValues(prev => {
+          const updated = { ...prev, ...updates }
+          const newMinMax: MinMax = { ...minMax }
+
+          for (const [key, val] of Object.entries(updates)) {
+            const num = parseFloat(val)
+            if (!isNaN(num)) {
+              const existing = newMinMax[key] ?? { min: num, max: num }
+              newMinMax[key] = {
+                min: Math.min(existing.min, num),
+                max: Math.max(existing.max, num),
+              }
+            }
+          }
+
+          setMinMax(newMinMax)
+          return updated
+        })
+
         setLastUpdate(new Date().toLocaleTimeString())
       }
     }
@@ -42,7 +63,6 @@ function App() {
 
       if (topic === 'Pool_temp/temperatur' || topic === 'Gaszaehler/stand') {
         messageQueue.current[topic] = payload
-        console.log('📨 Direkt:', topic, payload)
         return
       }
 
@@ -64,24 +84,27 @@ function App() {
           const combinedKey = `${topic}.${key}`
           messageQueue.current[combinedKey] = val
         }
-
-        console.log('📨 JSON:', topic, flat)
       } catch {
         messageQueue.current[topic] = payload
-        console.log('📨 Text:', topic, payload)
       }
     })
 
     return () => clearInterval(interval)
-  }, [])
+  }, [minMax])
 
   const toggleBoolean = (publishTopic: string, current: string) => {
     const next = current?.toUpperCase() === 'ON' ? 'OFF' : 'ON'
-    console.log('⚡ publish', publishTopic, '→', next)
-    client.publish(publishTopic, next, err => {
-      if (err) console.error('❌ Publish-Fehler:', err)
-    })
+    client.publish(publishTopic, next)
   }
+
+  const renderBar = (value: number, max = 100) => (
+    <div className="w-full bg-gray-300 rounded-full h-2.5 mt-2">
+      <div
+        className="bg-blue-500 h-2.5 rounded-full transition-all"
+        style={{ width: `${Math.min(100, (value / max) * 100)}%` }}
+      />
+    </div>
+  )
 
   return (
     <main className="min-h-screen p-4 bg-white dark:bg-gray-900 text-black dark:text-white transition-colors duration-300">
@@ -92,10 +115,13 @@ function App() {
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {topics.map(({ label, type, unit, favorite, statusTopic, publishTopic, topic }) => {
           const key = statusTopic ?? topic
-          const value = values[key]?.toUpperCase()
+          const raw = values[key]
+          const value = raw?.toUpperCase()
+          const num = parseFloat(raw ?? '')
+          const range = minMax[key] ?? { min: num, max: num }
 
           return (
-            <div key={key} className={`bg-gray-100 dark:bg-gray-800 rounded-2xl shadow p-4 border-2 ${favorite ? 'border-yellow-400' : 'border-transparent'}`}>
+            <div key={key} className={`bg-gray-100 dark:bg-gray-800 rounded-2xl shadow p-4 border-2 ${favorite ? 'border-yellow-400' : 'border-gray-700'}`}>
               <h2 className="text-xl font-semibold mb-2">{label}</h2>
 
               {type === 'boolean' && (
@@ -107,12 +133,18 @@ function App() {
                 </button>
               )}
 
-              {type === 'number' && (
-                <p className="text-3xl">{values[key] ?? '...'} {unit}</p>
+              {type === 'number' && !isNaN(num) && (
+                <>
+                  <p className="text-3xl">{num} {unit}</p>
+                  {renderBar(num, Math.max(range.max, 1))}
+                  <div className="text-xs text-gray-500 mt-1">
+                    Min: {range.min.toFixed(1)} {unit} | Max: {range.max.toFixed(1)} {unit}
+                  </div>
+                </>
               )}
 
               {type === 'string' && (
-                <p className="text-xl">{values[key] ?? '...'}</p>
+                <p className="text-xl">{value ?? '...'}</p>
               )}
             </div>
           )
