@@ -12,8 +12,8 @@ type MinMax = Record<string, { min: number; max: number }>
 
 function App() {
   const [values, setValues] = useState<Record<string, string>>({})
-  const [minMax, setMinMax] = useState<MinMax>({})
   const [lastUpdate, setLastUpdate] = useState<string>('')
+  const [minMax, setMinMax] = useState<MinMax>({})
   const messageQueue = useRef<Record<string, string>>({})
 
   useEffect(() => {
@@ -24,23 +24,22 @@ function App() {
       if (Object.keys(updates).length > 0) {
         setValues(prev => {
           const updated = { ...prev, ...updates }
-          const newMinMax: MinMax = { ...minMax }
+          const nextMinMax: MinMax = { ...minMax }
 
           for (const [key, val] of Object.entries(updates)) {
             const num = parseFloat(val)
             if (!isNaN(num)) {
-              const existing = newMinMax[key] ?? { min: num, max: num }
-              newMinMax[key] = {
-                min: Math.min(existing.min, num),
-                max: Math.max(existing.max, num),
+              const current = nextMinMax[key] ?? { min: num, max: num }
+              nextMinMax[key] = {
+                min: Math.min(current.min, num),
+                max: Math.max(current.max, num),
               }
             }
           }
 
-          setMinMax(newMinMax)
+          setMinMax(nextMinMax)
           return updated
         })
-
         setLastUpdate(new Date().toLocaleTimeString())
       }
     }
@@ -97,10 +96,10 @@ function App() {
     client.publish(publishTopic, next)
   }
 
-  const renderBar = (value: number, max = 100) => (
-    <div className="w-full bg-gray-300 rounded-full h-2.5 mt-2">
+  const progressBar = (value: number, max = 100, color = 'bg-blue-500') => (
+    <div className="w-full bg-gray-300 rounded-full h-2 mt-2 overflow-hidden">
       <div
-        className="bg-blue-500 h-2.5 rounded-full transition-all"
+        className={`${color} h-2 transition-all`}
         style={{ width: `${Math.min(100, (value / max) * 100)}%` }}
       />
     </div>
@@ -117,11 +116,16 @@ function App() {
           const key = statusTopic ?? topic
           const raw = values[key]
           const value = raw?.toUpperCase()
-          const num = parseFloat(raw ?? '')
+          const num = parseFloat(raw)
           const range = minMax[key] ?? { min: num, max: num }
+          const isNumber = type === 'number' && !isNaN(num)
+
+          let bgColor = ''
+          if (label.includes('Balkonkraftwerk')) bgColor = 'bg-green-100 dark:bg-green-900'
+          else if (label.includes('Verbrauch aktuell')) bgColor = 'bg-yellow-100 dark:bg-yellow-900'
 
           return (
-            <div key={key} className={`bg-gray-100 dark:bg-gray-800 rounded-2xl shadow p-4 border-2 ${favorite ? 'border-yellow-400' : 'border-gray-700'}`}>
+            <div key={key} className={`rounded-2xl shadow p-4 border-2 ${bgColor} ${favorite ? 'border-yellow-400' : 'border-gray-500'}`}>
               <h2 className="text-xl font-semibold mb-2">{label}</h2>
 
               {type === 'boolean' && (
@@ -133,18 +137,18 @@ function App() {
                 </button>
               )}
 
-              {type === 'number' && !isNaN(num) && (
+              {isNumber && (
                 <>
-                  <p className="text-3xl">{num} {unit}</p>
-                  {renderBar(num, Math.max(range.max, 1))}
-                  <div className="text-xs text-gray-500 mt-1">
+                  <p className="text-3xl">{raw ?? '...'} {unit}</p>
+                  {progressBar(num, range.max > 0 ? range.max : 100, 'bg-blue-600')}
+                  <div className="text-xs mt-1 text-gray-500 dark:text-gray-400">
                     Min: {range.min.toFixed(1)} {unit} | Max: {range.max.toFixed(1)} {unit}
                   </div>
                 </>
               )}
 
               {type === 'string' && (
-                <p className="text-xl">{value ?? '...'}</p>
+                <p className="text-xl">{raw ?? '...'}</p>
               )}
             </div>
           )
