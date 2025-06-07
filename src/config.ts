@@ -73,7 +73,7 @@ export const topics = [
     label: 'Balkonkraftwerk Erzeugung:',
     type: 'number',
     unit: 'W',
-    statusTopic: 'tele/Balkonkraftwerk/SENSOR.ENERGY.Power[0]'',
+    statusTopic: 'tele/Balkonkraftwerk/SENSOR.ENERGY.Power[0]',
   },
  {
     label: 'Eingespeist [gesamt]:',
