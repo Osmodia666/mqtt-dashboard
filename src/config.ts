@@ -87,6 +87,12 @@ export const topics = [
     unit: 'm³',
     statusTopic: 'Gaszaehler/stand',
   },
+    {
+    label: 'Stromzähler Stand:',
+    type: 'number',
+    unit: 'kWh',
+    statusTopic: 'tele/Stromzähler/SENSOR.grid.Verbrauch_gesamt',
+  },
   {
     label: 'Spannung L1',
     type: 'number',
