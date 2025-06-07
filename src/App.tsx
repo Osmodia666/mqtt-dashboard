@@ -33,7 +33,7 @@ function App() {
             const relevant =
               !key.includes('Gaszaehler') &&
               !key.includes('Eingespeist') &&
-              (key.includes('Leistung_L') || key.includes('Verbrauch_aktuell'))
+              (key.includes('Wirkleistung_L') || key.includes('Verbrauch_aktuell'))
 
             if (!isNaN(num) && relevant) {
               const current = nextMinMax[key] ?? { min: num, max: num }
