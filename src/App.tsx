@@ -30,12 +30,12 @@ function App() {
 
           for (const [key, val] of Object.entries(updates)) {
             const num = parseFloat(val)
-            if (
-              !isNaN(num) &&
+            const relevant =
               !key.includes('Gaszaehler') &&
               !key.includes('Eingespeist') &&
-              !key.includes('Stromzähler')
-            ) {
+              (key.includes('Leistung_L') || key.includes('Verbrauch_aktuell'))
+
+            if (!isNaN(num) && relevant) {
               const current = nextMinMax[key] ?? { min: num, max: num }
               nextMinMax[key] = {
                 min: Math.min(current.min, num),
@@ -66,6 +66,7 @@ function App() {
 
     client.on('message', (topic, message) => {
       const payload = message.toString()
+
       if (topic === 'Pool_temp/temperatur' || topic === 'Gaszaehler/stand') {
         messageQueue.current[topic] = payload
         return
@@ -102,28 +103,31 @@ function App() {
     client.publish(publishTopic, next)
   }
 
-  const getBarColor = (label: string, value: number): string => {
+  const getBarColor = (label: string, value: number) => {
     if (label.includes('Verbrauch aktuell')) {
       if (value >= 2000) return 'bg-red-600'
       if (value >= 500) return 'bg-yellow-400'
       return 'bg-green-500'
     }
-    if (label.includes('Balkonkraftwerk')) {
-      if (value >= 400) return 'bg-green-500'
-      if (value >= 150) return 'bg-yellow-400'
-      return 'bg-red-600'
-    }
     if (label.includes('Pool Temperatur')) {
-      if (value > 23) return 'bg-green-500'
+      if (value > 23) return 'bg-green-600'
       if (value > 17) return 'bg-yellow-400'
       return 'bg-blue-500'
+    }
+    if (label.includes('Balkonkraftwerk')) {
+      if (value > 400) return 'bg-green-600'
+      if (value > 150) return 'bg-yellow-400'
+      return 'bg-red-500'
     }
     return 'bg-blue-500'
   }
 
   const progressBar = (value: number, max = 100, color = 'bg-blue-500') => (
     <div className="w-full bg-gray-300 rounded-full h-2 mt-2 overflow-hidden">
-      <div className={`${color} h-2 transition-all`} style={{ width: `${Math.min(100, (value / max) * 100)}%` }} />
+      <div
+        className={`${color} h-2 transition-all`}
+        style={{ width: `${Math.min(100, (value / max) * 100)}%` }}
+      />
     </div>
   )
 
@@ -139,13 +143,9 @@ function App() {
           const raw = values[key]
           const value = raw?.toUpperCase()
           const num = parseFloat(raw)
-          const showMinMax =
-            !key.includes('Gaszaehler') &&
-            !key.includes('Eingespeist') &&
-            !key.includes('Stromzähler')
-
-          const range = minMax[key] ?? { min: num, max: num }
           const isNumber = type === 'number' && !isNaN(num)
+          const isTracked = key.includes('Leistung_L') || key.includes('Verbrauch_aktuell')
+          const range = minMax[key] ?? { min: num, max: num }
 
           let bgColor = ''
           if (label.includes('Balkonkraftwerk')) bgColor = 'bg-green-100 dark:bg-green-900'
@@ -170,7 +170,7 @@ function App() {
                 <>
                   <p className="text-3xl">{raw ?? '...'} {unit}</p>
                   {progressBar(num, range.max > 0 ? range.max : 100, barColor)}
-                  {showMinMax && (
+                  {isTracked && (
                     <div className="text-xs mt-1 text-gray-500 dark:text-gray-400">
                       Min: {range.min.toFixed(1)} {unit} | Max: {range.max.toFixed(1)} {unit}
                     </div>
