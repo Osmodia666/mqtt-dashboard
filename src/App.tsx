@@ -1,4 +1,3 @@
-
 // src/App.tsx
 import { useEffect, useState, useRef } from 'react'
 import mqtt from 'mqtt'
@@ -54,12 +53,21 @@ function App() {
 
     client.on('connect', () => {
       console.log('✅ MQTT verbunden!')
+
       const initialTopics = topics.map(t => t.statusTopic || t.topic).filter(Boolean)
       client.subscribe(initialTopics, err => {
         if (err) console.error('❌ Subscribe error:', err)
         else console.log('📡 Subscribed to:', initialTopics)
       })
       client.subscribe('#')
+
+      // ⚡ Zustandsabfrage für Tasmota-Geräte
+      topics.forEach(({ publishTopic }) => {
+        if (publishTopic) {
+          const base = publishTopic.split('/')[1] // cmnd/<topic>/state
+          client.publish(`cmnd/${base}/state`, '')
+        }
+      })
     })
 
     client.on('reconnect', () => console.log('🔁 Reconnecting...'))
