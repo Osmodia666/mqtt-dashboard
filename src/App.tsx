@@ -30,8 +30,12 @@ function App() {
 
           for (const [key, val] of Object.entries(updates)) {
             const num = parseFloat(val)
-            const isExcluded = key.includes('Gaszaehler') || key.includes('Eingespeist') || key.includes('Stromzähler')
-            if (!isNaN(num) && !isExcluded) {
+            if (
+              !isNaN(num) &&
+              !key.includes('Gaszaehler') &&
+              !key.includes('Eingespeist') &&
+              !key.includes('Stromzähler')
+            ) {
               const current = nextMinMax[key] ?? { min: num, max: num }
               nextMinMax[key] = {
                 min: Math.min(current.min, num),
@@ -62,7 +66,6 @@ function App() {
 
     client.on('message', (topic, message) => {
       const payload = message.toString()
-
       if (topic === 'Pool_temp/temperatur' || topic === 'Gaszaehler/stand') {
         messageQueue.current[topic] = payload
         return
@@ -99,28 +102,28 @@ function App() {
     client.publish(publishTopic, next)
   }
 
-  const getBarColor = (label: string, value: number) => {
+  const getBarColor = (label: string, value: number): string => {
     if (label.includes('Verbrauch aktuell')) {
       if (value >= 2000) return 'bg-red-600'
       if (value >= 500) return 'bg-yellow-400'
       return 'bg-green-500'
     }
-
     if (label.includes('Balkonkraftwerk')) {
-      if (value > 400) return 'bg-green-500'
-      if (value > 150) return 'bg-yellow-400'
+      if (value >= 400) return 'bg-green-500'
+      if (value >= 150) return 'bg-yellow-400'
       return 'bg-red-600'
     }
-
+    if (label.includes('Pool Temperatur')) {
+      if (value > 23) return 'bg-green-500'
+      if (value > 17) return 'bg-yellow-400'
+      return 'bg-blue-500'
+    }
     return 'bg-blue-500'
   }
 
   const progressBar = (value: number, max = 100, color = 'bg-blue-500') => (
     <div className="w-full bg-gray-300 rounded-full h-2 mt-2 overflow-hidden">
-      <div
-        className={`${color} h-2 transition-all`}
-        style={{ width: `${Math.min(100, (value / max) * 100)}%` }}
-      />
+      <div className={`${color} h-2 transition-all`} style={{ width: `${Math.min(100, (value / max) * 100)}%` }} />
     </div>
   )
 
@@ -136,14 +139,13 @@ function App() {
           const raw = values[key]
           const value = raw?.toUpperCase()
           const num = parseFloat(raw)
-          const isNumber = type === 'number' && !isNaN(num)
-
           const showMinMax =
             !key.includes('Gaszaehler') &&
             !key.includes('Eingespeist') &&
             !key.includes('Stromzähler')
 
           const range = minMax[key] ?? { min: num, max: num }
+          const isNumber = type === 'number' && !isNaN(num)
 
           let bgColor = ''
           if (label.includes('Balkonkraftwerk')) bgColor = 'bg-green-100 dark:bg-green-900'
