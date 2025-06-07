@@ -8,7 +8,7 @@ const client = mqtt.connect(mqttConfig.host, {
   password: mqttConfig.password,
 })
 
-client.setMaxListeners(50) // ⚠️ hinzugefügt zur Vermeidung der MaxListenersWarning
+client.setMaxListeners(50)
 
 type MinMax = Record<string, { min: number; max: number }>
 
@@ -30,7 +30,8 @@ function App() {
 
           for (const [key, val] of Object.entries(updates)) {
             const num = parseFloat(val)
-            if (!isNaN(num) && !key.includes('Gaszaehler') && !key.includes('Eingespeist')) {
+            const isExcluded = key.includes('Gaszaehler') || key.includes('Eingespeist') || key.includes('Stromzähler')
+            if (!isNaN(num) && !isExcluded) {
               const current = nextMinMax[key] ?? { min: num, max: num }
               nextMinMax[key] = {
                 min: Math.min(current.min, num),
@@ -104,6 +105,13 @@ function App() {
       if (value >= 500) return 'bg-yellow-400'
       return 'bg-green-500'
     }
+
+    if (label.includes('Balkonkraftwerk')) {
+      if (value > 400) return 'bg-green-500'
+      if (value > 150) return 'bg-yellow-400'
+      return 'bg-red-600'
+    }
+
     return 'bg-blue-500'
   }
 
@@ -128,9 +136,14 @@ function App() {
           const raw = values[key]
           const value = raw?.toUpperCase()
           const num = parseFloat(raw)
-          const showMinMax = !key.includes('Gaszaehler') && !key.includes('Eingespeist')
-          const range = minMax[key] ?? { min: num, max: num }
           const isNumber = type === 'number' && !isNaN(num)
+
+          const showMinMax =
+            !key.includes('Gaszaehler') &&
+            !key.includes('Eingespeist') &&
+            !key.includes('Stromzähler')
+
+          const range = minMax[key] ?? { min: num, max: num }
 
           let bgColor = ''
           if (label.includes('Balkonkraftwerk')) bgColor = 'bg-green-100 dark:bg-green-900'
