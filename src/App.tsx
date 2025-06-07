@@ -51,16 +51,26 @@ function App() {
 
     const interval = setInterval(flush, 300)
 
-    client.on('connect', () => {
-      console.log('✅ MQTT verbunden!')
+   client.on('connect', () => {
+  console.log('✅ MQTT verbunden!')
+  const allTopics = topics.map(t => t.statusTopic || t.topic).filter(Boolean)
+  const commands = topics
+    .filter(t => t.publishTopic?.includes('/POWER'))
+    .map(t => t.publishTopic ?? t.topic)
 
-      const initialTopics = topics.map(t => t.statusTopic || t.topic).filter(Boolean)
-      client.subscribe(initialTopics, err => {
-        if (err) console.error('❌ Subscribe error:', err)
-        else console.log('📡 Subscribed to:', initialTopics)
-      })
-      client.subscribe('#')
+  client.subscribe(allTopics, err => {
+    if (err) console.error('❌ Subscribe error:', err)
+    else console.log('📡 Subscribed to:', allTopics)
+  })
 
+  // 🟢 Statusabfragen für alle Schalter
+  commands.forEach(cmd => {
+    client.publish(cmd, '', err => {
+      if (err) console.error(`❌ Initialstatus für ${cmd} fehlgeschlagen`, err)
+    })
+  })
+
+  client.subscribe('#')
       // ⚡ Zustandsabfrage für Tasmota-Geräte
       topics.forEach(({ publishTopic }) => {
         if (publishTopic) {
