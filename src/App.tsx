@@ -8,7 +8,7 @@ const client = mqtt.connect(mqttConfig.host, {
   password: mqttConfig.password,
 })
 
-client.setMaxListeners(50)
+client.setMaxListeners(75)
 
 type MinMax = Record<string, { min: number; max: number }>
 
