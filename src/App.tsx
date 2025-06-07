@@ -30,7 +30,7 @@ function App() {
 
           for (const [key, val] of Object.entries(updates)) {
             const num = parseFloat(val)
-            if (!isNaN(num) && !key.includes('Gaszaehler') && !key.includes('Eingespeist')) {
+            if (!isNaN(num) && !key.includes('Gaszaehler') && !key.includes('Eingespeist') && !key.includes('Verbrauch_gesamt')) {
               const current = nextMinMax[key] ?? { min: num, max: num }
               nextMinMax[key] = {
                 min: Math.min(current.min, num),
