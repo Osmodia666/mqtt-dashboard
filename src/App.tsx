@@ -1,3 +1,4 @@
+
 // src/App.tsx
 import { useEffect, useState, useRef } from 'react'
 import mqtt from 'mqtt'
@@ -8,7 +9,7 @@ const client = mqtt.connect(mqttConfig.host, {
   password: mqttConfig.password,
 })
 
-client.setMaxListeners(100)
+client.setMaxListeners(50)
 
 type MinMax = Record<string, { min: number; max: number }>
 
@@ -30,12 +31,10 @@ function App() {
 
           for (const [key, val] of Object.entries(updates)) {
             const num = parseFloat(val)
-            const relevant =
-              !key.includes('Gaszaehler') &&
-              !key.includes('Eingespeist') &&
-              (key.includes('Wirkleistung_L') || key.includes('Verbrauch_aktuell'))
-
-            if (!isNaN(num) && relevant) {
+            if (
+              !isNaN(num) &&
+              (key.includes('power_L') || key.includes('Verbrauch_aktuell') || key === 'Pool_temp/temperatur')
+            ) {
               const current = nextMinMax[key] ?? { min: num, max: num }
               nextMinMax[key] = {
                 min: Math.min(current.min, num),
@@ -55,10 +54,12 @@ function App() {
 
     client.on('connect', () => {
       console.log('✅ MQTT verbunden!')
-      client.subscribe('#', err => {
+      const initialTopics = topics.map(t => t.statusTopic || t.topic).filter(Boolean)
+      client.subscribe(initialTopics, err => {
         if (err) console.error('❌ Subscribe error:', err)
-        else console.log('📡 Subscribed to all topics')
+        else console.log('📡 Subscribed to:', initialTopics)
       })
+      client.subscribe('#')
     })
 
     client.on('reconnect', () => console.log('🔁 Reconnecting...'))
@@ -109,15 +110,15 @@ function App() {
       if (value >= 500) return 'bg-yellow-400'
       return 'bg-green-500'
     }
+    if (label.includes('Balkonkraftwerk')) {
+      if (value > 400) return 'bg-green-500'
+      if (value > 150) return 'bg-yellow-400'
+      return 'bg-red-600'
+    }
     if (label.includes('Pool Temperatur')) {
-      if (value > 23) return 'bg-green-600'
+      if (value > 23) return 'bg-green-500'
       if (value > 17) return 'bg-yellow-400'
       return 'bg-blue-500'
-    }
-    if (label.includes('Balkonkraftwerk')) {
-      if (value > 400) return 'bg-green-600'
-      if (value > 150) return 'bg-yellow-400'
-      return 'bg-red-500'
     }
     return 'bg-blue-500'
   }
@@ -144,7 +145,8 @@ function App() {
           const value = raw?.toUpperCase()
           const num = parseFloat(raw)
           const isNumber = type === 'number' && !isNaN(num)
-          const isTracked = key.includes('Leistung_L') || key.includes('Verbrauch_aktuell')
+          const showMinMax =
+            key.includes('power_L') || key.includes('Verbrauch_aktuell') || key === 'Pool_temp/temperatur'
           const range = minMax[key] ?? { min: num, max: num }
 
           let bgColor = ''
@@ -169,8 +171,8 @@ function App() {
               {isNumber && (
                 <>
                   <p className="text-3xl">{raw ?? '...'} {unit}</p>
-                  {progressBar(num, range.max > 0 ? range.max : 100, barColor)}
-                  {isTracked && (
+                  {showMinMax && progressBar(num, range.max > 0 ? range.max : 100, barColor)}
+                  {showMinMax && (
                     <div className="text-xs mt-1 text-gray-500 dark:text-gray-400">
                       Min: {range.min.toFixed(1)} {unit} | Max: {range.max.toFixed(1)} {unit}
                     </div>
