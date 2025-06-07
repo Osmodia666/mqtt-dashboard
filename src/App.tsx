@@ -30,9 +30,10 @@ function App() {
 
           for (const [key, val] of Object.entries(updates)) {
             const num = parseFloat(val)
-            if (
-              !isNaN(num) &&
-              (key.includes('power_L') || key.includes('Verbrauch_aktuell') || key === 'Pool_temp/temperatur')
+            if (!isNaN(num) && (
+              key.includes('power_L') ||
+              key.includes('Verbrauch_aktuell') ||
+              key === 'Pool_temp/temperatur')
             ) {
               const current = nextMinMax[key] ?? { min: num, max: num }
               nextMinMax[key] = {
@@ -51,30 +52,23 @@ function App() {
 
     const interval = setInterval(flush, 300)
 
-   client.on('connect', () => {
-  console.log('✅ MQTT verbunden!')
-  const allTopics = topics.map(t => t.statusTopic || t.topic).filter(Boolean)
-  const commands = topics
-    .filter(t => t.publishTopic?.includes('/POWER'))
-    .map(t => t.publishTopic ?? t.topic)
+    client.on('connect', () => {
+      console.log('✅ MQTT verbunden!')
+      const allTopics = topics.map(t => t.statusTopic || t.topic).filter(Boolean)
 
-  client.subscribe(allTopics, err => {
-    if (err) console.error('❌ Subscribe error:', err)
-    else console.log('📡 Subscribed to:', allTopics)
-  })
+      client.subscribe(allTopics, err => {
+        if (err) console.error('❌ Subscribe error:', err)
+        else console.log('📡 Subscribed to:', allTopics)
+      })
 
-  // 🟢 Statusabfragen für alle Schalter
-  commands.forEach(cmd => {
-    client.publish(cmd, '', err => {
-      if (err) console.error(`❌ Initialstatus für ${cmd} fehlgeschlagen`, err)
-    })
-  })
+      client.subscribe('#')
 
-  client.subscribe('#')
-      // ⚡ Zustandsabfrage für Tasmota-Geräte
       topics.forEach(({ publishTopic }) => {
+        if (publishTopic?.includes('/POWER')) {
+          client.publish(publishTopic, '')
+        }
         if (publishTopic) {
-          const base = publishTopic.split('/')[1] // cmnd/<topic>/state
+          const base = publishTopic.split('/')[1]
           client.publish(`cmnd/${base}/state`, '')
         }
       })
