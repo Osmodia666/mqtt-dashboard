@@ -97,9 +97,9 @@ export const topics = [
     type: 'group',
     unit: 'V',
     keys: [
-      { label: 'L1', key: 'tele/Stromzähler/SENSOR.ENERGY.Voltage[0]' },
-      { label: 'L2', key: 'tele/Stromzähler/SENSOR.ENERGY.Voltage[1]' },
-      { label: 'L3', key: 'tele/Stromzähler/SENSOR.ENERGY.Voltage[2]' },
+      { label: 'L1', key: 'tele/Stromzähler/SENSOR.ENERGY.Spannung_L1' },
+      { label: 'L2', key: 'tele/Stromzähler/SENSOR.ENERGY.Spannung_L2' },
+      { label: 'L3', key: 'tele/Stromzähler/SENSOR.ENERGY.Spannung_L3' },
     ],
   },
   {
