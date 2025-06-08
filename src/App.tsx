@@ -33,8 +33,8 @@ function App() {
             if (!isNaN(num) && (
               key.includes('power_L') ||
               key.includes('Verbrauch_aktuell') ||
-              key === 'Pool_temp/temperatur'
-            )) {
+              key === 'Pool_temp/temperatur')
+            ) {
               const current = nextMinMax[key] ?? { min: num, max: num }
               nextMinMax[key] = {
                 min: Math.min(current.min, num),
@@ -55,12 +55,10 @@ function App() {
     client.on('connect', () => {
       console.log('✅ MQTT verbunden!')
       const allTopics = topics.map(t => t.statusTopic || t.topic).filter(Boolean)
-
       client.subscribe(allTopics, err => {
         if (err) console.error('❌ Subscribe error:', err)
         else console.log('📡 Subscribed to:', allTopics)
       })
-
       client.subscribe('#')
 
       topics.forEach(({ publishTopic }) => {
@@ -90,9 +88,7 @@ function App() {
         const flatten = (obj: any, prefix = ''): Record<string, string> =>
           Object.entries(obj).reduce((acc, [key, val]) => {
             const newKey = prefix ? `${prefix}.${key}` : key
-            if (Array.isArray(val)) {
-              acc[newKey] = String(val[0])
-            } else if (typeof val === 'object' && val !== null) {
+            if (typeof val === 'object' && val !== null) {
               Object.assign(acc, flatten(val, newKey))
             } else {
               acc[newKey] = String(val)
@@ -140,7 +136,7 @@ function App() {
   const progressBar = (value: number, max = 100, color = 'bg-blue-500') => (
     <div className="w-full bg-gray-300 rounded-full h-2 mt-2 overflow-hidden">
       <div
-        className={`${color} h-2 transition-all duration-700 ease-out`}
+        className={`${color} h-2 transition-all duration-1000 ease-out`}
         style={{ width: `${Math.min(100, (value / max) * 100)}%` }}
       />
     </div>
