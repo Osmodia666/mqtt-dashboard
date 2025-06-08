@@ -92,6 +92,18 @@ export const topics = [
     unit: 'kWh',
     statusTopic: 'tele/Stromzähler/SENSOR.grid.Verbrauch_gesamt',
   },
+    // ✅ Gruppiert: Leistung
+  {
+    label: 'Leistung L1–L3',
+    type: 'group',
+    unit: 'W',
+    keys: [
+      { label: 'L1', key: 'tele/Stromzähler/SENSOR.grid.power_L1' },
+      { label: 'L2', key: 'tele/Stromzähler/SENSOR.grid.power_L2' },
+      { label: 'L3', key: 'tele/Stromzähler/SENSOR.grid.power_L3' },
+    ],
+  },
+  // ✅ Gruppiert: Spannung
   {
     label: 'Spannung L1–L3',
     type: 'group',
@@ -102,6 +114,7 @@ export const topics = [
       { label: 'L3', key: 'tele/Stromzähler/SENSOR.ENERGY.Spannung_L3' },
     ],
   },
+  // ✅ Gruppiert: Strom
   {
     label: 'Strom L1–L3',
     type: 'group',
@@ -110,16 +123,6 @@ export const topics = [
       { label: 'L1', key: 'tele/Stromzähler/SENSOR.grid.Strom_L1' },
       { label: 'L2', key: 'tele/Stromzähler/SENSOR.grid.Strom_L2' },
       { label: 'L3', key: 'tele/Stromzähler/SENSOR.grid.Strom_L3' },
-    ],
-  },
-  {
-    label: 'Leistung L1–L3',
-    type: 'group',
-    unit: 'W',
-    keys: [
-      { label: 'L1', key: 'tele/Stromzähler/SENSOR.grid.power_L1' },
-      { label: 'L2', key: 'tele/Stromzähler/SENSOR.grid.power_L2' },
-      { label: 'L3', key: 'tele/Stromzähler/SENSOR.grid.power_L3' },
     ],
   },
 ]
