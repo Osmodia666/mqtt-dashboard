@@ -1,5 +1,4 @@
 // src/config.ts
-
 export const mqttConfig = {
   host: 'wss://cyberdyne.chickenkiller.com:8884',
   username: 'christopher',
@@ -7,7 +6,6 @@ export const mqttConfig = {
 }
 
 export const topics = [
-  // Schalter
   {
     label: 'Ender 3 Pro',
     type: 'boolean',
@@ -58,8 +56,6 @@ export const topics = [
     statusTopic: 'stat/Poolpumpe/POWER',
     publishTopic: 'cmnd/Poolpumpe/POWER',
   },
-
-  // Sensorwerte
   {
     label: 'Pool Temperatur:',
     type: 'number',
@@ -76,13 +72,13 @@ export const topics = [
     label: 'Balkonkraftwerk Erzeugung:',
     type: 'number',
     unit: 'W',
-    statusTopic: 'tele/Balkonkraftwerk/SENSOR.ENERGY.Power.0',
+    statusTopic: 'tele/Balkonkraftwerk/SENSOR.ENERGY.Power[0]',
   },
   {
     label: 'Erzeugung [gesamt]:',
     type: 'number',
     unit: 'kWh',
-    statusTopic: 'tele/Balkonkraftwerk/SENSOR.ENERGY.EnergyPTotal.0',
+    statusTopic: 'tele/Balkonkraftwerk/SENSOR.ENERGY.EnergyPTotal[0]',
   },
   {
     label: 'Gaszähler Stand:',
@@ -96,48 +92,6 @@ export const topics = [
     unit: 'kWh',
     statusTopic: 'tele/Stromzähler/SENSOR.grid.Verbrauch_gesamt',
   },
-
-  // Phasenleistung
-  {
-    label: 'Leistung L1',
-    type: 'number',
-    unit: 'W',
-    statusTopic: 'tele/Stromzähler/SENSOR.grid.power_L1',
-  },
-  {
-    label: 'Leistung L2',
-    type: 'number',
-    unit: 'W',
-    statusTopic: 'tele/Stromzähler/SENSOR.grid.power_L2',
-  },
-  {
-    label: 'Leistung L3',
-    type: 'number',
-    unit: 'W',
-    statusTopic: 'tele/Stromzähler/SENSOR.grid.power_L3',
-  },
-
-  // Strom (Ampere)
-  {
-    label: 'Strom L1',
-    type: 'number',
-    unit: 'A',
-    statusTopic: 'tele/Stromzähler/SENSOR.grid.Strom_L1',
-  },
-  {
-    label: 'Strom L2',
-    type: 'number',
-    unit: 'A',
-    statusTopic: 'tele/Stromzähler/SENSOR.grid.Strom_L2',
-  },
-  {
-    label: 'Strom L3',
-    type: 'number',
-    unit: 'A',
-    statusTopic: 'tele/Stromzähler/SENSOR.grid.Strom_L3',
-  },
-
-  // Gruppierte Anzeige – Spannungen
   {
     label: 'Spannung L1–L3',
     type: 'group',
@@ -146,6 +100,26 @@ export const topics = [
       { label: 'L1', key: 'tele/Stromzähler/SENSOR.ENERGY.Voltage[0]' },
       { label: 'L2', key: 'tele/Stromzähler/SENSOR.ENERGY.Voltage[1]' },
       { label: 'L3', key: 'tele/Stromzähler/SENSOR.ENERGY.Voltage[2]' },
+    ],
+  },
+  {
+    label: 'Strom L1–L3',
+    type: 'group',
+    unit: 'A',
+    keys: [
+      { label: 'L1', key: 'tele/Stromzähler/SENSOR.grid.Strom_L1' },
+      { label: 'L2', key: 'tele/Stromzähler/SENSOR.grid.Strom_L2' },
+      { label: 'L3', key: 'tele/Stromzähler/SENSOR.grid.Strom_L3' },
+    ],
+  },
+  {
+    label: 'Leistung L1–L3',
+    type: 'group',
+    unit: 'W',
+    keys: [
+      { label: 'L1', key: 'tele/Stromzähler/SENSOR.grid.power_L1' },
+      { label: 'L2', key: 'tele/Stromzähler/SENSOR.grid.power_L2' },
+      { label: 'L3', key: 'tele/Stromzähler/SENSOR.grid.power_L3' },
     ],
   },
 ]
