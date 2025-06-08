@@ -15,7 +15,11 @@ type MinMax = Record<string, { min: number; max: number }>
 function App() {
   const [values, setValues] = useState<Record<string, string>>({})
   const [lastUpdate, setLastUpdate] = useState<string>('')
-  const [minMax, setMinMax] = useState<MinMax>({})
+  const [minMax, setMinMax] = useState<MinMax>(() => {
+    const stored = localStorage.getItem('minMax')
+    return stored ? JSON.parse(stored) : {}
+  })
+
   const messageQueue = useRef<Record<string, string>>({})
 
   useEffect(() => {
@@ -30,12 +34,15 @@ function App() {
 
           for (const [key, val] of Object.entries(updates)) {
             const num = parseFloat(val)
-            if (!isNaN(num) && (
-              key.includes('power_L') ||
-              key.includes('Verbrauch_aktuell') ||
-              key === 'Pool_temp/temperatur' ||
-              key.includes('Balkonkraftwerk')
-            )) {
+            if (
+              !isNaN(num) &&
+              (
+                key.includes('power_L') ||
+                key.includes('Verbrauch_aktuell') ||
+                key === 'Pool_temp/temperatur' ||
+                key.includes('Balkonkraftwerk')
+              )
+            ) {
               const current = nextMinMax[key] ?? { min: num, max: num }
               nextMinMax[key] = {
                 min: Math.min(current.min, num),
@@ -45,8 +52,10 @@ function App() {
           }
 
           setMinMax(nextMinMax)
+          localStorage.setItem('minMax', JSON.stringify(nextMinMax))
           return updated
         })
+
         setLastUpdate(new Date().toLocaleTimeString())
       }
     }
@@ -54,9 +63,13 @@ function App() {
     const interval = setInterval(flush, 300)
 
     client.on('connect', () => {
+      console.log('✅ MQTT verbunden!')
       const allTopics = topics.map(t => t.statusTopic || t.topic).filter(Boolean)
+      client.subscribe(allTopics, err => {
+        if (err) console.error('❌ Subscribe error:', err)
+        else console.log('📡 Subscribed to:', allTopics)
+      })
 
-      client.subscribe(allTopics)
       client.subscribe('#')
 
       topics.forEach(({ publishTopic }) => {
@@ -69,6 +82,9 @@ function App() {
         }
       })
     })
+
+    client.on('reconnect', () => console.log('🔁 Reconnecting...'))
+    client.on('error', err => console.error('❌ MQTT Fehler:', err))
 
     client.on('message', (topic, message) => {
       const payload = message.toString()
@@ -153,8 +169,8 @@ function App() {
           const showMinMax =
             key.includes('power_L') ||
             key.includes('Verbrauch_aktuell') ||
-            key.includes('Balkonkraftwerk') ||
-            key === 'Pool_temp/temperatur'
+            key === 'Pool_temp/temperatur' ||
+            label.includes('Balkonkraftwerk')
           const range = minMax[key] ?? { min: num, max: num }
 
           let bgColor = ''
