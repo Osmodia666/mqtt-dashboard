@@ -104,16 +104,16 @@ export const topics = [
     ],
   },
   // ✅ Gruppiert: Spannung
-  {
-    label: 'Spannung L1–L3',
-    type: 'group',
-    unit: 'V',
-    keys: [
-      { label: 'L1', key: 'tele/Stromzähler/SENSOR.ENERGY.Spannung_L1' },
-      { label: 'L2', key: 'tele/Stromzähler/SENSOR.ENERGY.Spannung_L2' },
-      { label: 'L3', key: 'tele/Stromzähler/SENSOR.ENERGY.Spannung_L3' },
-    ],
-  },
+{
+  label: 'Spannung L1–L3',
+  type: 'group',
+  unit: 'V',
+  keys: [
+    { label: 'L1', key: 'tele/Stromzähler/SENSOR.Spannung_L1' },
+    { label: 'L2', key: 'tele/Stromzähler/SENSOR.Spannung_L2' },
+    { label: 'L3', key: 'tele/Stromzähler/SENSOR.Spannung_L3' },
+  ],
+},
   // ✅ Gruppiert: Strom
   {
     label: 'Strom L1–L3',
