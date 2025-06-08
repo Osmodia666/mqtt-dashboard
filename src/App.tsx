@@ -57,7 +57,7 @@ function App() {
               key.includes('power_L') ||
               key.includes('Verbrauch_aktuell') ||
               key === 'Pool_temp/temperatur' ||
-              key.includes('Eingespeist_gesamt')
+              key.includes('Balkonkraftwerk')
             )) {
               const current = nextMinMax[key] ?? { min: num, max: num }
               nextMinMax[key] = {
