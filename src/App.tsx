@@ -223,30 +223,29 @@ function App() {
 
         {/* Gruppierte Anzeige: Spannung, Leistung, Strom */}
         <div className="col-span-full grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {['Spannung', 'Leistung', 'Strom'].map(groupLabel => (
-            <div key={groupLabel} className="rounded-2xl shadow p-4 border-2 border-gray-500 bg-blue-50 dark:bg-gray-800">
-              <h2 className="text-xl font-semibold mb-2">{groupLabel} L1–L3</h2>
-              {['L1', 'L2', 'L3'].map(phase => {
-                const key = Object.keys(values).find(k =>
-                  k.toLowerCase().includes(groupLabel.toLowerCase()) && k.includes(phase)
-                )
-                const val = key ? parseFloat(values[key]) : NaN
-                const range = key && minMax[key] ? minMax[key] : { min: val, max: val }
+  {topics.filter(t => t.type === 'group').map(group => (
+    <div key={group.label} className="rounded-2xl shadow p-4 border-2 border-gray-500 bg-blue-50 dark:bg-gray-800">
+      <h2 className="text-xl font-semibold mb-2">{group.label}</h2>
+      {group.keys?.map(({ label: phaseLabel, key }) => {
+        const rawVal = values[key]
+        const val = rawVal !== undefined ? parseFloat(rawVal) : NaN
+        const range = minMax[key] ?? { min: val, max: val }
 
-                return (
-                  <div key={phase} className="mb-2">
-                    <div className="text-sm">{phase}: {val ?? '...'} {groupLabel === 'Strom' ? 'A' : groupLabel === 'Leistung' ? 'W' : 'V'}</div>
-                    {progressBar(val, groupLabel === 'Spannung' ? 250 : 1000, 'bg-blue-500')}
-                    <div className="text-xs text-gray-500 dark:text-gray-400">
-                      Min: {range.min?.toFixed(1)} | Max: {range.max?.toFixed(1)}
-                    </div>
-                  </div>
-                )
-              })}
+        return (
+          <div key={key} className="mb-2">
+            <div className="text-sm">
+              {phaseLabel}: {isNaN(val) ? '...' : `${val} ${group.unit}`}
             </div>
-          ))}
-        </div>
-      </div>
+            {progressBar(val, group.label.includes('Spannung') ? 250 : 1000, 'bg-blue-500')}
+            <div className="text-xs text-gray-500 dark:text-gray-400">
+              Min: {range.min?.toFixed(1)} | Max: {range.max?.toFixed(1)}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  ))}
+</div>
     </main>
   )
 }
