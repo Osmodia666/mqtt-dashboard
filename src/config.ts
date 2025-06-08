@@ -1,4 +1,5 @@
 // src/config.ts
+
 export const mqttConfig = {
   host: 'wss://cyberdyne.chickenkiller.com:8884',
   username: 'christopher',
@@ -6,6 +7,7 @@ export const mqttConfig = {
 }
 
 export const topics = [
+  // Schalter
   {
     label: 'Ender 3 Pro',
     type: 'boolean',
@@ -13,14 +15,14 @@ export const topics = [
     publishTopic: 'cmnd/Ender_3_Pro/POWER',
     favorite: true,
   },
-    {
+  {
     label: 'Sidewinder X1',
     type: 'boolean',
     statusTopic: 'stat/Sidewinder_X1/POWER1',
     publishTopic: 'cmnd/Sidewinder_X1/POWER',
     favorite: true,
   },
-    {
+  {
     label: 'Steckdose 1',
     type: 'boolean',
     statusTopic: 'stat/Steckdose_1/POWER',
@@ -32,13 +34,13 @@ export const topics = [
     statusTopic: 'stat/Steckdose_2/POWER',
     publishTopic: 'cmnd/Steckdose_2/POWER',
   },
-   {
+  {
     label: 'Doppelsteckdose',
     type: 'boolean',
     statusTopic: 'stat/Doppelsteckdose/POWER',
     publishTopic: 'cmnd/Doppelsteckdose/POWER',
   },
-   {
+  {
     label: 'Beleuchtung',
     type: 'boolean',
     statusTopic: 'stat/Beleuchtung/POWER',
@@ -50,50 +52,53 @@ export const topics = [
     statusTopic: 'stat/Teichpumpe/POWER',
     publishTopic: 'cmnd/Teichpumpe/POWER',
   },
-    {
+  {
     label: 'Poolpumpe',
     type: 'boolean',
     statusTopic: 'stat/Poolpumpe/POWER',
     publishTopic: 'cmnd/Poolpumpe/POWER',
   },
+
+  // Sensorwerte
   {
     label: 'Pool Temperatur:',
     type: 'number',
     unit: '°C',
     statusTopic: 'Pool_temp/temperatur',
   },
-   {
+  {
     label: 'Verbrauch aktuell:',
     type: 'number',
     unit: 'W',
     statusTopic: 'tele/Stromzähler/SENSOR.grid.Verbrauch_aktuell',
   },
-  
-   {
+  {
     label: 'Balkonkraftwerk Erzeugung:',
     type: 'number',
     unit: 'W',
     statusTopic: 'tele/Balkonkraftwerk/SENSOR.ENERGY.Power.0',
   },
- {
+  {
     label: 'Erzeugung [gesamt]:',
     type: 'number',
     unit: 'kWh',
     statusTopic: 'tele/Balkonkraftwerk/SENSOR.ENERGY.EnergyPTotal.0',
-  },  
+  },
   {
     label: 'Gaszähler Stand:',
     type: 'number',
     unit: 'm³',
     statusTopic: 'Gaszaehler/stand',
   },
-    {
+  {
     label: 'Stromzähler Stand:',
     type: 'number',
     unit: 'kWh',
     statusTopic: 'tele/Stromzähler/SENSOR.grid.Verbrauch_gesamt',
   },
-      {
+
+  // Phasenleistung
+  {
     label: 'Leistung L1',
     type: 'number',
     unit: 'W',
@@ -111,24 +116,15 @@ export const topics = [
     unit: 'W',
     statusTopic: 'tele/Stromzähler/SENSOR.grid.power_L3',
   },
-{
-  label: 'Spannung L1–L3',
-  type: 'group',
-  keys: [
-    { label: 'L1', key: 'tele/Stromzaehler/SENSOR.ENERGY.Voltage[0]' },
-    { label: 'L2', key: 'tele/Stromzaehler/SENSOR.ENERGY.Voltage[1]' },
-    { label: 'L3', key: 'tele/Stromzaehler/SENSOR.ENERGY.Voltage[2]' },
-  ],
-  unit: 'V',
-},
-   {
+
+  // Strom (Ampere)
+  {
     label: 'Strom L1',
     type: 'number',
     unit: 'A',
     statusTopic: 'tele/Stromzähler/SENSOR.grid.Strom_L1',
   },
-  
-   {
+  {
     label: 'Strom L2',
     type: 'number',
     unit: 'A',
@@ -139,5 +135,17 @@ export const topics = [
     type: 'number',
     unit: 'A',
     statusTopic: 'tele/Stromzähler/SENSOR.grid.Strom_L3',
+  },
+
+  // Gruppierte Anzeige – Spannungen
+  {
+    label: 'Spannung L1–L3',
+    type: 'group',
+    unit: 'V',
+    keys: [
+      { label: 'L1', key: 'tele/Stromzähler/SENSOR.ENERGY.Voltage[0]' },
+      { label: 'L2', key: 'tele/Stromzähler/SENSOR.ENERGY.Voltage[1]' },
+      { label: 'L3', key: 'tele/Stromzähler/SENSOR.ENERGY.Voltage[2]' },
+    ],
   },
 ]
