@@ -168,7 +168,7 @@ function App() {
           const num = parseFloat(raw)
           const isNumber = type === 'number' && !isNaN(num)
 
-          if (label.includes('Eingespeist')) {
+          if (label.includes('Erzeugung [gesamt]')) {
             raw = (num + 178.779).toFixed(3)
           }
 
