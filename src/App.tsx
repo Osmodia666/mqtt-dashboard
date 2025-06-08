@@ -90,7 +90,9 @@ function App() {
         const flatten = (obj: any, prefix = ''): Record<string, string> =>
           Object.entries(obj).reduce((acc, [key, val]) => {
             const newKey = prefix ? `${prefix}.${key}` : key
-            if (typeof val === 'object' && val !== null) {
+            if (Array.isArray(val)) {
+              acc[newKey] = String(val[0])
+            } else if (typeof val === 'object' && val !== null) {
               Object.assign(acc, flatten(val, newKey))
             } else {
               acc[newKey] = String(val)
@@ -158,7 +160,9 @@ function App() {
           const num = parseFloat(raw)
           const isNumber = type === 'number' && !isNaN(num)
           const showMinMax =
-            key.includes('power_L') || key.includes('Verbrauch_aktuell') || key === 'Pool_temp/temperatur'
+            key.includes('power_L') ||
+            key.includes('Verbrauch_aktuell') ||
+            key === 'Pool_temp/temperatur'
           const range = minMax[key] ?? { min: num, max: num }
 
           let bgColor = ''
