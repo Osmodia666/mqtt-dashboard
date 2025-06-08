@@ -87,7 +87,7 @@ function App() {
         }
         if (publishTopic) {
           const base = publishTopic.split('/')[1]
-          client.publish(cmnd/${base}/state, '')
+          client.publish(`cmnd/${base}/state`, '')
         }
       })
     })
