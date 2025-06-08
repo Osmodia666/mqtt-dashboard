@@ -173,7 +173,11 @@ function App() {
           }
 
           const showMinMax =
-            key.includes('power_L') || key.includes('Verbrauch_aktuell') || key === 'Pool_temp/temperatur' || key.includes('Eingespeist_gesamt')
+            key.includes('power_L') ||
+            key.includes('Verbrauch_aktuell') ||
+            key === 'Pool_temp/temperatur' ||
+            label.includes('Balkonkraftwerk') ||
+            key.includes('Erzeugung_gesamt')
           const range = minMax[key] ?? { min: num, max: num }
           const barColor = getBarColor(label, num)
 
