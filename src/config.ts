@@ -93,23 +93,29 @@ export const topics = [
     unit: 'kWh',
     statusTopic: 'tele/Stromzähler/SENSOR.grid.Verbrauch_gesamt',
   },
+      {
+    label: 'Leistung L1',
+    type: 'number',
+    unit: 'W',
+    statusTopic: 'tele/Stromzähler/SENSOR.grid.power_L1',
+  },
+  {
+    label: 'Leistung L2',
+    type: 'number',
+    unit: 'W',
+    statusTopic: 'tele/Stromzähler/SENSOR.grid.power_L2',
+  },
+  {
+    label: 'Leistung L3',
+    type: 'number',
+    unit: 'W',
+    statusTopic: 'tele/Stromzähler/SENSOR.grid.power_L3',
+  },
   {
     label: 'Spannung L1',
     type: 'number',
     unit: 'V',
     statusTopic: 'tele/Stromzähler/SENSOR.grid.Spannung_L1',
-  },
-   {
-    label: 'Strom L1',
-    type: 'number',
-    unit: 'A',
-    statusTopic: 'tele/Stromzähler/SENSOR.grid.Strom_L1',
-  },
-    {
-    label: 'Leistung L1',
-    type: 'number',
-    unit: 'W',
-    statusTopic: 'tele/Stromzähler/SENSOR.grid.power_L1',
   },
   {
     label: 'Spannung L2',
@@ -118,33 +124,28 @@ export const topics = [
     statusTopic: 'tele/Stromzähler/SENSOR.grid.Spannung_L2',
   },
    {
-    label: 'Strom L2',
-    type: 'number',
-    unit: 'A',
-    statusTopic: 'tele/Stromzähler/SENSOR.grid.Strom_L2',
-  },
-    {
-    label: 'Leistung L2',
-    type: 'number',
-    unit: 'W',
-    statusTopic: 'tele/Stromzähler/SENSOR.grid.power_L2',
-  },
-  {
     label: 'Spannung L3',
     type: 'number',
     unit: 'V',
     statusTopic: 'tele/Stromzähler/SENSOR.grid.Spannung_L3',
   },
    {
+    label: 'Strom L1',
+    type: 'number',
+    unit: 'A',
+    statusTopic: 'tele/Stromzähler/SENSOR.grid.Strom_L1',
+  },
+  
+   {
+    label: 'Strom L2',
+    type: 'number',
+    unit: 'A',
+    statusTopic: 'tele/Stromzähler/SENSOR.grid.Strom_L2',
+  },
+  {
     label: 'Strom L3',
     type: 'number',
     unit: 'A',
     statusTopic: 'tele/Stromzähler/SENSOR.grid.Strom_L3',
-  },
-    {
-    label: 'Leistung L3',
-    type: 'number',
-    unit: 'W',
-    statusTopic: 'tele/Stromzähler/SENSOR.grid.power_L3',
   },
 ]
