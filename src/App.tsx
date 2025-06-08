@@ -86,6 +86,10 @@ function App() {
 
     client.on('message', (topic, message) => {
       const payload = message.toString()
+        if (topic === 'Pool_temp/temperatur' || topic === 'Gaszaehler/stand') {
+        messageQueue.current[topic] = payload
+        return
+      }
       try {
         const json = JSON.parse(payload)
         const flatten = (obj: any, prefix = ''): Record<string, string> =>
