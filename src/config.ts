@@ -111,24 +111,16 @@ export const topics = [
     unit: 'W',
     statusTopic: 'tele/Stromzähler/SENSOR.grid.power_L3',
   },
-  {
-    label: 'Spannung L1',
-    type: 'number',
-    unit: 'V',
-    statusTopic: 'tele/Stromzähler/SENSOR.grid.Spannung_L1',
-  },
-  {
-    label: 'Spannung L2',
-    type: 'number',
-    unit: 'V',
-    statusTopic: 'tele/Stromzähler/SENSOR.grid.Spannung_L2',
-  },
-   {
-    label: 'Spannung L3',
-    type: 'number',
-    unit: 'V',
-    statusTopic: 'tele/Stromzähler/SENSOR.grid.Spannung_L3',
-  },
+{
+  label: 'Spannung L1–L3',
+  type: 'group',
+  keys: [
+    { label: 'L1', key: 'tele/Stromzaehler/SENSOR.ENERGY.Voltage[0]' },
+    { label: 'L2', key: 'tele/Stromzaehler/SENSOR.ENERGY.Voltage[1]' },
+    { label: 'L3', key: 'tele/Stromzaehler/SENSOR.ENERGY.Voltage[2]' },
+  ],
+  unit: 'V',
+},
    {
     label: 'Strom L1',
     type: 'number',
