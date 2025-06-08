@@ -10,7 +10,6 @@ const client = mqtt.connect(mqttConfig.host, {
 client.setMaxListeners(100)
 
 type MinMax = Record<string, { min: number; max: number }>
-
 const STORAGE_KEY = 'minMaxStore'
 const LAST_RESET_KEY = 'minMaxLastReset'
 
@@ -53,12 +52,13 @@ function App() {
 
           for (const [key, val] of Object.entries(updates)) {
             const num = parseFloat(val)
-            if (!isNaN(num) && (
-              key.includes('power_L') ||
-              key.includes('Verbrauch_aktuell') ||
-              key === 'Pool_temp/temperatur' ||
-              key.includes('Eingespeist_gesamt')
-            )) {
+            if (!isNaN(num) &&
+              (key.includes('power_L') ||
+                key.includes('Verbrauch_aktuell') ||
+                key === 'Pool_temp/temperatur' ||
+                key.includes('Balkonkraftwerk') ||
+                key.includes('Voltage')))
+            {
               const current = nextMinMax[key] ?? { min: num, max: num }
               nextMinMax[key] = {
                 min: Math.min(current.min, num),
@@ -150,9 +150,35 @@ function App() {
 
   const progressBar = (value: number, max = 100, color = 'bg-blue-500') => (
     <div className="w-full bg-gray-300 rounded-full h-2 mt-2 overflow-hidden">
-      <div className={`${color} h-2 transition-all duration-1000 ease-out`} style={{ width: `${Math.min(100, (value / max) * 100)}%` }} />
+      <div
+        className={`${color} h-2 transition-all duration-1000 ease-out`}
+        style={{ width: `${Math.min(100, (value / max) * 100)}%` }}
+      />
     </div>
   )
+
+  const renderVoltageGroup = () => {
+    const phases = ['L1', 'L2', 'L3']
+    return (
+      <div className="rounded-2xl shadow p-4 border-2 border-gray-500 bg-blue-50 dark:bg-gray-800 col-span-full">
+        <h2 className="text-xl font-semibold mb-4">Spannung L1–L3</h2>
+        {phases.map(phase => {
+          const key = Object.keys(values).find(k => k.includes(`Voltage.${phase}`))
+          const val = key ? parseFloat(values[key]) : NaN
+          const range = key && minMax[key] ? minMax[key] : { min: val, max: val }
+          return (
+            <div key={phase} className="mb-2">
+              <div className="text-sm">{phase}: {val ?? '...'} V</div>
+              {progressBar(val, 250, 'bg-blue-500')}
+              <div className="text-xs text-gray-500 dark:text-gray-400">
+                Min: {range.min?.toFixed(1)} | Max: {range.max?.toFixed(1)}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    )
+  }
 
   return (
     <main className="min-h-screen p-4 bg-white dark:bg-gray-900 text-black dark:text-white transition-colors duration-300">
@@ -160,24 +186,17 @@ function App() {
         Letztes Update: {lastUpdate || 'Lade...'}
       </header>
 
-      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         {topics.map(({ label, type, unit, favorite, statusTopic, publishTopic, topic }) => {
           const key = statusTopic ?? topic
-          let raw = values[key]
+          const raw = values[key]
           const value = raw?.toUpperCase()
           const num = parseFloat(raw)
           const isNumber = type === 'number' && !isNaN(num)
 
-          if (label.includes('Erzeugung [gesamt]')) {
-            raw = (num + 178.779).toFixed(3)
-          }
-
           const showMinMax =
-            key.includes('power_L') ||
-            key.includes('Verbrauch_aktuell') ||
-            key === 'Pool_temp/temperatur' ||
-            label.includes('Balkonkraftwerk') ||
-            key.includes('Erzeugung_gesamt')
+            key.includes('power_L') || key.includes('Verbrauch_aktuell') || key === 'Pool_temp/temperatur' || key.includes('Balkonkraftwerk')
+
           const range = minMax[key] ?? { min: num, max: num }
           const barColor = getBarColor(label, num)
 
@@ -216,6 +235,8 @@ function App() {
             </div>
           )
         })}
+
+        {renderVoltageGroup()}
       </div>
     </main>
   )
