@@ -76,10 +76,10 @@ export const topics = [
     statusTopic: 'tele/Balkonkraftwerk/SENSOR.ENERGY.Power.0',
   },
  {
-    label: 'Eingespeist [gesamt]:',
+    label: 'Erzeugung [gesamt]:',
     type: 'number',
     unit: 'kWh',
-    statusTopic: 'tele/Stromzähler/SENSOR.grid.Eingespeist_gesamt',
+    statusTopic: 'tele/Balkonkraftwerk/SENSOR.ENERGY.EnergyPTotal',
   },  
   {
     label: 'Gaszähler Stand:',
