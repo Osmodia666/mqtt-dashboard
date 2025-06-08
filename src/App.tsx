@@ -33,8 +33,9 @@ function App() {
             if (!isNaN(num) && (
               key.includes('power_L') ||
               key.includes('Verbrauch_aktuell') ||
-              key === 'Pool_temp/temperatur')
-            ) {
+              key === 'Pool_temp/temperatur' ||
+              key.includes('Balkonkraftwerk')
+            )) {
               const current = nextMinMax[key] ?? { min: num, max: num }
               nextMinMax[key] = {
                 min: Math.min(current.min, num),
@@ -53,12 +54,9 @@ function App() {
     const interval = setInterval(flush, 300)
 
     client.on('connect', () => {
-      console.log('✅ MQTT verbunden!')
       const allTopics = topics.map(t => t.statusTopic || t.topic).filter(Boolean)
-      client.subscribe(allTopics, err => {
-        if (err) console.error('❌ Subscribe error:', err)
-        else console.log('📡 Subscribed to:', allTopics)
-      })
+
+      client.subscribe(allTopics)
       client.subscribe('#')
 
       topics.forEach(({ publishTopic }) => {
@@ -71,9 +69,6 @@ function App() {
         }
       })
     })
-
-    client.on('reconnect', () => console.log('🔁 Reconnecting...'))
-    client.on('error', err => console.error('❌ MQTT Fehler:', err))
 
     client.on('message', (topic, message) => {
       const payload = message.toString()
@@ -121,7 +116,7 @@ function App() {
       return 'bg-green-500'
     }
     if (label.includes('Balkonkraftwerk')) {
-      if (value > 400) return 'bg-green-500'
+      if (value > 450) return 'bg-green-500'
       if (value > 150) return 'bg-yellow-400'
       return 'bg-red-600'
     }
@@ -156,7 +151,10 @@ function App() {
           const num = parseFloat(raw)
           const isNumber = type === 'number' && !isNaN(num)
           const showMinMax =
-            key.includes('power_L') || key.includes('Verbrauch_aktuell') || key === 'Pool_temp/temperatur'
+            key.includes('power_L') ||
+            key.includes('Verbrauch_aktuell') ||
+            key.includes('Balkonkraftwerk') ||
+            key === 'Pool_temp/temperatur'
           const range = minMax[key] ?? { min: num, max: num }
 
           let bgColor = ''
