@@ -7,22 +7,41 @@ const client = mqtt.connect(mqttConfig.host, {
   username: mqttConfig.username,
   password: mqttConfig.password,
 })
-
 client.setMaxListeners(100)
 
 type MinMax = Record<string, { min: number; max: number }>
 
+const STORAGE_KEY = 'minMaxStore'
+const LAST_RESET_KEY = 'minMaxLastReset'
+
+function loadMinMax(): MinMax {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY)
+    return stored ? JSON.parse(stored) : {}
+  } catch {
+    return {}
+  }
+}
+
+function saveMinMax(data: MinMax) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
+}
+
 function App() {
   const [values, setValues] = useState<Record<string, string>>({})
   const [lastUpdate, setLastUpdate] = useState<string>('')
-  const [minMax, setMinMax] = useState<MinMax>(() => {
-    const stored = localStorage.getItem('minMax')
-    return stored ? JSON.parse(stored) : {}
-  })
-
+  const [minMax, setMinMax] = useState<MinMax>(() => loadMinMax())
   const messageQueue = useRef<Record<string, string>>({})
 
   useEffect(() => {
+    const now = Date.now()
+    const lastReset = parseInt(localStorage.getItem(LAST_RESET_KEY) || '0', 10)
+    if (now - lastReset > 86400000) {
+      setMinMax({})
+      localStorage.setItem(LAST_RESET_KEY, String(now))
+      localStorage.removeItem(STORAGE_KEY)
+    }
+
     const flush = () => {
       const updates = { ...messageQueue.current }
       messageQueue.current = {}
@@ -34,15 +53,12 @@ function App() {
 
           for (const [key, val] of Object.entries(updates)) {
             const num = parseFloat(val)
-            if (
-              !isNaN(num) &&
-              (
-                key.includes('power_L') ||
-                key.includes('Verbrauch_aktuell') ||
-                key === 'Pool_temp/temperatur' ||
-                key.includes('Balkonkraftwerk')
-              )
-            ) {
+            if (!isNaN(num) && (
+              key.includes('power_L') ||
+              key.includes('Verbrauch_aktuell') ||
+              key === 'Pool_temp/temperatur' ||
+              key.includes('Eingespeist_gesamt')
+            )) {
               const current = nextMinMax[key] ?? { min: num, max: num }
               nextMinMax[key] = {
                 min: Math.min(current.min, num),
@@ -52,10 +68,9 @@ function App() {
           }
 
           setMinMax(nextMinMax)
-          localStorage.setItem('minMax', JSON.stringify(nextMinMax))
+          saveMinMax(nextMinMax)
           return updated
         })
-
         setLastUpdate(new Date().toLocaleTimeString())
       }
     }
@@ -63,15 +78,9 @@ function App() {
     const interval = setInterval(flush, 300)
 
     client.on('connect', () => {
-      console.log('✅ MQTT verbunden!')
       const allTopics = topics.map(t => t.statusTopic || t.topic).filter(Boolean)
-      client.subscribe(allTopics, err => {
-        if (err) console.error('❌ Subscribe error:', err)
-        else console.log('📡 Subscribed to:', allTopics)
-      })
-
+      client.subscribe(allTopics)
       client.subscribe('#')
-
       topics.forEach(({ publishTopic }) => {
         if (publishTopic?.includes('/POWER')) {
           client.publish(publishTopic, '')
@@ -83,12 +92,8 @@ function App() {
       })
     })
 
-    client.on('reconnect', () => console.log('🔁 Reconnecting...'))
-    client.on('error', err => console.error('❌ MQTT Fehler:', err))
-
     client.on('message', (topic, message) => {
       const payload = message.toString()
-
       if (topic === 'Pool_temp/temperatur' || topic === 'Gaszaehler/stand') {
         messageQueue.current[topic] = payload
         return
@@ -106,7 +111,6 @@ function App() {
             }
             return acc
           }, {})
-
         const flat = flatten(json)
         for (const [key, val] of Object.entries(flat)) {
           const combinedKey = `${topic}.${key}`
@@ -146,10 +150,7 @@ function App() {
 
   const progressBar = (value: number, max = 100, color = 'bg-blue-500') => (
     <div className="w-full bg-gray-300 rounded-full h-2 mt-2 overflow-hidden">
-      <div
-        className={`${color} h-2 transition-all duration-1000 ease-out`}
-        style={{ width: `${Math.min(100, (value / max) * 100)}%` }}
-      />
+      <div className={`${color} h-2 transition-all duration-1000 ease-out`} style={{ width: `${Math.min(100, (value / max) * 100)}%` }} />
     </div>
   )
 
@@ -162,22 +163,23 @@ function App() {
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {topics.map(({ label, type, unit, favorite, statusTopic, publishTopic, topic }) => {
           const key = statusTopic ?? topic
-          const raw = values[key]
+          let raw = values[key]
           const value = raw?.toUpperCase()
           const num = parseFloat(raw)
           const isNumber = type === 'number' && !isNaN(num)
+
+          if (label.includes('Eingespeist')) {
+            raw = (num + 178.779).toFixed(3)
+          }
+
           const showMinMax =
-            key.includes('power_L') ||
-            key.includes('Verbrauch_aktuell') ||
-            key === 'Pool_temp/temperatur' ||
-            label.includes('Balkonkraftwerk')
+            key.includes('power_L') || key.includes('Verbrauch_aktuell') || key === 'Pool_temp/temperatur' || key.includes('Eingespeist_gesamt')
           const range = minMax[key] ?? { min: num, max: num }
+          const barColor = getBarColor(label, num)
 
           let bgColor = ''
           if (label.includes('Balkonkraftwerk')) bgColor = 'bg-green-100 dark:bg-green-900'
           else if (label.includes('Verbrauch aktuell')) bgColor = 'bg-yellow-100 dark:bg-yellow-900'
-
-          const barColor = getBarColor(label, num)
 
           return (
             <div key={key} className={`rounded-2xl shadow p-4 border-2 ${bgColor} ${favorite ? 'border-yellow-400' : 'border-gray-500'}`}>
