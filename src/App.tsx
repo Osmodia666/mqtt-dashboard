@@ -1,4 +1,3 @@
-// src/App.tsx
 import { useEffect, useState, useRef } from 'react'
 import mqtt from 'mqtt'
 import { mqttConfig, topics } from './config'
@@ -10,8 +9,8 @@ const client = mqtt.connect(mqttConfig.host, {
 client.setMaxListeners(100)
 
 type MinMax = Record<string, { min: number; max: number }>
-const STORAGE_KEY = 'global_minmax_store'
-const LAST_RESET_KEY = 'global_minmax_reset'
+const STORAGE_KEY = 'minMaxStore'
+const LAST_RESET_KEY = 'minMaxLastReset'
 
 function loadMinMax(): MinMax {
   try {
@@ -83,7 +82,9 @@ function App() {
       client.subscribe(allTopics)
       client.subscribe('#')
       topics.forEach(({ publishTopic }) => {
-        if (publishTopic?.includes('/POWER')) client.publish(publishTopic, '')
+        if (publishTopic?.includes('/POWER')) {
+          client.publish(publishTopic, '')
+        }
         if (publishTopic) {
           const base = publishTopic.split('/')[1]
           client.publish(`cmnd/${base}/state`, '')
@@ -115,6 +116,8 @@ function App() {
         const flat = flatten(json)
         for (const [key, val] of Object.entries(flat)) {
           const combinedKey = `${topic}.${key}`
+          console.log('[MQTT]', topic, '→', payload)
+          Object.keys(flat).forEach(k => console.log(k))
           messageQueue.current[combinedKey] = val
         }
       } catch {
@@ -161,53 +164,82 @@ function App() {
         Letztes Update: {lastUpdate || 'Lade...'}
       </header>
       <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-        {topics.map(({ label, type, unit, favorite, statusTopic, publishTopic, topic }) => {
-          const key = statusTopic ?? topic
-          const raw = values[key]
-          const value = raw?.toUpperCase()
-          const num = parseFloat(raw)
-          const isNumber = type === 'number' && !isNaN(num)
+        {topics
+          .filter(t => t.type !== 'group')
+          .map(({ label, type, unit, favorite, statusTopic, publishTopic, topic }) => {
+            const key = statusTopic ?? topic
+            let raw = values[key]
+            const value = raw?.toUpperCase()
+            const num = parseFloat(raw)
+            const isNumber = type === 'number' && !isNaN(num)
 
-          if (label.includes('Erzeugung [gesamt]') && !isNaN(num)) {
-            raw = (num + 178.779).toFixed(3)
-          }
+            if (label.includes('Erzeugung [gesamt]')) {
+              raw = (num + 178.779).toFixed(3)
+            }
 
-          const showMinMax = !label.includes('gesamt') &&
-            (key.includes('power_L') || key.includes('Verbrauch_aktuell') || key === 'Pool_temp/temperatur' || key.includes('Balkonkraftwerk'))
+            const showMinMax = (
+              !label.includes('gesamt') &&
+              (key.includes('power_L') || key.includes('Verbrauch_aktuell') || key === 'Pool_temp/temperatur' || key.includes('Balkonkraftwerk'))
+            )
+            const range = minMax[key] ?? { min: num, max: num }
+            const barColor = getBarColor(label, num)
 
-          const range = minMax[key] ?? { min: num, max: num }
-          const barColor = getBarColor(label, num)
+            let bgColor = ''
+            if (label.includes('Balkonkraftwerk')) bgColor = 'bg-green-100 dark:bg-green-900'
+            else if (label.includes('Verbrauch aktuell')) bgColor = 'bg-yellow-100 dark:bg-yellow-900'
 
-          let bgColor = ''
-          if (label.includes('Balkonkraftwerk')) bgColor = 'bg-green-100 dark:bg-green-900'
-          else if (label.includes('Verbrauch aktuell')) bgColor = 'bg-yellow-100 dark:bg-yellow-900'
+            return (
+              <div key={key} className={`rounded-2xl shadow p-4 border-2 ${bgColor} ${favorite ? 'border-yellow-400' : 'border-gray-500'}`}>
+                <h2 className="text-xl font-semibold mb-2">{label}</h2>
+                {type === 'boolean' && (
+                  <button
+                    className={`px-4 py-2 rounded-xl text-white ${value === 'ON' ? 'bg-green-500' : 'bg-red-500'}`}
+                    onClick={() => toggleBoolean(publishTopic ?? key, value)}
+                  >
+                    {value === 'ON' ? 'AN' : 'AUS'}
+                  </button>
+                )}
+                {isNumber && (
+                  <>
+                    <p className="text-3xl">{raw ?? '...'} {unit}</p>
+                    {showMinMax && progressBar(num, range.max > 0 ? range.max : 100, barColor)}
+                    {showMinMax && (
+                      <div className="text-xs mt-1 text-gray-500 dark:text-gray-400">
+                        Min: {range.min.toFixed(1)} {unit} | Max: {range.max.toFixed(1)} {unit}
+                      </div>
+                    )}
+                  </>
+                )}
+                {type === 'string' && <p className="text-xl">{raw ?? '...'}</p>}
+              </div>
+            )
+          })}
 
-          return (
-            <div key={key} className={`rounded-2xl shadow p-4 border-2 ${bgColor} ${favorite ? 'border-yellow-400' : 'border-gray-500'}`}>
-              <h2 className="text-xl font-semibold mb-2">{label}</h2>
-              {type === 'boolean' && (
-                <button
-                  className={`px-4 py-2 rounded-xl text-white ${value === 'ON' ? 'bg-green-500' : 'bg-red-500'}`}
-                  onClick={() => toggleBoolean(publishTopic ?? key, value)}
-                >
-                  {value === 'ON' ? 'AN' : 'AUS'}
-                </button>
-              )}
-              {isNumber && (
-                <>
-                  <p className="text-3xl">{raw ?? '...'} {unit}</p>
-                  {showMinMax && progressBar(num, range.max > 0 ? range.max : 100, barColor)}
-                  {showMinMax && (
-                    <div className="text-xs mt-1 text-gray-500 dark:text-gray-400">
-                      Min: {range.min.toFixed(1)} {unit} | Max: {range.max.toFixed(1)} {unit}
+        {/* Gruppierte Anzeige: Spannung, Leistung, Strom */}
+        <div className="col-span-full grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {topics.filter(t => t.type === 'group').map(group => (
+            <div key={group.label} className="rounded-2xl shadow p-4 border-2 border-gray-500 bg-blue-50 dark:bg-gray-800">
+              <h2 className="text-xl font-semibold mb-2">{group.label}</h2>
+              {group.keys?.map(({ label: phaseLabel, key }) => {
+                const rawVal = values[key]
+                const val = rawVal !== undefined ? parseFloat(rawVal) : NaN
+                const range = minMax[key] ?? { min: val, max: val }
+
+                return (
+                  <div key={key} className="mb-2">
+                    <div className="text-sm">
+                      {phaseLabel}: {isNaN(val) ? '...' : `${val} ${group.unit}`}
                     </div>
-                  )}
-                </>
-              )}
-              {type === 'string' && <p className="text-xl">{raw ?? '...'}</p>}
+                    {progressBar(val, group.label.includes('Spannung') ? 250 : 1000, 'bg-blue-500')}
+                    <div className="text-xs text-gray-500 dark:text-gray-400">
+                      Min: {range.min?.toFixed(1)} | Max: {range.max?.toFixed(1)}
+                    </div>
+                  </div>
+                )
+              })}
             </div>
-          )
-        })}
+          ))}
+        </div>
       </div>
     </main>
   )
