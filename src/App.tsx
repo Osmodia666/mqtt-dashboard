@@ -116,6 +116,7 @@ function App() {
         const flat = flatten(json)
         for (const [key, val] of Object.entries(flat)) {
           const combinedKey = `${topic}.${key}`
+          console.log('[MQTT] Combined key:', combinedKey, '→', val) // 🔍 Debug-Ausgabe
           messageQueue.current[combinedKey] = val
         }
       } catch {
