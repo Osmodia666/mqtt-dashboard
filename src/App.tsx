@@ -33,8 +33,8 @@ function App() {
             if (!isNaN(num) && (
               key.includes('power_L') ||
               key.includes('Verbrauch_aktuell') ||
-              key === 'Pool_temp/temperatur')
-            ) {
+              key === 'Pool_temp/temperatur'
+            )) {
               const current = nextMinMax[key] ?? { min: num, max: num }
               nextMinMax[key] = {
                 min: Math.min(current.min, num),
@@ -140,7 +140,7 @@ function App() {
   const progressBar = (value: number, max = 100, color = 'bg-blue-500') => (
     <div className="w-full bg-gray-300 rounded-full h-2 mt-2 overflow-hidden">
       <div
-        className={`${color} h-2 transition-all`}
+        className={`${color} h-2 transition-all duration-700 ease-out`}
         style={{ width: `${Math.min(100, (value / max) * 100)}%` }}
       />
     </div>
@@ -160,9 +160,7 @@ function App() {
           const num = parseFloat(raw)
           const isNumber = type === 'number' && !isNaN(num)
           const showMinMax =
-            key.includes('power_L') ||
-            key.includes('Verbrauch_aktuell') ||
-            key === 'Pool_temp/temperatur'
+            key.includes('power_L') || key.includes('Verbrauch_aktuell') || key === 'Pool_temp/temperatur'
           const range = minMax[key] ?? { min: num, max: num }
 
           let bgColor = ''
