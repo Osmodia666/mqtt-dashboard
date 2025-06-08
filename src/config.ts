@@ -147,4 +147,9 @@ export const topics = [
     unit: 'W',
     statusTopic: 'tele/Stromzähler/SENSOR.grid.power_L3',
   },
+  {
+  label: 'Raw Balkonkraftwerk JSON',
+  type: 'string',
+  topic: 'tele/Balkonkraftwerk/SENSOR',
+},
 ]
