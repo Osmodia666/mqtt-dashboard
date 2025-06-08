@@ -79,7 +79,7 @@ export const topics = [
     label: 'Erzeugung [gesamt]:',
     type: 'number',
     unit: 'kWh',
-    statusTopic: 'tele/Balkonkraftwerk/SENSOR.ENERGY.EnergyPTotal',
+    statusTopic: 'tele/Balkonkraftwerk/SENSOR.ENERGY.EnergyPTotal.0',
   },  
   {
     label: 'Gaszähler Stand:',
