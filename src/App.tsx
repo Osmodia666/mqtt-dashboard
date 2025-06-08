@@ -57,7 +57,7 @@ function App() {
               key.includes('power_L') ||
               key.includes('Verbrauch_aktuell') ||
               key === 'Pool_temp/temperatur' ||
-              key.includes('Balkonkraftwerk')
+              key.includes('Eingespeist_gesamt')
             )) {
               const current = nextMinMax[key] ?? { min: num, max: num }
               nextMinMax[key] = {
@@ -103,7 +103,7 @@ function App() {
         const json = JSON.parse(payload)
         const flatten = (obj: any, prefix = ''): Record<string, string> =>
           Object.entries(obj).reduce((acc, [key, val]) => {
-            const newKey = prefix ? ${prefix}.${key} : key
+            const newKey = prefix ? `${prefix}.${key}` : key
             if (typeof val === 'object' && val !== null) {
               Object.assign(acc, flatten(val, newKey))
             } else {
@@ -113,7 +113,7 @@ function App() {
           }, {})
         const flat = flatten(json)
         for (const [key, val] of Object.entries(flat)) {
-          const combinedKey = ${topic}.${key}
+          const combinedKey = `${topic}.${key}`
           messageQueue.current[combinedKey] = val
         }
       } catch {
@@ -150,7 +150,7 @@ function App() {
 
   const progressBar = (value: number, max = 100, color = 'bg-blue-500') => (
     <div className="w-full bg-gray-300 rounded-full h-2 mt-2 overflow-hidden">
-      <div className={${color} h-2 transition-all duration-1000 ease-out} style={{ width: ${Math.min(100, (value / max) * 100)}% }} />
+      <div className={`${color} h-2 transition-all duration-1000 ease-out`} style={{ width: `${Math.min(100, (value / max) * 100)}%` }} />
     </div>
   )
 
@@ -168,7 +168,7 @@ function App() {
           const num = parseFloat(raw)
           const isNumber = type === 'number' && !isNaN(num)
 
-          if (label.includes('Erzeugung [gesamt]')) {
+          if (label.includes('Eingespeist')) {
             raw = (num + 178.779).toFixed(3)
           }
 
@@ -182,12 +182,12 @@ function App() {
           else if (label.includes('Verbrauch aktuell')) bgColor = 'bg-yellow-100 dark:bg-yellow-900'
 
           return (
-            <div key={key} className={rounded-2xl shadow p-4 border-2 ${bgColor} ${favorite ? 'border-yellow-400' : 'border-gray-500'}}>
+            <div key={key} className={`rounded-2xl shadow p-4 border-2 ${bgColor} ${favorite ? 'border-yellow-400' : 'border-gray-500'}`}>
               <h2 className="text-xl font-semibold mb-2">{label}</h2>
 
               {type === 'boolean' && (
                 <button
-                  className={px-4 py-2 rounded-xl text-white ${value === 'ON' ? 'bg-green-500' : 'bg-red-500'}}
+                  className={`px-4 py-2 rounded-xl text-white ${value === 'ON' ? 'bg-green-500' : 'bg-red-500'}`}
                   onClick={() => toggleBoolean(publishTopic ?? key, value)}
                 >
                   {value === 'ON' ? 'AN' : 'AUS'}
