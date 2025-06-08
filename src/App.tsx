@@ -52,7 +52,14 @@ function App() {
 
           for (const [key, val] of Object.entries(updates)) {
             const num = parseFloat(val)
-            if (!isNaN(num) && /power_L|Verbrauch_aktuell|Pool_temp|Balkonkraftwerk|Voltage|Strom_L|Leistung_L/.test(key)) {
+            if (!isNaN(num) &&
+              (key.includes('power_L') ||
+                key.includes('Verbrauch_aktuell') ||
+                key === 'Pool_temp/temperatur' ||
+                key.includes('Balkonkraftwerk') ||
+                key.includes('Voltage') ||
+                key.includes('Strom_L')))
+            {
               const current = nextMinMax[key] ?? { min: num, max: num }
               nextMinMax[key] = {
                 min: Math.min(current.min, num),
@@ -76,7 +83,9 @@ function App() {
       client.subscribe(allTopics)
       client.subscribe('#')
       topics.forEach(({ publishTopic }) => {
-        if (publishTopic?.includes('/POWER')) client.publish(publishTopic, '')
+        if (publishTopic?.includes('/POWER')) {
+          client.publish(publishTopic, '')
+        }
         if (publishTopic) {
           const base = publishTopic.split('/')[1]
           client.publish(`cmnd/${base}/state`, '')
@@ -86,10 +95,12 @@ function App() {
 
     client.on('message', (topic, message) => {
       const payload = message.toString()
-        if (topic === 'Pool_temp/temperatur' || topic === 'Gaszaehler/stand') {
+
+      if (topic === 'Pool_temp/temperatur' || topic === 'Gaszaehler/stand') {
         messageQueue.current[topic] = payload
         return
       }
+
       try {
         const json = JSON.parse(payload)
         const flatten = (obj: any, prefix = ''): Record<string, string> =>
@@ -145,26 +156,6 @@ function App() {
     </div>
   )
 
-  const renderMiniGroup = (title: string, keys: { label: string, match: string, unit: string }[]) => (
-    <div className="rounded-2xl shadow p-4 border-2 border-gray-500 bg-blue-50 dark:bg-gray-800 col-span-full">
-      <h2 className="text-xl font-semibold mb-4">{title}</h2>
-      {keys.map(({ label, match, unit }) => {
-        const key = Object.keys(values).find(k => k.includes(match))
-        const val = key ? parseFloat(values[key]) : NaN
-        const range = key && minMax[key] ? minMax[key] : { min: val, max: val }
-        return (
-          <div key={label} className="mb-2">
-            <div className="text-sm">{label}: {val ?? '...'} {unit}</div>
-            {progressBar(val, 250, 'bg-blue-500')}
-            <div className="text-xs text-gray-500 dark:text-gray-400">
-              Min: {range.min?.toFixed(1)} | Max: {range.max?.toFixed(1)}
-            </div>
-          </div>
-        )
-      })}
-    </div>
-  )
-
   return (
     <main className="min-h-screen p-4 bg-white dark:bg-gray-900 text-black dark:text-white transition-colors duration-300">
       <header className="mb-4 text-sm text-gray-500 dark:text-gray-400">
@@ -172,69 +163,87 @@ function App() {
       </header>
 
       <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-        {topics.filter(t => t.type !== 'group').map(({ label, type, unit, favorite, statusTopic, publishTopic, topic }) => {
-          const key = statusTopic ?? topic
-          let raw = values[key]
-          const value = raw?.toUpperCase()
-          const num = parseFloat(raw)
-          const isNumber = type === 'number' && !isNaN(num)
+        {topics
+          .filter(t => t.type !== 'group')
+          .map(({ label, type, unit, favorite, statusTopic, publishTopic, topic }) => {
+            const key = statusTopic ?? topic
+            let raw = values[key]
+            const value = raw?.toUpperCase()
+            const num = parseFloat(raw)
+            const isNumber = type === 'number' && !isNaN(num)
 
-          if (label.includes('Erzeugung [gesamt]')) raw = (num + 178.779).toFixed(3)
+            if (label.includes('Erzeugung [gesamt]')) {
+              raw = (num + 178.779).toFixed(3)
+            }
 
-          const showMinMax =
-            key.includes('power_L') || key.includes('Verbrauch_aktuell') || key === 'Pool_temp/temperatur' || key.includes('Balkonkraftwerk')
+            const showMinMax = (
+              !label.includes('gesamt') &&
+              (key.includes('power_L') || key.includes('Verbrauch_aktuell') || key === 'Pool_temp/temperatur' || key.includes('Balkonkraftwerk'))
+            )
+            const range = minMax[key] ?? { min: num, max: num }
+            const barColor = getBarColor(label, num)
 
-          const range = minMax[key] ?? { min: num, max: num }
-          const barColor = getBarColor(label, num)
+            let bgColor = ''
+            if (label.includes('Balkonkraftwerk')) bgColor = 'bg-green-100 dark:bg-green-900'
+            else if (label.includes('Verbrauch aktuell')) bgColor = 'bg-yellow-100 dark:bg-yellow-900'
 
-          let bgColor = ''
-          if (label.includes('Balkonkraftwerk')) bgColor = 'bg-green-100 dark:bg-green-900'
-          else if (label.includes('Verbrauch aktuell')) bgColor = 'bg-yellow-100 dark:bg-yellow-900'
+            return (
+              <div key={key} className={`rounded-2xl shadow p-4 border-2 ${bgColor} ${favorite ? 'border-yellow-400' : 'border-gray-500'}`}>
+                <h2 className="text-xl font-semibold mb-2">{label}</h2>
 
-          return (
-            <div key={key} className={`rounded-2xl shadow p-4 border-2 ${bgColor} ${favorite ? 'border-yellow-400' : 'border-gray-500'}`}>
-              <h2 className="text-xl font-semibold mb-2">{label}</h2>
+                {type === 'boolean' && (
+                  <button
+                    className={`px-4 py-2 rounded-xl text-white ${value === 'ON' ? 'bg-green-500' : 'bg-red-500'}`}
+                    onClick={() => toggleBoolean(publishTopic ?? key, value)}
+                  >
+                    {value === 'ON' ? 'AN' : 'AUS'}
+                  </button>
+                )}
 
-              {type === 'boolean' && (
-                <button
-                  className={`px-4 py-2 rounded-xl text-white ${value === 'ON' ? 'bg-green-500' : 'bg-red-500'}`}
-                  onClick={() => toggleBoolean(publishTopic ?? key, value)}
-                >
-                  {value === 'ON' ? 'AN' : 'AUS'}
-                </button>
-              )}
+                {isNumber && (
+                  <>
+                    <p className="text-3xl">{raw ?? '...'} {unit}</p>
+                    {showMinMax && progressBar(num, range.max > 0 ? range.max : 100, barColor)}
+                    {showMinMax && (
+                      <div className="text-xs mt-1 text-gray-500 dark:text-gray-400">
+                        Min: {range.min.toFixed(1)} {unit} | Max: {range.max.toFixed(1)} {unit}
+                      </div>
+                    )}
+                  </>
+                )}
 
-              {isNumber && (
-                <>
-                  <p className="text-3xl">{raw ?? '...'} {unit}</p>
-                  {showMinMax && progressBar(num, range.max > 0 ? range.max : 100, barColor)}
-                  {showMinMax && (
-                    <div className="text-xs mt-1 text-gray-500 dark:text-gray-400">
-                      Min: {range.min.toFixed(1)} {unit} | Max: {range.max.toFixed(1)} {unit}
+                {type === 'string' && (
+                  <p className="text-xl">{raw ?? '...'}</p>
+                )}
+              </div>
+            )
+          })}
+
+        {/* Gruppierte Anzeige: Spannung, Leistung, Strom */}
+        <div className="col-span-full grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {['Spannung', 'Leistung', 'Strom'].map(groupLabel => (
+            <div key={groupLabel} className="rounded-2xl shadow p-4 border-2 border-gray-500 bg-blue-50 dark:bg-gray-800">
+              <h2 className="text-xl font-semibold mb-2">{groupLabel} L1–L3</h2>
+              {['L1', 'L2', 'L3'].map(phase => {
+                const key = Object.keys(values).find(k =>
+                  k.toLowerCase().includes(groupLabel.toLowerCase()) && k.includes(phase)
+                )
+                const val = key ? parseFloat(values[key]) : NaN
+                const range = key && minMax[key] ? minMax[key] : { min: val, max: val }
+
+                return (
+                  <div key={phase} className="mb-2">
+                    <div className="text-sm">{phase}: {val ?? '...'} {groupLabel === 'Strom' ? 'A' : groupLabel === 'Leistung' ? 'W' : 'V'}</div>
+                    {progressBar(val, groupLabel === 'Spannung' ? 250 : 1000, 'bg-blue-500')}
+                    <div className="text-xs text-gray-500 dark:text-gray-400">
+                      Min: {range.min?.toFixed(1)} | Max: {range.max?.toFixed(1)}
                     </div>
-                  )}
-                </>
-              )}
-              {type === 'string' && <p className="text-xl">{raw ?? '...'}</p>}
+                  </div>
+                )
+              })}
             </div>
-          )
-        })}
-
-        {renderMiniGroup('Spannung L1–L3', [
-          { label: 'L1', match: 'Spannung_L1', unit: 'V' },
-          { label: 'L2', match: 'Spannung_L2', unit: 'V' },
-          { label: 'L3', match: 'Spannung_L3', unit: 'V' },
-        ])}
-        {renderMiniGroup('Strom L1–L3', [
-          { label: 'L1', match: 'Strom_L1', unit: 'A' },
-          { label: 'L2', match: 'Strom_L2', unit: 'A' },
-          { label: 'L3', match: 'Strom_L3', unit: 'A' },
-        ])}
-        {renderMiniGroup('Leistung L1–L3', [
-          { label: 'L1', match: 'power_L1', unit: 'W' },
-          { label: 'L2', match: 'power_L2', unit: 'W' },
-          { label: 'L3', match: 'power_L3', unit: 'W' },
-        ])}
+          ))}
+        </div>
       </div>
     </main>
   )
