@@ -109,9 +109,9 @@ export const topics = [
   type: 'group',
   unit: 'V',
   keys: [
-    { label: 'L1', key: 'tele/Stromzähler/SENSOR.Spannung_L1' },
-    { label: 'L2', key: 'tele/Stromzähler/SENSOR.Spannung_L2' },
-    { label: 'L3', key: 'tele/Stromzähler/SENSOR.Spannung_L3' },
+    { label: 'L1', key: 'tele/Stromzähler/SENSOR.grid.Spannung_L1' },
+    { label: 'L2', key: 'tele/Stromzähler/SENSOR.grid.Spannung_L2' },
+    { label: 'L3', key: 'tele/Stromzähler/SENSOR.grid.Spannung_L3' },
   ],
 },
   // ✅ Gruppiert: Strom
