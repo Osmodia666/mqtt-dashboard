@@ -217,9 +217,9 @@ function App() {
         })}
 
         {renderMiniGroup('Spannung L1–L3', [
-          { label: 'L1', match: 'Voltage[0]', unit: 'V' },
-          { label: 'L2', match: 'Voltage[1]', unit: 'V' },
-          { label: 'L3', match: 'Voltage[2]', unit: 'V' },
+          { label: 'L1', match: 'Spannung_L1', unit: 'V' },
+          { label: 'L2', match: 'Spannung_L2', unit: 'V' },
+          { label: 'L3', match: 'Spannung_L3', unit: 'V' },
         ])}
         {renderMiniGroup('Strom L1–L3', [
           { label: 'L1', match: 'Strom_L1', unit: 'A' },
