@@ -9,8 +9,10 @@ const client = mqtt.connect(mqttConfig.host, {
 client.setMaxListeners(100)
 
 type MinMax = Record<string, { min: number; max: number }>
-const STORAGE_KEY = 'minMaxStore'
-const LAST_RESET_KEY = 'minMaxLastReset'
+const STORAGE_KEY = 'global_minmax_store'
+const LAST_RESET_KEY = 'global_minmax_store_reset'
+const MINMAX_TOPIC = 'dashboard/minmax/update'
+
 
 function loadMinMax(): MinMax {
   try {
@@ -28,10 +30,12 @@ function saveMinMax(data: MinMax) {
 function App() {
   const [values, setValues] = useState<Record<string, string>>({})
   const [lastUpdate, setLastUpdate] = useState<string>('')
-  const [minMax, setMinMax] = useState<MinMax>(() => loadMinMax())
+  const [minMax, setMinMax] = useState<MinMax>({})
   const messageQueue = useRef<Record<string, string>>({})
 
   useEffect(() => {
+     client.on('connect', () => {
+    client.subscribe(MINMAX_TOPIC)
     const now = Date.now()
     const lastReset = parseInt(localStorage.getItem(LAST_RESET_KEY) || '0', 10)
     if (now - lastReset > 86400000) {
@@ -67,8 +71,8 @@ function App() {
             }
           }
 
-          setMinMax(nextMinMax)
-          saveMinMax(nextMinMax)
+         setMinMax(nextMinMax)
+          client.publish(MINMAX_TOPIC, JSON.stringify(nextMinMax))
           return updated
         })
         setLastUpdate(new Date().toLocaleTimeString())
@@ -99,6 +103,16 @@ function App() {
         messageQueue.current[topic] = payload
         return
       }
+      if (topic === MINMAX_TOPIC) {
+  try {
+    const incoming = JSON.parse(payload)
+    setMinMax(prev => ({ ...prev, ...incoming }))
+  } catch (err) {
+    console.error('[MQTT] Fehler beim MinMax-Update:', err)
+  }
+  return
+}
+
 
       try {
         const json = JSON.parse(payload)
