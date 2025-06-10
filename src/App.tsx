@@ -1,8 +1,4 @@
 // src/App.tsx
-// Deine überarbeitete, moderne Version
-// ✅ Dark Mode optimiert
-// ✅ Moderne Grid-Anzeige mit xl:grid-cols-6
-// ✅ Globale MQTT Min/Max Synchronisierung
 
 import { useEffect, useState, useRef } from 'react'
 import mqtt from 'mqtt'
@@ -75,11 +71,8 @@ function App() {
     client.on('connect', () => {
       const allTopics = topics.map(t => t.statusTopic || t.topic).filter(Boolean)
       client.subscribe([...allTopics, '#', MINMAX_TOPIC])
-
       topics.forEach(({ publishTopic }) => {
-        if (publishTopic?.includes('/POWER')) {
-          client.publish(publishTopic, '')
-        }
+        if (publishTopic?.includes('/POWER')) client.publish(publishTopic, '')
         if (publishTopic) {
           const base = publishTopic.split('/')[1]
           client.publish(`cmnd/${base}/state`, '')
@@ -89,12 +82,10 @@ function App() {
 
     client.on('message', (topic, message) => {
       const payload = message.toString()
-
       if (topic === 'Pool_temp/temperatur' || topic === 'Gaszaehler/stand') {
         messageQueue.current[topic] = payload
         return
       }
-
       if (topic === MINMAX_TOPIC) {
         try {
           const incoming = JSON.parse(payload)
@@ -154,7 +145,7 @@ function App() {
       <header className="mb-6 text-sm text-gray-400">Letztes Update: {lastUpdate || 'Lade...'}</header>
 
       <div className="grid xl:grid-cols-6 lg:grid-cols-5 md:grid-cols-4 sm:grid-cols-2 gap-4">
-        {topics.filter(t => t.type !== 'group').map(({ label, type, unit, favorite, statusTopic, publishTopic, topic }) => {
+        {topics.filter(t => t.type !== 'group' && !['Poolpumpe', 'Stromzähler Stand:', 'Gaszähler Stand:'].includes(t.label)).map(({ label, type, unit, favorite, statusTopic, publishTopic, topic }) => {
           const key = statusTopic ?? topic
           let raw = values[key]
           const value = raw?.toUpperCase()
@@ -187,8 +178,27 @@ function App() {
             </div>
           )
         })}
+
+        {/* Poolgruppe */}
+        <div className="rounded-xl p-4 border border-blue-400 bg-gray-800">
+          <h2 className="text-md font-bold mb-2">Pool</h2>
+          <div className="flex items-center gap-4">
+            <button className={`px-4 py-1 text-sm rounded-lg text-white ${values['stat/Poolpumpe/POWER'] === 'ON' ? 'bg-green-500' : 'bg-red-500'}`} onClick={() => toggleBoolean('cmnd/Poolpumpe/POWER', values['stat/Poolpumpe/POWER'])}>
+              Poolpumpe: {values['stat/Poolpumpe/POWER'] === 'ON' ? 'AN' : 'AUS'}
+            </button>
+            <div className="text-xl">🌡️ {values['Pool_temp/temperatur'] ?? '...'} °C</div>
+          </div>
+        </div>
+
+        {/* Energiezählergruppe */}
+        <div className="rounded-xl p-4 border border-purple-400 bg-gray-800">
+          <h2 className="text-md font-bold mb-2">Zähler</h2>
+          <div className="text-lg">Strom: {values['tele/Stromzähler/SENSOR.grid.Verbrauch_gesamt'] ?? '...'} kWh</div>
+          <div className="text-lg">Gas: {values['Gaszaehler/stand'] ?? '...'} m³</div>
+        </div>
       </div>
 
+      {/* Gruppierte L1–L3 Anzeige */}
       <div className="mt-10 grid grid-cols-1 sm:grid-cols-3 gap-4">
         {topics.filter(t => t.type === 'group').map(group => (
           <div key={group.label} className="rounded-xl shadow p-4 border border-gray-600 bg-gray-800">
