@@ -1,5 +1,4 @@
 // src/App.tsx
-
 import { useEffect, useState, useRef } from 'react'
 import mqtt from 'mqtt'
 import { mqttConfig, topics } from './config'
@@ -42,14 +41,10 @@ function App() {
 
           for (const [key, val] of Object.entries(updates)) {
             const num = parseFloat(val)
-            if (!isNaN(num) && (
-              key.includes('power_L') ||
-              key.includes('Verbrauch_aktuell') ||
-              key === 'Pool_temp/temperatur' ||
-              key.includes('Balkonkraftwerk') ||
-              key.includes('Voltage') ||
-              key.includes('Strom_L')
-            )) {
+            if (!isNaN(num) &&
+              (key.includes('power_L') || key.includes('Verbrauch_aktuell') ||
+               key === 'Pool_temp/temperatur' || key.includes('Balkonkraftwerk') ||
+               key.includes('Voltage') || key.includes('Strom_L'))) {
               const current = nextMinMax[key] ?? { min: num, max: num }
               nextMinMax[key] = {
                 min: Math.min(current.min, num),
@@ -71,8 +66,11 @@ function App() {
     client.on('connect', () => {
       const allTopics = topics.map(t => t.statusTopic || t.topic).filter(Boolean)
       client.subscribe([...allTopics, '#', MINMAX_TOPIC])
+
       topics.forEach(({ publishTopic }) => {
-        if (publishTopic?.includes('/POWER')) client.publish(publishTopic, '')
+        if (publishTopic?.includes('/POWER')) {
+          client.publish(publishTopic, '')
+        }
         if (publishTopic) {
           const base = publishTopic.split('/')[1]
           client.publish(`cmnd/${base}/state`, '')
@@ -90,9 +88,7 @@ function App() {
         try {
           const incoming = JSON.parse(payload)
           setMinMax(prev => ({ ...prev, ...incoming }))
-        } catch (err) {
-          console.error('[MQTT] Fehler beim MinMax-Update:', err)
-        }
+        } catch {}
         return
       }
 
@@ -108,7 +104,6 @@ function App() {
             }
             return acc
           }, {})
-
         const flat = flatten(json)
         for (const [key, val] of Object.entries(flat)) {
           const combinedKey = `${topic}.${key}`
@@ -144,61 +139,86 @@ function App() {
     <main className="min-h-screen p-6 bg-gray-950 text-white font-sans">
       <header className="mb-6 text-sm text-gray-400">Letztes Update: {lastUpdate || 'Lade...'}</header>
 
-      <div className="grid xl:grid-cols-6 lg:grid-cols-5 md:grid-cols-4 sm:grid-cols-2 gap-4">
-        {topics.filter(t => t.type !== 'group' && !['Poolpumpe', 'Stromzähler Stand:', 'Gaszähler Stand:'].includes(t.label)).map(({ label, type, unit, favorite, statusTopic, publishTopic, topic }) => {
+      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
+
+        {/* 3D-Drucker zusammen */}
+        <div className="rounded-xl p-4 border border-gray-600 bg-gray-800">
+          <h2 className="text-md font-bold mb-2">3D-Drucker</h2>
+          {['Ender_3_Pro', 'Sidewinder_X1'].map(name => {
+            const topic = `stat/${name}/POWER1`
+            const state = values[topic]?.toUpperCase()
+            return (
+              <div key={topic} className="flex justify-between items-center mb-2">
+                <span>{name.replace('_', ' ')}</span>
+                <button
+                  className={`px-4 py-1 text-sm rounded-lg text-white ${state === 'ON' ? 'bg-green-500' : 'bg-red-500'}`}
+                  onClick={() => toggleBoolean(`cmnd/${name}/POWER`, state)}>
+                  {state === 'ON' ? 'AN' : 'AUS'}
+                </button>
+              </div>
+            )
+          })}
+        </div>
+
+        {/* Poolpumpe + Temperatur */}
+        <div className="rounded-xl p-4 border border-gray-600 bg-gray-800">
+          <h2 className="text-md font-bold mb-2">Pool</h2>
+          <div className="flex justify-between items-center mb-2">
+            <span>Pumpe</span>
+            <button
+              className={`px-4 py-1 text-sm rounded-lg text-white ${values['stat/Poolpumpe/POWER'] === 'ON' ? 'bg-green-500' : 'bg-red-500'}`}
+              onClick={() => toggleBoolean('cmnd/Poolpumpe/POWER', values['stat/Poolpumpe/POWER'])}>
+              {values['stat/Poolpumpe/POWER'] === 'ON' ? 'AN' : 'AUS'}
+            </button>
+          </div>
+          <div>
+            <div className="text-sm">Temperatur: {values['Pool_temp/temperatur'] ?? '...'} °C</div>
+            {progressBar(parseFloat(values['Pool_temp/temperatur']) || 0, 40, getBarColor('Pool Temperatur', parseFloat(values['Pool_temp/temperatur']) || 0))}
+          </div>
+        </div>
+
+        {/* Stromzähler + Gaszähler */}
+        <div className="rounded-xl p-4 border border-gray-600 bg-gray-800">
+          <h2 className="text-md font-bold mb-2">Zähler</h2>
+          <p>Strom: {values['tele/Stromzähler/SENSOR.grid.Verbrauch_gesamt'] ?? '...'} kWh</p>
+          <p>Gas: {values['Gaszaehler/stand'] ?? '...'} m³</p>
+        </div>
+
+        {/* Einzelwerte */}
+        {topics.filter(t => t.type !== 'group' && !t.label.includes('3D') && !t.label.includes('Poolpumpe') && !t.label.includes('Gaszähler') && !t.label.includes('Stromzähler')).map(({ label, type, unit, statusTopic, publishTopic, topic }) => {
           const key = statusTopic ?? topic
-          let raw = values[key]
+          const raw = values[key]
           const value = raw?.toUpperCase()
           const num = parseFloat(raw)
-          const isNumber = type === 'number' && !isNaN(num)
-          if (label.includes('Erzeugung [gesamt]')) raw = (num + 178.779).toFixed(3)
-
-          const showMinMax = (!label.includes('gesamt') && (key.includes('power_L') || key.includes('Verbrauch_aktuell') || key === 'Pool_temp/temperatur' || key.includes('Balkonkraftwerk')))
+          const showMinMax = key === 'Pool_temp/temperatur' || key.includes('power_L') || key.includes('Balkonkraftwerk') || key.includes('Verbrauch_aktuell')
           const range = minMax[key] ?? { min: num, max: num }
           const barColor = getBarColor(label, num)
 
           return (
-            <div key={key} className={`rounded-xl p-4 border ${favorite ? 'border-yellow-400' : 'border-gray-600'} bg-gray-800`}>
+            <div key={key} className="rounded-xl p-4 border border-gray-600 bg-gray-800">
               <h2 className="text-md font-bold mb-2">{label}</h2>
               {type === 'boolean' && (
-                <button className={`px-4 py-1 text-sm rounded-lg text-white ${value === 'ON' ? 'bg-green-500' : 'bg-red-500'}`} onClick={() => toggleBoolean(publishTopic ?? key, value)}>
+                <button
+                  className={`px-4 py-1 text-sm rounded-lg text-white ${value === 'ON' ? 'bg-green-500' : 'bg-red-500'}`}
+                  onClick={() => toggleBoolean(publishTopic ?? key, value)}>
                   {value === 'ON' ? 'AN' : 'AUS'}
                 </button>
               )}
-              {isNumber && (
+              {type === 'number' && (
                 <>
                   <p className="text-2xl">{raw ?? '...'} {unit}</p>
                   {showMinMax && progressBar(num, range.max > 0 ? range.max : 100, barColor)}
                   {showMinMax && (
-                    <p className="text-xs mt-1 text-gray-400">Min: {range.min.toFixed(1)} {unit} | Max: {range.max.toFixed(1)} {unit}</p>
+                    <p className="text-xs text-gray-400">Min: {range.min?.toFixed(1)} {unit} | Max: {range.max?.toFixed(1)} {unit}</p>
                   )}
                 </>
               )}
-              {type === 'string' && <p className="text-lg">{raw ?? '...'}</p>}
             </div>
           )
         })}
-
-        {/* Poolgruppe */}
-        <div className="rounded-xl p-4 border border-blue-400 bg-gray-800">
-          <h2 className="text-md font-bold mb-2">Pool</h2>
-          <div className="flex items-center gap-4">
-            <button className={`px-4 py-1 text-sm rounded-lg text-white ${values['stat/Poolpumpe/POWER'] === 'ON' ? 'bg-green-500' : 'bg-red-500'}`} onClick={() => toggleBoolean('cmnd/Poolpumpe/POWER', values['stat/Poolpumpe/POWER'])}>
-              Poolpumpe: {values['stat/Poolpumpe/POWER'] === 'ON' ? 'AN' : 'AUS'}
-            </button>
-            <div className="text-xl">🌡️ {values['Pool_temp/temperatur'] ?? '...'} °C</div>
-          </div>
-        </div>
-
-        {/* Energiezählergruppe */}
-        <div className="rounded-xl p-4 border border-purple-400 bg-gray-800">
-          <h2 className="text-md font-bold mb-2">Zähler</h2>
-          <div className="text-lg">Strom: {values['tele/Stromzähler/SENSOR.grid.Verbrauch_gesamt'] ?? '...'} kWh</div>
-          <div className="text-lg">Gas: {values['Gaszaehler/stand'] ?? '...'} m³</div>
-        </div>
       </div>
 
-      {/* Gruppierte L1–L3 Anzeige */}
+      {/* Gruppierte Phase-Daten */}
       <div className="mt-10 grid grid-cols-1 sm:grid-cols-3 gap-4">
         {topics.filter(t => t.type === 'group').map(group => (
           <div key={group.label} className="rounded-xl shadow p-4 border border-gray-600 bg-gray-800">
