@@ -57,12 +57,6 @@ export const topics = [
     publishTopic: 'cmnd/Poolpumpe/POWER',
   },
   {
-    label: 'Pool Temperatur:',
-    type: 'number',
-    unit: '°C',
-    statusTopic: 'Pool_temp/temperatur',
-  },
-  {
     label: 'Verbrauch aktuell:',
     type: 'number',
     unit: 'W',
@@ -79,18 +73,6 @@ export const topics = [
     type: 'number',
     unit: 'kWh',
     statusTopic: 'tele/Balkonkraftwerk/SENSOR.ENERGY.EnergyPTotal.0',
-  },
-  {
-    label: 'Gaszähler Stand:',
-    type: 'number',
-    unit: 'm³',
-    statusTopic: 'Gaszaehler/stand',
-  },
-  {
-    label: 'Stromzähler Stand:',
-    type: 'number',
-    unit: 'kWh',
-    statusTopic: 'tele/Stromzähler/SENSOR.grid.Verbrauch_gesamt',
   },
     // ✅ Gruppiert: Leistung
   {
