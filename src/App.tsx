@@ -16,7 +16,7 @@ const MINMAX_TOPIC = 'dashboard/minmax/update'
 
 function App() {
   const [values, setValues] = useState<Record<string, string>>({})
-  const [lastUpdate, setLastUpdate] = useState<string>('')
+  const [lastUpdate, setLastUpdate] = useState('')
   const [minMax, setMinMax] = useState<MinMax>({})
   const messageQueue = useRef<Record<string, string>>({})
 
@@ -36,18 +36,14 @@ function App() {
       if (Object.keys(updates).length > 0) {
         setValues(prev => {
           const updated = { ...prev, ...updates }
-          const nextMinMax: MinMax = { ...minMax }
+          const nextMinMax = { ...minMax }
 
           for (const [key, val] of Object.entries(updates)) {
             const num = parseFloat(val)
-            if (!isNaN(num) && (
-              key.includes('power_L') ||
-              key.includes('Verbrauch_aktuell') ||
-              key === 'Pool_temp/temperatur' ||
-              key.includes('Balkonkraftwerk') ||
-              key.includes('Voltage') ||
-              key.includes('Strom_L')
-            )) {
+            if (!isNaN(num) &&
+              (key.includes('power_L') || key.includes('Verbrauch_aktuell') ||
+              key === 'Pool_temp/temperatur' || key.includes('Balkonkraftwerk') ||
+              key.includes('Voltage') || key.includes('Strom_L'))) {
               const current = nextMinMax[key] ?? { min: num, max: num }
               nextMinMax[key] = {
                 min: Math.min(current.min, num),
@@ -65,6 +61,7 @@ function App() {
     }
 
     const interval = setInterval(flush, 300)
+
     client.on('connect', () => {
       const allTopics = topics.map(t => t.statusTopic || t.topic).filter(Boolean)
       client.subscribe([...allTopics, '#', MINMAX_TOPIC])
@@ -126,125 +123,146 @@ function App() {
     client.publish(publishTopic, next)
   }
 
-  const getBarColor = (label: string, value: number) => {
-    if (label.includes('Verbrauch aktuell')) return value >= 2000 ? 'bg-red-600' : value >= 500 ? 'bg-yellow-400' : 'bg-green-500'
-    if (label.includes('Balkonkraftwerk')) return value > 450 ? 'bg-green-500' : value > 150 ? 'bg-yellow-400' : 'bg-red-600'
-    if (label.includes('Pool Temperatur')) return value > 23 ? 'bg-green-500' : value > 17 ? 'bg-yellow-400' : 'bg-blue-500'
-    return 'bg-blue-500'
-  }
-
   const progressBar = (value: number, max = 100, color = 'bg-blue-500') => (
     <div className="w-full bg-gray-300 rounded-full h-2 mt-2 overflow-hidden">
-      <div className={`${color} h-2 transition-all duration-1000 ease-out`} style={{ width: `${Math.min(100, (value / max) * 100)}%` }} />
+      <div className={`${color} h-2 transition-all duration-500 ease-out`} style={{ width: `${Math.min(100, (value / max) * 100)}%` }} />
     </div>
   )
+
+  const Icon = ({ name }: { name: string }) => {
+    const icons: Record<string, string> = {
+      pool: '🏊', plug: '🔌', bolt: '⚡', light: '💡',
+      gas: '🔥', temp: '🌡️', printer: '🖨️', meter: '📟',
+    }
+    return <span className="text-xl mr-2">{icons[name] ?? '🔧'}</span>
+  }
+
   return (
-    <main className="min-h-screen p-4 sm:p-6 bg-gray-950 text-white font-sans">
-      <header className="mb-6 text-sm text-gray-400">Letztes Update: {lastUpdate || 'Lade...'}</header>
+    <main className="min-h-screen p-4 bg-gray-950 text-white font-sans">
+      <header className="mb-4 text-sm text-gray-400">Letztes Update: {lastUpdate || 'Lade...'}</header>
 
       <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
-
-        {/* Spezialkachel: Pool */}
+        {/* Kachel: 3D-Drucker */}
         <div className="col-span-1 rounded-xl p-4 border border-gray-600 bg-gray-800">
-          <h2 className="text-md font-bold mb-2 flex items-center gap-2">🌊 Pool</h2>
-          <div className="flex justify-between items-center mb-1">
-            <span>Pumpe</span>
-            <button
-              className={`px-3 py-1 text-sm rounded text-white ${values['stat/Poolpumpe/POWER'] === 'ON' ? 'bg-green-500' : 'bg-red-500'}`}
-              onClick={() => toggleBoolean('cmnd/Poolpumpe/POWER', values['stat/Poolpumpe/POWER'])}>
-              {values['stat/Poolpumpe/POWER'] === 'ON' ? 'AN' : 'AUS'}
-            </button>
-          </div>
-          <div className="mt-2">
-            Temperatur: {isNaN(parseFloat(values['Pool_temp/temperatur'])) ? '...' : `${values['Pool_temp/temperatur']} °C`}
-            {progressBar(parseFloat(values['Pool_temp/temperatur']), 40, getBarColor('Pool Temperatur', parseFloat(values['Pool_temp/temperatur'])))}
-          </div>
-        </div>
-
-        {/* Steckdosen 1 + 2 */}
-        <div className="col-span-1 rounded-xl p-4 border border-gray-600 bg-gray-800">
-          <h2 className="text-md font-bold mb-2 flex items-center gap-2">🔌 Steckdosen</h2>
-          {['Steckdose 1', 'Steckdose 2'].map(name => {
-            const entry = topics.find(t => t.label === name)
-            const raw = values[entry?.statusTopic ?? '']
-            const state = raw?.toUpperCase()
+          <h2 className="font-bold text-md mb-2 flex items-center"><Icon name="printer" />3D-Drucker</h2>
+          {['Ender 3 Pro', 'Sidewinder X1'].map(label => {
+            const entry = topics.find(t => t.label === label)
+            if (!entry) return null
+            const val = values[entry.statusTopic ?? entry.topic]?.toUpperCase()
             return (
-              <div key={name} className="flex justify-between items-center mb-1">
-                <span>{name}</span>
-                <button
-                  className={`px-3 py-1 text-sm rounded text-white ${state === 'ON' ? 'bg-green-500' : 'bg-red-500'}`}
-                  onClick={() => toggleBoolean(entry!.publishTopic!, state)}
-                >
-                  {state === 'ON' ? 'AN' : 'AUS'}
+              <div key={label} className="flex justify-between items-center">
+                <span>{label}</span>
+                <button className={`px-3 py-1 text-sm rounded text-white ${val === 'ON' ? 'bg-green-500' : 'bg-red-500'}`} onClick={() => toggleBoolean(entry.publishTopic!, val)}>
+                  {val === 'ON' ? 'AN' : 'AUS'}
                 </button>
               </div>
             )
           })}
         </div>
 
-        {/* Strom + Gaszähler */}
+        {/* Kachel: Steckdose 1 & 2 */}
         <div className="col-span-1 rounded-xl p-4 border border-gray-600 bg-gray-800">
-          <h2 className="text-md font-bold mb-2 flex items-center gap-2">⚡ Zähler</h2>
+          <h2 className="font-bold text-md mb-2 flex items-center"><Icon name="plug" />Steckdosen</h2>
+          {['Steckdose 1', 'Steckdose 2'].map(label => {
+            const entry = topics.find(t => t.label === label)
+            if (!entry) return null
+            const val = values[entry.statusTopic ?? entry.topic]?.toUpperCase()
+            return (
+              <div key={label} className="flex justify-between items-center">
+                <span>{label}</span>
+                <button className={`px-3 py-1 text-sm rounded text-white ${val === 'ON' ? 'bg-green-500' : 'bg-red-500'}`} onClick={() => toggleBoolean(entry.publishTopic!, val)}>
+                  {val === 'ON' ? 'AN' : 'AUS'}
+                </button>
+              </div>
+            )
+          })}
+        </div>
+
+        {/* Kachel: Strom- & Gaszähler */}
+        <div className="col-span-1 rounded-xl p-4 border border-gray-600 bg-gray-800">
+          <h2 className="font-bold text-md mb-2 flex items-center"><Icon name="meter" />Zähler</h2>
           <p>Strom: {values['tele/Stromzähler/SENSOR.grid.Verbrauch_gesamt'] ?? '...'} kWh</p>
           <p>Gas: {values['Gaszaehler/stand'] ?? '...'} m³</p>
         </div>
 
-        {/* Alle restlichen Einzelgeräte */}
+        {/* Kachel: Pool */}
+        <div className="col-span-1 rounded-xl p-4 border border-gray-600 bg-gray-800">
+          <h2 className="font-bold text-md mb-2 flex items-center"><Icon name="pool" />Pool</h2>
+          {(() => {
+            const pump = topics.find(t => t.label === 'Poolpumpe')
+            const tempKey = 'Pool_temp/temperatur'
+            const raw = values[tempKey]
+            const num = parseFloat(raw)
+            const val = isNaN(num) ? '...' : `${num} °C`
+            const range = minMax[tempKey] ?? { min: num, max: num }
+            return (
+              <>
+                <div className="flex justify-between items-center">
+                  <span>Pumpe</span>
+                  {pump && (
+                    <button className={`px-3 py-1 text-sm rounded text-white ${values[pump.topic]?.toUpperCase() === 'ON' ? 'bg-green-500' : 'bg-red-500'}`} onClick={() => toggleBoolean(pump.publishTopic!, values[pump.topic])}>
+                      {values[pump.topic]?.toUpperCase() === 'ON' ? 'AN' : 'AUS'}
+                    </button>
+                  )}
+                </div>
+                <p className="mt-2">Temperatur: {val}</p>
+                {progressBar(num, 40, 'bg-blue-400')}
+                <p className="text-xs text-gray-400">Min: {range.min.toFixed(1)} | Max: {range.max.toFixed(1)} °C</p>
+              </>
+            )
+          })()}
+        </div>
+
+        {/* Normale Kacheln */}
         {topics
-          .filter(t =>
-            t.type !== 'group' &&
-            !['Poolpumpe', 'Steckdose 1', 'Steckdose 2'].includes(t.label)
-          )
+          .filter(t => t.type !== 'group' && !['Poolpumpe', 'Ender 3 Pro', 'Sidewinder X1', 'Steckdose 1', 'Steckdose 2', 'Stromzähler Stand', 'Gaszähler Stand:'].includes(t.label))
           .map(({ label, type, unit, favorite, statusTopic, publishTopic, topic }) => {
             const key = statusTopic ?? topic
-            let raw = values[key]
+            const raw = values[key]
             const value = raw?.toUpperCase()
             const num = parseFloat(raw)
             const isNumber = type === 'number' && !isNaN(num)
-            const showMinMax = !label.includes('gesamt') &&
-              (key.includes('power_L') || key.includes('Verbrauch_aktuell') || key === 'Pool_temp/temperatur' || key.includes('Balkonkraftwerk'))
+            const showMinMax = !label.includes('gesamt') && (key.includes('power_L') || key.includes('Verbrauch_aktuell') || key === 'Pool_temp/temperatur' || key.includes('Balkonkraftwerk'))
             const range = minMax[key] ?? { min: num, max: num }
-            const barColor = getBarColor(label, num)
 
             return (
-              <div key={key} className="rounded-xl p-4 border border-gray-600 bg-gray-800">
-                <h2 className="text-md font-bold mb-2">{label}</h2>
+              <div key={key} className={`rounded-xl p-4 border ${favorite ? 'border-yellow-400' : 'border-gray-600'} bg-gray-800`}>
+                <h2 className="font-bold text-md mb-2">{label}</h2>
                 {type === 'boolean' && (
-                  <button className={`px-3 py-1 rounded text-white ${value === 'ON' ? 'bg-green-500' : 'bg-red-500'}`} onClick={() => toggleBoolean(publishTopic ?? key, value)}>
+                  <button className={`px-4 py-1 rounded text-white ${value === 'ON' ? 'bg-green-500' : 'bg-red-500'}`} onClick={() => toggleBoolean(publishTopic ?? key, value)}>
                     {value === 'ON' ? 'AN' : 'AUS'}
                   </button>
                 )}
                 {isNumber && (
                   <>
-                    <p className="text-xl">{raw ?? '...'} {unit}</p>
-                    {showMinMax && progressBar(num, range.max > 0 ? range.max : 100, barColor)}
-                    {showMinMax && <p className="text-xs text-gray-400">Min: {range.min.toFixed(1)} {unit} | Max: {range.max.toFixed(1)} {unit}</p>}
+                    <p className="text-2xl">{raw ?? '...'} {unit}</p>
+                    {progressBar(num, range.max > 0 ? range.max : 100, 'bg-blue-500')}
+                    <p className="text-xs text-gray-400">Min: {range.min.toFixed(1)} | Max: {range.max.toFixed(1)} {unit}</p>
                   </>
                 )}
               </div>
             )
           })}
+      </div>
 
-        {/* Gruppenanzeige: Strom / Spannung / Leistung */}
-        <div className="col-span-full grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6">
-          {topics.filter(t => t.type === 'group').map(group => (
-            <div key={group.label} className="rounded-xl p-4 border border-gray-600 bg-gray-800">
-              <h2 className="text-md font-bold mb-2">{group.label}</h2>
-              {group.keys?.map(({ label: phase, key }) => {
-                const raw = values[key]
-                const val = raw !== undefined ? parseFloat(raw) : NaN
-                const range = minMax[key] ?? { min: val, max: val }
-                return (
-                  <div key={key} className="mb-2">
-                    <div className="text-sm">{phase}: {isNaN(val) ? '...' : `${val} ${group.unit}`}</div>
-                    {progressBar(val, group.label.includes('Spannung') ? 250 : 1000)}
-                    <p className="text-xs text-gray-400">Min: {range.min?.toFixed(1)} | Max: {range.max?.toFixed(1)}</p>
-                  </div>
-                )
-              })}
-            </div>
-          ))}
-        </div>
+      {/* Gruppenanzeige: Spannung, Strom, Leistung */}
+      <div className="mt-10 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+        {topics.filter(t => t.type === 'group').map(group => (
+          <div key={group.label} className="rounded-xl p-4 border border-gray-600 bg-gray-800">
+            <h2 className="font-semibold text-md mb-2">{group.label}</h2>
+            {group.keys?.map(({ label: phase, key }) => {
+              const val = parseFloat(values[key])
+              const range = minMax[key] ?? { min: val, max: val }
+              return (
+                <div key={key}>
+                  <p className="text-sm">{phase}: {isNaN(val) ? '...' : `${val} ${group.unit}`}</p>
+                  {progressBar(val, group.label.includes('Spannung') ? 250 : 1000, 'bg-blue-500')}
+                  <p className="text-xs text-gray-400">Min: {range.min.toFixed(1)} | Max: {range.max.toFixed(1)}</p>
+                </div>
+              )
+            })}
+          </div>
+        ))}
       </div>
     </main>
   )
