@@ -2,7 +2,15 @@
 import { useEffect, useState, useRef } from 'react'
 import mqtt from 'mqtt'
 import { mqttConfig, topics } from './config'
-import { FiCpu, FiDroplet, FiThermometer, FiZap, FiActivity, FiBox } from 'react-icons/fi'
+import {
+  FaThermometerHalf,
+  FaPlug,
+  FaLightbulb,
+  FaSwimmingPool,
+  FaBolt,
+  FaCubes,
+  FaTachometerAlt,
+} from 'react-icons/fa'
 
 const client = mqtt.connect(mqttConfig.host, {
   username: mqttConfig.username,
@@ -10,11 +18,11 @@ const client = mqtt.connect(mqttConfig.host, {
 })
 client.setMaxListeners(100)
 
+type MinMax = Record<string, { min: number; max: number }>
+
 const STORAGE_KEY = 'global_minmax_store'
 const LAST_RESET_KEY = 'global_minmax_store_reset'
 const MINMAX_TOPIC = 'dashboard/minmax/update'
-
-type MinMax = Record<string, { min: number; max: number }>
 
 function App() {
   const [values, setValues] = useState<Record<string, string>>({})
@@ -34,6 +42,7 @@ function App() {
     const flush = () => {
       const updates = { ...messageQueue.current }
       messageQueue.current = {}
+
       if (Object.keys(updates).length > 0) {
         setValues(prev => {
           const updated = { ...prev, ...updates }
@@ -71,9 +80,7 @@ function App() {
       const allTopics = topics.map(t => t.statusTopic || t.topic).filter(Boolean)
       client.subscribe([...allTopics, '#', MINMAX_TOPIC])
       topics.forEach(({ publishTopic }) => {
-        if (publishTopic?.includes('/POWER')) {
-          client.publish(publishTopic, '')
-        }
+        if (publishTopic?.includes('/POWER')) client.publish(publishTopic, '')
         if (publishTopic) {
           const base = publishTopic.split('/')[1]
           client.publish(`cmnd/${base}/state`, '')
@@ -83,10 +90,12 @@ function App() {
 
     client.on('message', (topic, message) => {
       const payload = message.toString()
+
       if (topic === 'Pool_temp/temperatur' || topic === 'Gaszaehler/stand') {
         messageQueue.current[topic] = payload
         return
       }
+
       if (topic === MINMAX_TOPIC) {
         try {
           const incoming = JSON.parse(payload)
@@ -128,12 +137,6 @@ function App() {
     client.publish(publishTopic, next)
   }
 
-  const progressBar = (value: number, max = 100, color = 'bg-blue-500') => (
-    <div className="w-full bg-gray-300 rounded-full h-2 mt-2 overflow-hidden">
-      <div className={`${color} h-2`} style={{ width: `${Math.min(100, (value / max) * 100)}%` }} />
-    </div>
-  )
-
   const getBarColor = (label: string, value: number) => {
     if (label.includes('Verbrauch aktuell')) return value >= 2000 ? 'bg-red-600' : value >= 500 ? 'bg-yellow-400' : 'bg-green-500'
     if (label.includes('Balkonkraftwerk')) return value > 450 ? 'bg-green-500' : value > 150 ? 'bg-yellow-400' : 'bg-red-600'
@@ -141,118 +144,104 @@ function App() {
     return 'bg-blue-500'
   }
 
-  const IconTitle = ({ icon, title }: { icon: JSX.Element, title: string }) => (
-    <h2 className="text-md font-bold flex items-center gap-2 mb-2">{icon}{title}</h2>
+  const progressBar = (value: number, max = 100, color = 'bg-blue-500') => (
+    <div className="w-full bg-gray-300 rounded-full h-2 mt-2 overflow-hidden">
+      <div className={`${color} h-2 transition-all duration-1000 ease-out`} style={{ width: `${Math.min(100, (value / max) * 100)}%` }} />
+    </div>
   )
 
   return (
-    <main className="min-h-screen p-6 bg-gray-950 text-white font-sans">
+    <main className="min-h-screen p-4 sm:p-6 bg-gray-950 text-white font-sans">
       <header className="mb-6 text-sm text-gray-400">Letztes Update: {lastUpdate || 'Lade...'}</header>
 
-      <div className="grid xl:grid-cols-6 md:grid-cols-3 sm:grid-cols-2 gap-4">
-        {/* 3D Drucker */}
-        <div className="rounded-xl p-4 border border-yellow-500 bg-gray-800 col-span-1">
-          <IconTitle icon={<FiCpu />} title="3D-Drucker" />
-          {['Ender 3 Pro', 'Sidewinder X1'].map(name => {
-            const dev = topics.find(t => t.label.includes(name))
-            const val = values[dev?.statusTopic ?? '']
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+        {/* Spezialkachel: 3D-Drucker */}
+        <div className="col-span-1 rounded-xl p-4 border border-gray-600 bg-gray-800">
+          <h2 className="text-md font-bold mb-2 flex items-center gap-2"><FaCubes /> 3D-Drucker</h2>
+          {['Ender_3_Pro', 'Sidewinder_X1'].map(label => {
+            const topic = topics.find(t => t.label.replaceAll(' ', '_') === label)
+            if (!topic) return null
+            const raw = values[topic.statusTopic ?? topic.topic]
+            const value = raw?.toUpperCase()
             return (
-              <div key={name} className="flex justify-between mb-2">
-                <span>{name}</span>
-                <button onClick={() => toggleBoolean(dev?.publishTopic ?? '', val)} className={`px-3 py-1 rounded ${val === 'ON' ? 'bg-green-500' : 'bg-red-500'} text-white text-sm`}>
-                  {val === 'ON' ? 'AN' : 'AUS'}
+              <div key={label} className="flex justify-between items-center my-1">
+                <span>{label.replaceAll('_', ' ')}</span>
+                <button className={`px-4 py-1 rounded text-white ${value === 'ON' ? 'bg-green-500' : 'bg-red-500'}`} onClick={() => toggleBoolean(topic.publishTopic!, value)}>
+                  {value === 'ON' ? 'AN' : 'AUS'}
                 </button>
               </div>
             )
           })}
         </div>
 
-        {/* Pool */}
-        <div className="rounded-xl p-4 border border-gray-600 bg-gray-800 col-span-1">
-          <IconTitle icon={<FiDroplet />} title="Pool" />
-          <div className="flex justify-between mb-2">
-            <span>Pumpe</span>
-            <button onClick={() => {
-              const topic = topics.find(t => t.label === 'Poolpumpe')
-              const val = values[topic?.statusTopic ?? '']
-              toggleBoolean(topic?.publishTopic ?? '', val)
-            }} className={`px-3 py-1 rounded ${values['stat/Poolpumpe/POWER'] === 'ON' ? 'bg-green-500' : 'bg-red-500'} text-white text-sm`}>
-              {values['stat/Poolpumpe/POWER'] === 'ON' ? 'AN' : 'AUS'}
-            </button>
-          </div>
-          <div className="text-sm">Temperatur: {values['Pool_temp/temperatur'] ?? '...'} °C</div>
-          {progressBar(parseFloat(values['Pool_temp/temperatur']) || 0, 30, 'bg-blue-500')}
-          <div className="text-xs text-gray-400">
-            Min: {minMax['Pool_temp/temperatur']?.min?.toFixed(1) ?? '-'} °C | Max: {minMax['Pool_temp/temperatur']?.max?.toFixed(1) ?? '-'} °C
-          </div>
+        {/* Spezialkachel: Pool */}
+        <div className="col-span-1 rounded-xl p-4 border border-gray-600 bg-gray-800">
+          <h2 className="text-md font-bold mb-2 flex items-center gap-2"><FaSwimmingPool /> Pool</h2>
+          {(() => {
+            const pumpe = topics.find(t => t.label === 'Poolpumpe')
+            const tempKey = 'Pool_temp/temperatur'
+            const tempRaw = values[tempKey]
+            const tempVal = tempRaw !== undefined ? parseFloat(tempRaw) : NaN
+            const range = minMax[tempKey] ?? { min: tempVal, max: tempVal }
+
+            return (
+              <>
+                <div className="flex justify-between items-center my-1">
+                  <span>Pumpe</span>
+                  {pumpe && (
+                    <button className={`px-4 py-1 rounded text-white ${values[pumpe.topic]?.toUpperCase() === 'ON' ? 'bg-green-500' : 'bg-red-500'}`}
+                      onClick={() => toggleBoolean(pumpe.publishTopic!, values[pumpe.topic])}>
+                      {values[pumpe.topic]?.toUpperCase() === 'ON' ? 'AN' : 'AUS'}
+                    </button>
+                  )}
+                </div>
+                <div className="mt-2">
+                  Temperatur: {isNaN(tempVal) ? '...' : `${tempVal} °C`}
+                  {progressBar(tempVal, 40, getBarColor('Pool Temperatur', tempVal))}
+                  <p className="text-xs text-gray-400">Min: {range.min?.toFixed(1)} °C | Max: {range.max?.toFixed(1)} °C</p>
+                </div>
+              </>
+            )
+          })()}
         </div>
 
-        {/* Zähler */}
-        <div className="rounded-xl p-4 border border-gray-600 bg-gray-800 col-span-1">
-          <IconTitle icon={<FiZap />} title="Zähler" />
+        {/* Spezialkachel: Strom + Gas */}
+        <div className="col-span-1 rounded-xl p-4 border border-gray-600 bg-gray-800">
+          <h2 className="text-md font-bold mb-2 flex items-center gap-2"><FaBolt /> Zähler</h2>
           <p>Strom: {values['tele/Stromzähler/SENSOR.grid.Verbrauch_gesamt'] ?? '...'} kWh</p>
           <p>Gas: {values['Gaszaehler/stand'] ?? '...'} m³</p>
         </div>
 
-        {/* Weitere Einzelkacheln */}
-        {topics
-          .filter(t =>
-            !['Ender 3 Pro', 'Sidewinder X1', 'Poolpumpe', 'Pool Temperatur:', 'Gaszähler Stand:', 'Stromzähler Stand:'].includes(t.label)
-            && t.type !== 'group'
+        {/* Standardgeräte */}
+        {topics.filter(t => t.type !== 'group' && !['Ender 3 Pro', 'Sidewinder X1', 'Poolpumpe'].includes(t.label)).map(({ label, type, unit, favorite, statusTopic, publishTopic, topic }) => {
+          const key = statusTopic ?? topic
+          let raw = values[key]
+          const value = raw?.toUpperCase()
+          const num = parseFloat(raw)
+          const isNumber = type === 'number' && !isNaN(num)
+          const showMinMax = !label.includes('gesamt') && (key.includes('power_L') || key.includes('Verbrauch_aktuell') || key === 'Pool_temp/temperatur' || key.includes('Balkonkraftwerk'))
+          const range = minMax[key] ?? { min: num, max: num }
+          const barColor = getBarColor(label, num)
+
+          return (
+            <div key={key} className={`rounded-xl p-4 border ${favorite ? 'border-yellow-400' : 'border-gray-600'} bg-gray-800`}>
+              <h2 className="text-md font-bold mb-2">{label}</h2>
+              {type === 'boolean' && (
+                <button className={`px-4 py-1 rounded text-white ${value === 'ON' ? 'bg-green-500' : 'bg-red-500'}`} onClick={() => toggleBoolean(publishTopic ?? key, value)}>
+                  {value === 'ON' ? 'AN' : 'AUS'}
+                </button>
+              )}
+              {isNumber && (
+                <>
+                  <p className="text-2xl">{raw ?? '...'} {unit}</p>
+                  {showMinMax && progressBar(num, range.max > 0 ? range.max : 100, barColor)}
+                  {showMinMax && <p className="text-xs text-gray-400">Min: {range.min.toFixed(1)} {unit} | Max: {range.max.toFixed(1)} {unit}</p>}
+                </>
+              )}
+              {type === 'string' && <p className="text-lg">{raw ?? '...'}</p>}
+            </div>
           )
-          .map(({ label, type, unit, favorite, statusTopic, publishTopic, topic }) => {
-            const key = statusTopic ?? topic
-            let raw = values[key]
-            const value = raw?.toUpperCase()
-            const num = parseFloat(raw)
-            const isNumber = type === 'number' && !isNaN(num)
-            if (label.includes('Erzeugung [gesamt]')) raw = (num + 178.779).toFixed(3)
-
-            const showMinMax = (!label.includes('gesamt') && (key.includes('power_L') || key.includes('Verbrauch_aktuell') || key === 'Pool_temp/temperatur' || key.includes('Balkonkraftwerk')))
-            const range = minMax[key] ?? { min: num, max: num }
-            const barColor = getBarColor(label, num)
-
-            return (
-              <div key={key} className="rounded-xl p-4 border border-gray-600 bg-gray-800 col-span-1">
-                <IconTitle icon={<FiActivity />} title={label} />
-                {type === 'boolean' && (
-                  <button onClick={() => toggleBoolean(publishTopic ?? key, value)} className={`px-3 py-1 rounded ${value === 'ON' ? 'bg-green-500' : 'bg-red-500'} text-white text-sm`}>
-                    {value === 'ON' ? 'AN' : 'AUS'}
-                  </button>
-                )}
-                {isNumber && (
-                  <>
-                    <p className="text-2xl">{raw ?? '...'} {unit}</p>
-                    {showMinMax && progressBar(num, range.max || 100, barColor)}
-                    {showMinMax && (
-                      <p className="text-xs text-gray-400">Min: {range.min?.toFixed(1)} {unit} | Max: {range.max?.toFixed(1)} {unit}</p>
-                    )}
-                  </>
-                )}
-                {type === 'string' && <p className="text-xl">{raw ?? '...'}</p>}
-              </div>
-            )
-          })}
-      </div>
-
-      <div className="mt-10 grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {topics.filter(t => t.type === 'group').map(group => (
-          <div key={group.label} className="rounded-xl p-4 border border-gray-600 bg-gray-800">
-            <IconTitle icon={<FiBox />} title={group.label} />
-            {group.keys?.map(({ label: phaseLabel, key }) => {
-              const rawVal = values[key]
-              const val = rawVal !== undefined ? parseFloat(rawVal) : NaN
-              const range = minMax[key] ?? { min: val, max: val }
-              return (
-                <div key={key} className="mb-2">
-                  <div className="text-sm">{phaseLabel}: {isNaN(val) ? '...' : `${val} ${group.unit}`}</div>
-                  {progressBar(val, group.label.includes('Spannung') ? 250 : 1000, 'bg-blue-500')}
-                  <p className="text-xs text-gray-400">Min: {range.min?.toFixed(1)} | Max: {range.max?.toFixed(1)}</p>
-                </div>
-              )
-            })}
-          </div>
-        ))}
+        })}
       </div>
     </main>
   )
