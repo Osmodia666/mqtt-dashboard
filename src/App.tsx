@@ -65,10 +65,10 @@ function App() {
     }
 
     const interval = setInterval(flush, 300)
+
     client.on('connect', () => {
       const allTopics = topics.map(t => t.statusTopic || t.topic).filter(Boolean)
       client.subscribe([...allTopics, '#', MINMAX_TOPIC])
-
       topics.forEach(({ publishTopic }) => {
         if (publishTopic?.includes('/POWER')) client.publish(publishTopic, '')
         if (publishTopic) {
@@ -77,7 +77,6 @@ function App() {
         }
       })
     })
-
     client.on('message', (topic, message) => {
       const payload = message.toString()
 
@@ -145,36 +144,28 @@ function App() {
       <header className="mb-6 text-sm text-gray-400">Letztes Update: {lastUpdate || 'Lade...'}</header>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-        {/* 3D-Drucker-Kachel */}
+        {/* 3D-Drucker Kachel */}
         <div className="col-span-1 rounded-xl p-4 border border-gray-600 bg-gray-800">
-          <h2 className="text-md font-bold mb-2 flex items-center gap-2">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-            3D-Drucker
-          </h2>
+          <h2 className="text-md font-bold mb-2 flex items-center gap-2">🧱 3D-Drucker</h2>
           {['Ender 3 Pro', 'Sidewinder X1'].map(label => {
             const topic = topics.find(t => t.label === label)
             if (!topic) return null
             const raw = values[topic.statusTopic ?? topic.topic]
             const value = raw?.toUpperCase()
             return (
-              <div key={label} className="flex justify-between items-center my-2">
+              <div key={label} className="flex justify-between items-center gap-2 my-1">
                 <span>{label}</span>
-                <button
-                  className={`px-4 py-1 rounded text-white ${value === 'ON' ? 'bg-green-500' : 'bg-red-500'}`}
-                  onClick={() => toggleBoolean(topic.publishTopic!, value)}
-                >
+                <button className={`px-4 py-1 rounded text-white ${value === 'ON' ? 'bg-green-500' : 'bg-red-500'}`} onClick={() => toggleBoolean(topic.publishTopic!, value)}>
                   {value === 'ON' ? 'AN' : 'AUS'}
                 </button>
               </div>
             )
           })}
         </div>
-        {/* Pool-Kachel */}
+
+        {/* Poolkachel */}
         <div className="col-span-1 rounded-xl p-4 border border-gray-600 bg-gray-800">
-          <h2 className="text-md font-bold mb-2 flex items-center gap-2">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M2 12h20M2 16h20M2 20h20" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-            Pool
-          </h2>
+          <h2 className="text-md font-bold mb-2 flex items-center gap-2">🏊 Pool</h2>
           {(() => {
             const pumpe = topics.find(t => t.label === 'Poolpumpe')
             const tempKey = 'Pool_temp/temperatur'
@@ -184,14 +175,12 @@ function App() {
 
             return (
               <>
-                <div className="flex justify-between items-center my-2">
+                <div className="flex justify-between items-center my-1">
                   <span>Pumpe</span>
                   {pumpe && (
-                    <button
-                      className={`px-4 py-1 rounded text-white ${values[pumpe.topic]?.toUpperCase() === 'ON' ? 'bg-green-500' : 'bg-red-500'}`}
-                      onClick={() => toggleBoolean(pumpe.publishTopic!, values[pumpe.topic])}
-                    >
-                      {values[pumpe.topic]?.toUpperCase() === 'ON' ? 'AN' : 'AUS'}
+                    <button className={`px-4 py-1 rounded text-white ${values[pumpe.statusTopic]?.toUpperCase() === 'ON' ? 'bg-green-500' : 'bg-red-500'}`}
+                      onClick={() => toggleBoolean(pumpe.publishTopic!, values[pumpe.statusTopic])}>
+                      {values[pumpe.statusTopic]?.toUpperCase() === 'ON' ? 'AN' : 'AUS'}
                     </button>
                   )}
                 </div>
@@ -204,76 +193,44 @@ function App() {
             )
           })()}
         </div>
-
-        {/* Steckdosen 1+2 */}
+        {/* Zähler Kachel */}
         <div className="col-span-1 rounded-xl p-4 border border-gray-600 bg-gray-800">
-          <h2 className="text-md font-bold mb-2 flex items-center gap-2">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M7 12V3m10 9V3m-5 13v6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-            Steckdosen
-          </h2>
+          <h2 className="text-md font-bold mb-2 flex items-center gap-2">⚡ Zähler</h2>
+          <p>Strom: {values['tele/Stromzähler/SENSOR.grid.Verbrauch_gesamt'] ?? '...'} kWh</p>
+          <p>Gas: {values['Gaszaehler/stand'] ?? '...'} m³</p>
+        </div>
+
+        {/* Steckdosen Kachel */}
+        <div className="col-span-1 rounded-xl p-4 border border-gray-600 bg-gray-800">
+          <h2 className="text-md font-bold mb-3 flex items-center gap-2">🔌 Steckdosen</h2>
           {['Steckdose 1', 'Steckdose 2'].map(label => {
-            const t = topics.find(t => t.label === label)
-            if (!t) return null
-            const val = values[t.topic]?.toUpperCase()
+            const topic = topics.find(t => t.label === label)
+            if (!topic) return null
+            const value = values[topic.statusTopic]?.toUpperCase()
             return (
-              <div key={label} className="flex justify-between items-center my-3">
+              <div key={label} className="flex justify-between items-center my-2">
                 <span>{label}</span>
-                <button className={`px-4 py-1 rounded text-white ${val === 'ON' ? 'bg-green-500' : 'bg-red-500'}`} onClick={() => toggleBoolean(t.publishTopic!, val)}>
-                  {val === 'ON' ? 'AN' : 'AUS'}
+                <button className={`px-4 py-1 rounded text-white ${value === 'ON' ? 'bg-green-500' : 'bg-red-500'}`}
+                  onClick={() => toggleBoolean(topic.publishTopic!, value)}>
+                  {value === 'ON' ? 'AN' : 'AUS'}
                 </button>
               </div>
             )
           })}
         </div>
 
-        {/* Strom+Gas Zähler */}
-        <div className="col-span-1 rounded-xl p-4 border border-gray-600 bg-gray-800">
-          <h2 className="text-md font-bold mb-2 flex items-center gap-2">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M11 17v-5H6v5m5-5V5h2v7h5v5" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-            Zähler
-          </h2>
-          <p>Strom: {values['tele/Stromzähler/SENSOR.grid.Verbrauch_gesamt'] ?? '...'} kWh</p>
-          <p>Gas: {values['Gaszaehler/stand'] ?? '...'} m³</p>
-        </div>
-
-        {/* Gruppen: Spannung, Strom, Leistung */}
-        {['Spannung', 'Strom', 'Leistung'].map(groupLabel => (
-          <div key={groupLabel} className="rounded-xl p-4 border border-gray-600 bg-gray-800 col-span-1">
-            <h2 className="text-md font-bold mb-2 flex items-center gap-2">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path d="M13 10V3L4 14h7v7l9-11h-7z" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-              {groupLabel}
-            </h2>
-            {['L1', 'L2', 'L3'].map(phase => {
-              const key = Object.keys(values).find(k => k.toLowerCase().includes(groupLabel.toLowerCase()) && k.includes(phase))
-              const val = key ? parseFloat(values[key]) : NaN
-              const range = key && minMax[key] ? minMax[key] : { min: val, max: val }
-
-              return (
-                <div key={phase} className="mb-2">
-                  <div className="text-sm">{phase}: {isNaN(val) ? '...' : `${val} ${groupLabel === 'Strom' ? 'A' : groupLabel === 'Leistung' ? 'W' : 'V'}`}</div>
-                  {progressBar(val, groupLabel === 'Spannung' ? 250 : 1000, 'bg-blue-500')}
-                  <div className="text-xs text-gray-400">Min: {range.min?.toFixed(1)} | Max: {range.max?.toFixed(1)}</div>
-                </div>
-              )
-            })}
-          </div>
-        ))}
-
-        {/* Restliche Geräte */}
+        {/* Einzelgeräte */}
         {topics.filter(t =>
           t.type !== 'group' &&
-          !['Ender 3 Pro', 'Sidewinder X1', 'Poolpumpe', 'Steckdose 1', 'Steckdose 2'].includes(t.label)
+          !['Ender 3 Pro', 'Sidewinder X1', 'Poolpumpe', 'Steckdose 1', 'Steckdose 2'].includes(t.label) &&
+          !['tele/Stromzähler/SENSOR.grid.Verbrauch_gesamt', 'Gaszaehler/stand'].includes(t.topic)
         ).map(({ label, type, unit, favorite, statusTopic, publishTopic, topic }) => {
           const key = statusTopic ?? topic
-          let raw = values[key]
+          const raw = values[key]
           const value = raw?.toUpperCase()
           const num = parseFloat(raw)
           const isNumber = type === 'number' && !isNaN(num)
-          const showMinMax = !label.includes('gesamt') &&
-            (key.includes('power_L') || key.includes('Verbrauch_aktuell') || key.includes('Balkonkraftwerk'))
-
+          const showMinMax = !label.includes('gesamt') && (key.includes('power_L') || key.includes('Verbrauch_aktuell') || key.includes('Balkonkraftwerk'))
           const range = minMax[key] ?? { min: num, max: num }
           const barColor = getBarColor(label, num)
 
@@ -281,7 +238,8 @@ function App() {
             <div key={key} className={`rounded-xl p-4 border ${favorite ? 'border-yellow-400' : 'border-gray-600'} bg-gray-800`}>
               <h2 className="text-md font-bold mb-2">{label}</h2>
               {type === 'boolean' && (
-                <button className={`px-4 py-1 rounded text-white ${value === 'ON' ? 'bg-green-500' : 'bg-red-500'}`} onClick={() => toggleBoolean(publishTopic ?? key, value)}>
+                <button className={`px-4 py-1 rounded text-white ${value === 'ON' ? 'bg-green-500' : 'bg-red-500'}`}
+                  onClick={() => toggleBoolean(publishTopic ?? key, value)}>
                   {value === 'ON' ? 'AN' : 'AUS'}
                 </button>
               )}
@@ -296,6 +254,27 @@ function App() {
             </div>
           )
         })}
+      </div>
+
+      {/* Gruppierte Anzeige: Spannung, Leistung, Strom */}
+      <div className="mt-10 grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {topics.filter(t => t.type === 'group').map(group => (
+          <div key={group.label} className="rounded-xl p-4 border border-gray-600 bg-gray-800">
+            <h2 className="text-lg font-bold mb-2">{group.label}</h2>
+            {group.keys?.map(({ label: subLabel, key }) => {
+              const rawVal = values[key]
+              const val = rawVal !== undefined ? parseFloat(rawVal) : NaN
+              const range = minMax[key] ?? { min: val, max: val }
+              return (
+                <div key={key} className="mb-2">
+                  <div className="text-sm">{subLabel}: {isNaN(val) ? '...' : `${val} ${group.unit}`}</div>
+                  {progressBar(val, group.label.includes('Spannung') ? 250 : 1000, 'bg-blue-500')}
+                  <div className="text-xs text-gray-400">Min: {range.min.toFixed(1)} | Max: {range.max.toFixed(1)}</div>
+                </div>
+              )
+            })}
+          </div>
+        ))}
       </div>
     </main>
   )
