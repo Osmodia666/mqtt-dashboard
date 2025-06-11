@@ -2,15 +2,6 @@
 import { useEffect, useState, useRef } from 'react'
 import mqtt from 'mqtt'
 import { mqttConfig, topics } from './config'
-import {
-  FaThermometerHalf,
-  FaPlug,
-  FaLightbulb,
-  FaSwimmingPool,
-  FaBolt,
-  FaCubes,
-  FaTachometerAlt,
-} from 'react-icons/fa'
 
 const client = mqtt.connect(mqttConfig.host, {
   username: mqttConfig.username,
@@ -150,14 +141,24 @@ function App() {
     </div>
   )
 
+  const Icon = ({ label }: { label: string }) => {
+    const icons: Record<string, JSX.Element> = {
+      '3D': <svg className="w-5 h-5 fill-current" viewBox="0 0 20 20"><path d="M3 3h14v14H3z"/></svg>,
+      'Pool': <svg className="w-5 h-5 fill-current" viewBox="0 0 20 20"><circle cx="10" cy="10" r="8"/></svg>,
+      'Zähler': <svg className="w-5 h-5 fill-current" viewBox="0 0 20 20"><path d="M10 0L12 10H8L10 0z"/></svg>,
+    }
+    return icons[label] || <svg className="w-5 h-5 fill-current" viewBox="0 0 20 20"><circle cx="10" cy="10" r="5"/></svg>
+  }
+
   return (
     <main className="min-h-screen p-4 sm:p-6 bg-gray-950 text-white font-sans">
       <header className="mb-6 text-sm text-gray-400">Letztes Update: {lastUpdate || 'Lade...'}</header>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-        {/* Spezialkachel: 3D-Drucker */}
+
+        {/* 3D-Drucker */}
         <div className="col-span-1 rounded-xl p-4 border border-gray-600 bg-gray-800">
-          <h2 className="text-md font-bold mb-2 flex items-center gap-2"><FaCubes /> 3D-Drucker</h2>
+          <h2 className="text-md font-bold mb-2 flex items-center gap-2"><Icon label="3D" /> 3D-Drucker</h2>
           {['Ender_3_Pro', 'Sidewinder_X1'].map(label => {
             const topic = topics.find(t => t.label.replaceAll(' ', '_') === label)
             if (!topic) return null
@@ -174,9 +175,9 @@ function App() {
           })}
         </div>
 
-        {/* Spezialkachel: Pool */}
+        {/* Pool */}
         <div className="col-span-1 rounded-xl p-4 border border-gray-600 bg-gray-800">
-          <h2 className="text-md font-bold mb-2 flex items-center gap-2"><FaSwimmingPool /> Pool</h2>
+          <h2 className="text-md font-bold mb-2 flex items-center gap-2"><Icon label="Pool" /> Pool</h2>
           {(() => {
             const pumpe = topics.find(t => t.label === 'Poolpumpe')
             const tempKey = 'Pool_temp/temperatur'
@@ -205,15 +206,18 @@ function App() {
           })()}
         </div>
 
-        {/* Spezialkachel: Strom + Gas */}
+        {/* Zähler */}
         <div className="col-span-1 rounded-xl p-4 border border-gray-600 bg-gray-800">
-          <h2 className="text-md font-bold mb-2 flex items-center gap-2"><FaBolt /> Zähler</h2>
+          <h2 className="text-md font-bold mb-2 flex items-center gap-2"><Icon label="Zähler" /> Zähler</h2>
           <p>Strom: {values['tele/Stromzähler/SENSOR.grid.Verbrauch_gesamt'] ?? '...'} kWh</p>
           <p>Gas: {values['Gaszaehler/stand'] ?? '...'} m³</p>
         </div>
 
-        {/* Standardgeräte */}
-        {topics.filter(t => t.type !== 'group' && !['Ender 3 Pro', 'Sidewinder X1', 'Poolpumpe'].includes(t.label)).map(({ label, type, unit, favorite, statusTopic, publishTopic, topic }) => {
+        {/* Restliche Geräte */}
+        {topics.filter(t =>
+          t.type !== 'group' &&
+          !['Ender 3 Pro', 'Sidewinder X1', 'Poolpumpe'].includes(t.label)
+        ).map(({ label, type, unit, favorite, statusTopic, publishTopic, topic }) => {
           const key = statusTopic ?? topic
           let raw = values[key]
           const value = raw?.toUpperCase()
