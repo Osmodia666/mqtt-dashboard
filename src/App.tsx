@@ -222,8 +222,7 @@ function App() {
         {/* Einzelgeräte */}
         {topics.filter(t =>
           t.type !== 'group' &&
-          !['Ender 3 Pro', 'Sidewinder X1', 'Poolpumpe', 'Steckdose 1', 'Steckdose 2'].includes(t.label) &&
-          !['tele/Stromzähler/SENSOR.grid.Verbrauch_gesamt', 'Gaszaehler/stand'].includes(t.topic)
+          !['Ender 3 Pro', 'Sidewinder X1', 'Poolpumpe', 'Steckdose 1', 'Steckdose 2'].includes(t.label)
         ).map(({ label, type, unit, favorite, statusTopic, publishTopic, topic }) => {
           const key = statusTopic ?? topic
           const raw = values[key]
