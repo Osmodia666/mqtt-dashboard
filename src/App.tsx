@@ -140,7 +140,6 @@ function App() {
       <header className="mb-6 text-sm text-gray-400">Letztes Update: {lastUpdate || 'Lade...'}</header>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-        {/* Kachel: 3D-Drucker */}
         <div className="rounded-xl p-4 border border-gray-600 bg-gray-800">
           <h2 className="text-md font-bold mb-2">🧱 3D-Drucker</h2>
           {['Ender 3 Pro', 'Sidewinder X1'].map((label, i) => {
@@ -159,7 +158,6 @@ function App() {
           })}
         </div>
 
-        {/* Kachel: Pool */}
         <div className="rounded-xl p-4 border border-gray-600 bg-gray-800">
           <h2 className="text-md font-bold mb-2">🏊 Pool</h2>
           {(() => {
@@ -188,7 +186,6 @@ function App() {
           })()}
         </div>
 
-        {/* Kachel: Strom + Gas */}
         <div className="rounded-xl p-4 border border-gray-600 bg-gray-800">
           <h2 className="text-md font-bold mb-2">⚡ Zähler</h2>
           <p>Strom: {(() => {
@@ -200,7 +197,6 @@ function App() {
           <p>Gas: {values['Gaszaehler/stand'] ?? '...'} m³</p>
         </div>
 
-        {/* Kachel: Steckdosen */}
         <div className="rounded-xl p-4 border border-gray-600 bg-gray-800">
           <h2 className="text-md font-bold mb-2">🔌 Steckdosen</h2>
           {['Steckdose 1', 'Steckdose 2'].map((label, i) => {
@@ -219,7 +215,6 @@ function App() {
           })}
         </div>
 
-        {/* Normale Geräte */}
         {topics.filter(t =>
           t.type !== 'group' &&
           !['Ender 3 Pro', 'Sidewinder X1', 'Poolpumpe', 'Steckdose 1', 'Steckdose 2'].includes(t.label)
@@ -253,7 +248,6 @@ function App() {
         })}
       </div>
 
-      {/* Gruppenkacheln */}
       <div className="mt-10 grid grid-cols-1 sm:grid-cols-3 gap-4">
         {topics.filter(t => t.type === 'group').map(group => (
           <div key={group.label} className="rounded-xl p-4 border border-gray-600 bg-gray-800">
