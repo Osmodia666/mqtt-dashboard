@@ -189,7 +189,7 @@ function App() {
         <div className="rounded-xl p-4 border border-gray-600 bg-gray-800">
           <h2 className="text-md font-bold mb-2">⚡ Zähler</h2>
           <p>Strom: {(() => {
-            const key = 'tele/Balkonkraftwerk/SENSOR.ENERGY.EnergyPTotal.0'
+            const key = 'tele/Stromzähler/SENSOR.grid.Verbrauch_gesamt'
             const raw = values[key]
             const num = parseFloat(raw)
             return !isNaN(num) ? (num + 178.779).toFixed(3) : '...'
