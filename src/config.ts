@@ -63,23 +63,6 @@ export const topics = [
     statusTopic: 'tele/Stromzähler/SENSOR.grid.Verbrauch_aktuell',
   },
   {
-    label: 'Verbrauch gesamt:',
-    type: 'number',
-    unit: 'kWh',
-    statusTopic: 'tele/Stromzähler/SENSOR.grid.Verbrauch_gesamt',
-  },
-  {
-    label: 'Einspeisung gesamt:',
-    type: 'number',
-    unit: 'kWh',
-    statusTopic: 'tele/Stromzähler/SENSOR.grid.Eingespeist_gesamt',
-  },
-  {
-    label: 'Gaszähler',
-    type: 'string',
-    topic: 'Gaszaehler/stand',
-  },
-  {
     label: 'Balkonkraftwerk Erzeugung:',
     type: 'number',
     unit: 'W',
@@ -91,14 +74,7 @@ export const topics = [
     unit: 'kWh',
     statusTopic: 'tele/Balkonkraftwerk/SENSOR.ENERGY.EnergyPTotal.0',
   },
-  {
-    label: 'Pool Temperatur',
-    type: 'number',
-    unit: '°C',
-    topic: 'Pool_temp/temperatur',
-  },
-
-  // 🔌 Gruppierte Anzeige: Leistung L1–L3
+    // ✅ Gruppiert: Leistung
   {
     label: 'Leistung L1–L3',
     type: 'group',
@@ -109,20 +85,18 @@ export const topics = [
       { label: 'L3', key: 'tele/Stromzähler/SENSOR.grid.power_L3' },
     ],
   },
-
-  // 🔌 Gruppierte Anzeige: Spannung L1–L3
-  {
-    label: 'Spannung L1–L3',
-    type: 'group',
-    unit: 'V',
-    keys: [
-      { label: 'L1', key: 'tele/Stromzähler/SENSOR.grid.Spannung_L1' },
-      { label: 'L2', key: 'tele/Stromzähler/SENSOR.grid.Spannung_L2' },
-      { label: 'L3', key: 'tele/Stromzähler/SENSOR.grid.Spannung_L3' },
-    ],
-  },
-
-  // 🔌 Gruppierte Anzeige: Strom L1–L3
+  // ✅ Gruppiert: Spannung
+{
+  label: 'Spannung L1–L3',
+  type: 'group',
+  unit: 'V',
+  keys: [
+    { label: 'L1', key: 'tele/Stromzähler/SENSOR.grid.Spannung_L1' },
+    { label: 'L2', key: 'tele/Stromzähler/SENSOR.grid.Spannung_L2' },
+    { label: 'L3', key: 'tele/Stromzähler/SENSOR.grid.Spannung_L3' },
+  ],
+},
+  // ✅ Gruppiert: Strom
   {
     label: 'Strom L1–L3',
     type: 'group',
