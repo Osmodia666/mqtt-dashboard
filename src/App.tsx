@@ -158,33 +158,34 @@ function App() {
           })}
         </div>
 
-        <div className="rounded-xl p-4 border border-gray-600 bg-gray-800">
-          <h2 className="text-md font-bold mb-2">🏊 Pool</h2>
-          {(() => {
-            const pumpe = topics.find(t => t.label === 'Poolpumpe')
-            const tempKey ='Pool_temp/temperatur'
-            const raw = values[tempKey]
-            const val = raw !== undefined ? parseFloat(raw) : NaN
-            const range = minMax[tempKey] ?? { min: val, max: val }
+<div className="rounded-xl p-4 border border-gray-600 bg-gray-800">
+  <h2 className="text-md font-bold mb-2">🏊 Pool</h2>
+  {(() => {
+    const pumpe = topics.find(t => t.label === 'Poolpumpe')
+    const tempKey = 'Pool_temp/temperatur'
+    const raw = values[tempKey]
+    const val = raw !== undefined ? parseFloat(raw) : NaN
+    const range = minMax[tempKey] ?? { min: val, max: val }
 
-            return (
-              <>
-                <div className="flex justify-between items-center">
-                  <span>Pumpe</span>
-                  {pumpe && (
-                    <button className={`px-4 py-1 rounded text-white ${values[pumpe.statusTopic]?.toUpperCase() === 'ON' ? 'bg-green-500' : 'bg-red-500'}`}
-                      onClick={() => toggleBoolean(pumpe.publishTopic!, values[pumpe.statusTopic])}>
-                      {values[pumpe.statusTopic]?.toUpperCase() === 'ON' ? 'AN' : 'AUS'}
-                    </button>
-                  )}
-                </div>
-                <p className="mt-3">Temperatur: {isNaN(val) ? '...' : `${val} °C`}</p>
-                {progressBar(val, 40, getBarColor('Pool Temperatur', val))}
-                <p className="text-xs text-gray-400">Min: {range.min?.toFixed(1)} °C | Max: {range.max?.toFixed(1)} °C</p>
-              </>
-            )
-          })()}
+    return (
+      <>
+        <div className="flex justify-between items-center">
+          <span>Pumpe</span>
+          {pumpe && (
+            <button className={`px-4 py-1 rounded text-white ${values[pumpe.statusTopic]?.toUpperCase() === 'ON' ? 'bg-green-500' : 'bg-red-500'}`}
+              onClick={() => toggleBoolean(pumpe.publishTopic!, values[pumpe.statusTopic])}>
+              {values[pumpe.statusTopic]?.toUpperCase() === 'ON' ? 'AN' : 'AUS'}
+            </button>
+          )}
         </div>
+        <p className="mt-3">🌡️ Temperatur: {isNaN(val) ? '...' : `${val} °C`}</p>
+        {progressBar(val, 40, getBarColor('Pool Temperatur', val))}
+        <p className="text-xs text-gray-400">Min: {range.min?.toFixed(1)} °C | Max: {range.max?.toFixed(1)} °C</p>
+      </>
+    )
+  })()}
+</div>
+
 
   <div className="rounded-xl p-4 border border-gray-600 bg-gray-800">
   <h2 className="text-md font-bold mb-2">🎰 Zähler</h2>
