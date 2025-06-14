@@ -68,12 +68,6 @@ export const topics = [
     unit: 'W',
     statusTopic: 'tele/Balkonkraftwerk/SENSOR.ENERGY.Power.0',
   },
-  {
-    label: 'Erzeugung [gesamt]:',
-    type: 'number',
-    unit: 'kWh',
-    statusTopic: 'tele/Balkonkraftwerk/SENSOR.ENERGY.EnergyPTotal.0',
-  },
     // ✅ Gruppiert: Leistung
   {
     label: 'Leistung L1–L3',
