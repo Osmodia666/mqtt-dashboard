@@ -29,37 +29,42 @@ function App() {
       localStorage.removeItem(STORAGE_KEY)
     }
 
-    const flush = () => {
-      const updates = { ...messageQueue.current }
-      messageQueue.current = {}
-      if (Object.keys(updates).length > 0) {
-        setValues(prev => {
-          const updated = { ...prev, ...updates }
-          const nextMinMax: MinMax = { ...minMax }
-          for (const [key, val] of Object.entries(updates)) {
-            const num = parseFloat(val)
-            if (!isNaN(num) && (
-              key.includes('power_L') ||
-              key.includes('Verbrauch_aktuell') ||
-              key === 'Pool_temp/temperatur' ||
-              key.includes('Balkonkraftwerk') ||
-              key.includes('Voltage') ||
-              key.includes('Strom_L')
-            )) {
-              const current = nextMinMax[key] ?? { min: num, max: num }
-              nextMinMax[key] = {
-                min: Math.min(current.min, num),
-                max: Math.max(current.max, num),
-              }
-            }
+const flush = () => {
+  const updates = { ...messageQueue.current }
+  messageQueue.current = {}
+
+  if (Object.keys(updates).length > 0) {
+    setValues(prev => {
+      const updated = { ...prev, ...updates }
+      const nextMinMax: MinMax = { ...minMax }
+
+      for (const [key, val] of Object.entries(updates)) {
+        const num = parseFloat(val)
+        if (!isNaN(num) && (
+          key.includes('power_L') ||
+          key.includes('Verbrauch_aktuell') ||
+          key === 'Pool_temp/temperatur' ||
+          key.includes('Balkonkraftwerk') ||
+          key.includes('Voltage') ||
+          key.includes('Strom_L')
+        )) {
+          const current = nextMinMax[key] ?? { min: num, max: num }
+          nextMinMax[key] = {
+            min: Math.min(current.min, num),
+            max: Math.max(current.max, num),
           }
-          setMinMax(nextMinMax)
-          client.publish(MINMAX_TOPIC, JSON.stringify(nextMinMax))
-          return updated
-        })
-        setLastUpdate(new Date().toLocaleTimeString())
+        }
       }
-    }
+
+      setMinMax(nextMinMax)
+      // Statt localStorage → per MQTT an den zentralen Broker senden
+      client.publish(MINMAX_TOPIC, JSON.stringify(nextMinMax))
+      return updated
+    })
+    setLastUpdate(new Date().toLocaleTimeString())
+  }
+}
+
 
     const interval = setInterval(flush, 300)
 
