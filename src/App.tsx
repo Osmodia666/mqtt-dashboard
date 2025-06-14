@@ -69,6 +69,7 @@ const flush = () => {
     const interval = setInterval(flush, 300)
 
     client.on('connect', () => {
+      client.publish('dashboard/minmax/request', '')
       const allTopics = topics.map(t => t.statusTopic || t.topic).filter(Boolean)
       client.subscribe([...allTopics, '#', MINMAX_TOPIC])
       topics.forEach(({ publishTopic }) => {
@@ -88,14 +89,15 @@ const flush = () => {
       }
 
       if (topic === MINMAX_TOPIC) {
-        try {
-          const incoming = JSON.parse(payload)
-          setMinMax(prev => ({ ...prev, ...incoming }))
-        } catch (err) {
-          console.error('[MQTT] Fehler beim MinMax-Update:', err)
-        }
-        return
-      }
+  try {
+    const incoming = JSON.parse(payload)
+    setMinMax(prev => ({ ...prev, ...incoming }))
+  } catch (err) {
+    console.error('[MQTT] Fehler beim MinMax-Update:', err)
+  }
+  return
+}
+
 
       try {
         const json = JSON.parse(payload)
