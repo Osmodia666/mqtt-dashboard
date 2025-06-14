@@ -187,10 +187,10 @@ function App() {
         </div>
 
   <div className="rounded-xl p-4 border border-gray-600 bg-gray-800">
-  <h2 className="text-md font-bold mb-2">⚡ Zähler</h2>
+  <h2 className="text-md font-bold mb-2">🎰 Zähler</h2>
   <div className="flex flex-col space-y-3">
-    <p>Strom: {values['tele/Stromzähler/SENSOR.grid.Verbrauch_gesamt'] ?? '...'} kWh</p>
-    <p>Gas: {values['Gaszaehler/stand'] ?? '...'} m³</p>
+      <p>⚡ Strom: {values['tele/Stromzähler/SENSOR.grid.Verbrauch_gesamt'] ?? '...'} kWh</p>
+    <p>🔥 Gas: {values['Gaszaehler/stand'] ?? '...'} m³</p>
   </div>
 </div>
 
