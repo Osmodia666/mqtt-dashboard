@@ -66,7 +66,13 @@ function App() {
 
       client.on('connect', () => {
         console.log('✅ MQTT connected')
-        const allTopics = topics.map(t => t.statusTopic || t.topic).filter(Boolean)
+        const allTopics = [
+  ...new Set(
+    topics
+      .map(t => t.statusTopic?.split('.')?.[0] || t.topic?.split('.')?.[0])
+      .filter(Boolean)
+  )
+]
         client.subscribe([...allTopics, MINMAX_TOPIC])
         client.publish('dashboard/minmax/request', '')
 
