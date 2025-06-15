@@ -17,7 +17,7 @@ function App() {
   const [lastUpdate, setLastUpdate] = useState('')
   const [minMax, setMinMax] = useState<MinMax>({})
   const messageQueue = useRef<Record<string, string>>({})
-  const subscribed = useRef(false)
+  const initialized = useRef(false)
 
   useEffect(() => {
     const flush = () => {
@@ -57,12 +57,12 @@ function App() {
 
     const interval = setInterval(flush, 300)
 
-    if (!subscribed.current) {
-      subscribed.current = true
+    if (!initialized.current) {
+      initialized.current = true
 
       client.on('connect', () => {
         const allTopics = topics.map(t => t.statusTopic || t.topic).filter(Boolean)
-        client.subscribe([...allTopics, '#', MINMAX_TOPIC])
+        client.subscribe([...allTopics, MINMAX_TOPIC])
         client.publish('dashboard/minmax/request', '')
 
         topics.forEach(({ publishTopic }) => {
@@ -116,13 +116,9 @@ function App() {
       })
     }
 
-    return () => {
-      clearInterval(interval)
-      client.end(true)
-    }
+    return () => clearInterval(interval)
   }, [minMax])
 
-  
   const toggleBoolean = (publishTopic: string, current: string) => {
     const next = current?.toUpperCase() === 'ON' ? 'OFF' : 'ON'
     client.publish(publishTopic, next)
@@ -141,10 +137,12 @@ function App() {
     </div>
   )
 
+  // 👉 Dein bestehendes Render-Teil bleibt unverändert – wird hier weggelassen zur Übersicht
+
   return (
     <main className="min-h-screen p-4 sm:p-6 bg-gray-950 text-white font-sans">
       <header className="mb-6 text-sm text-gray-400">Letztes Update: {lastUpdate || 'Lade...'}</header>
-
+      
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
         <div className="rounded-xl p-4 border border-gray-600 bg-gray-800">
           <h2 className="text-md font-bold mb-2">🧱 3D-Drucker</h2>
