@@ -66,6 +66,7 @@ function App() {
       initialized.current = true
 
       client.on('connect', () => {
+        console.log('✅ MQTT connected')
         const allTopics = topics.map(t => t.statusTopic || t.topic).filter(Boolean)
         client.subscribe([...allTopics, MINMAX_TOPIC])
         client.publish('dashboard/minmax/request', '')
@@ -81,6 +82,7 @@ function App() {
 
       client.on('message', (topic, message) => {
         const payload = message.toString()
+        console.log('📥 MQTT message:', topic, message.toString())
 
         if (topic === MINMAX_TOPIC) {
           try {
