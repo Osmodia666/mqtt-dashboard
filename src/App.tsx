@@ -79,10 +79,10 @@ function App() {
         })
       })
 
-      client.on('message', (topic, message) => {
-        const payload = message.toString()
-        console.log('📥 MQTT message:', topic, message.toString())
-
+   client.on('message', (topic, message) => {
+  messageQueue.current[topic] = message.toString();
+  console.log('[MQTT recv]', topic, message.toString());
+     
         if (topic === MINMAX_TOPIC) {
           try {
             const incoming = JSON.parse(payload)
