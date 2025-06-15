@@ -9,17 +9,13 @@ const MINMAX_TOPIC = 'dashboard/minmax/update'
 const client = mqtt.connect(mqttConfig.host, {
   username: mqttConfig.username,
   password: mqttConfig.password,
+  clientId: 'dashboard-client-' + Math.random().toString(16).substr(2, 8),
   reconnectPeriod: 1000,
   connectTimeout: 30_000,
-  clientId: 'dashboard-client-' + Math.random().toString(16).substr(2, 8),
   keepalive: 60,
-  debug: true,
   clean: true
 })
-
 client.setMaxListeners(50)
-client.on('error', err => console.error('[MQTT error]', err))
-client.on('offline', () => console.warn('[MQTT offline]'))
 
 function App() {
   const [values, setValues] = useState<Record<string, string>>({})
@@ -51,7 +47,7 @@ function App() {
               const current = nextMinMax[key] ?? { min: num, max: num }
               nextMinMax[key] = {
                 min: Math.min(current.min, num),
-                max: Math.max(current.max, num),
+                max: Math.max(current.max, num)
               }
             }
           }
@@ -91,7 +87,7 @@ function App() {
             const incoming = JSON.parse(payload)
             setMinMax(prev => ({ ...prev, ...incoming }))
           } catch (err) {
-            console.error('[MQTT] MinMax-Update Fehler:', err)
+            console.error('[MQTT] Fehler beim MinMax-Update:', err)
           }
           return
         }
@@ -139,8 +135,6 @@ function App() {
       <div className={`${color} h-2 transition-all duration-1000 ease-in-out`} style={{ width: `${Math.min(100, (value / max) * 100)}%` }} />
     </div>
   )
-
-
 
   return (
     <main className="min-h-screen p-4 sm:p-6 bg-gray-950 text-white font-sans">
