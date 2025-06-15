@@ -89,15 +89,16 @@ function App() {
   messageQueue.current[topic] = message.toString();
   console.log('[MQTT recv]', topic, message.toString());
      
-        if (topic === MINMAX_TOPIC) {
-          try {
-            const incoming = JSON.parse(payload)
-            setMinMax(prev => ({ ...prev, ...incoming }))
-          } catch (err) {
-            console.error('[MQTT] Fehler beim MinMax-Update:', err)
-          }
-          return
-        }
+      if (topic === MINMAX_TOPIC) {
+  try {
+    const incoming = JSON.parse(message.toString())
+    setMinMax(prev => ({ ...prev, ...incoming }))
+  } catch (err) {
+    console.error('[MQTT] Fehler beim MinMax-Update:', err)
+  }
+  return
+}
+
 
         try {
           const json = JSON.parse(payload)
