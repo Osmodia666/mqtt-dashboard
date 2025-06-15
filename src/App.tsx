@@ -135,7 +135,6 @@ function App() {
       <div className={`${color} h-2 transition-all duration-1000 ease-in-out`} style={{ width: `${Math.min(100, (value / max) * 100)}%` }} />
     </div>
   )
-
   return (
     <main className="min-h-screen p-4 sm:p-6 bg-gray-950 text-white font-sans">
       <header className="mb-6 text-sm text-gray-400">Letztes Update: {lastUpdate || 'Lade...'}</header>
