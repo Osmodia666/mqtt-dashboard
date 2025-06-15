@@ -3,7 +3,6 @@ import { useEffect, useState, useRef } from 'react'
 import mqtt from 'mqtt'
 import { mqttConfig, topics } from './config'
 
-type MinMax = Record<string, { min: number; max: number }>
 const MINMAX_TOPIC = 'dashboard/minmax/update'
 
 const client = mqtt.connect(mqttConfig.host, {
