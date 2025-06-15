@@ -67,9 +67,13 @@ function App() {
 
       client.on('connect', () => {
         console.log('✅ MQTT connected')
-        const allTopics = topics.map(t => t.statusTopic || t.topic).filter(Boolean)
+        const allTopics = topics
+    .map(t => t.statusTopic || t.topic)
+    .concat(topics.map(t => t.topic))  // Hier fügen wir explizit die tele/... Topics hinzu
+    .filter(Boolean)
+
         client.subscribe([...allTopics, MINMAX_TOPIC])
-        client.publish('dashboard/minmax/request', '')
+      client.publish('dashboard/minmax/request', '')
 
         topics.forEach(({ publishTopic }) => {
           if (publishTopic?.includes('/POWER')) client.publish(publishTopic, '')
