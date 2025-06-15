@@ -16,9 +16,6 @@ const client = mqtt.connect(mqttConfig.host, {
   clean: true
 })
 
-  clientId: 'dashboard-' + Math.random().toString(16).substr(2, 6),
-})
-
 client.setMaxListeners(50)
 client.on('error', err => console.error('[MQTT error]', err))
 client.on('offline', () => console.warn('[MQTT offline]'))
