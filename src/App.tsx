@@ -139,20 +139,7 @@ function App() {
     </div>
   )
 
-  // dein bestehendes JSX folgt wie bisher...
 
-  return (
-    <main className="min-h-screen p-4 sm:p-6 bg-gray-950 text-white font-sans">
-      <header className="mb-6 text-sm text-gray-400">Letztes Update: {lastUpdate || 'Lade...'}</header>
-      {/* alle Kacheln wie gehabt */}
-    </main>
-  )
-}
-
-export default App
-
-
-  // 👉 Dein bestehendes Render-Teil bleibt unverändert – wird hier weggelassen zur Übersicht
 
   return (
     <main className="min-h-screen p-4 sm:p-6 bg-gray-950 text-white font-sans">
