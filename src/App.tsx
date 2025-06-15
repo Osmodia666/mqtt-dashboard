@@ -71,7 +71,9 @@ function App() {
   .map(t => t.statusTopic)
   .filter(Boolean);
 
-        client.subscribe([...allTopics, MINMAX_TOPIC])
+        client.subscribe(allTopics, err => {
+  console.log('🎯 Subscribed topics:', allTopics, 'Error?', err);
+});
       client.publish('dashboard/minmax/request', '')
 
         topics.forEach(({ publishTopic }) => {
