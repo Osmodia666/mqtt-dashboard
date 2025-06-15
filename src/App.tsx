@@ -57,13 +57,13 @@ const flush = () => {
       }
 
       setMinMax(nextMinMax)
-      // Statt localStorage → per MQTT an den zentralen Broker senden
-      client.publish(MINMAX_TOPIC, JSON.stringify(nextMinMax))
+      client.publish(MINMAX_TOPIC, JSON.stringify(nextMinMax), { retain: true }) // ✅ retain gesetzt
       return updated
     })
     setLastUpdate(new Date().toLocaleTimeString())
   }
 }
+
 
 
     const interval = setInterval(flush, 300)
