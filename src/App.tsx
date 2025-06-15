@@ -3,6 +3,7 @@ import { useEffect, useState, useRef } from 'react'
 import mqtt from 'mqtt'
 import { mqttConfig, topics } from './config'
 
+type MinMax = Record<string, { min: number; max: number }>
 const MINMAX_TOPIC = 'dashboard/minmax/update'
 
 const client = mqtt.connect(mqttConfig.host, {
@@ -12,7 +13,7 @@ const client = mqtt.connect(mqttConfig.host, {
   reconnectPeriod: 1000,
   connectTimeout: 30_000,
   keepalive: 60,
-  clean: true
+  clean: true,
 })
 client.setMaxListeners(50)
 
@@ -46,7 +47,7 @@ function App() {
               const current = nextMinMax[key] ?? { min: num, max: num }
               nextMinMax[key] = {
                 min: Math.min(current.min, num),
-                max: Math.max(current.max, num)
+                max: Math.max(current.max, num),
               }
             }
           }
@@ -66,13 +67,7 @@ function App() {
 
       client.on('connect', () => {
         console.log('✅ MQTT connected')
-        const allTopics = [
-  ...new Set(
-    topics
-      .map(t => t.statusTopic?.split('.')?.[0] || t.topic?.split('.')?.[0])
-      .filter(Boolean)
-  )
-]
+        const allTopics = topics.map(t => t.statusTopic || t.topic).filter(Boolean)
         client.subscribe([...allTopics, MINMAX_TOPIC])
         client.publish('dashboard/minmax/request', '')
 
@@ -85,23 +80,22 @@ function App() {
         })
       })
 
-   client.on('message', (topic, message) => {
-  messageQueue.current[topic] = message.toString();
-  console.log('[MQTT recv]', topic, message.toString());
-     
-      if (topic === MINMAX_TOPIC) {
-  try {
-    const incoming = JSON.parse(message.toString())
-    setMinMax(prev => ({ ...prev, ...incoming }))
-  } catch (err) {
-    console.error('[MQTT] Fehler beim MinMax-Update:', err)
-  }
-  return
-}
+      client.on('message', (topic, msgBuffer) => {
+        const message = msgBuffer.toString()
+        console.log('[MQTT recv]', topic, message)
 
+        if (topic === MINMAX_TOPIC) {
+          try {
+            const incoming = JSON.parse(message)
+            setMinMax(prev => ({ ...prev, ...incoming }))
+          } catch (err) {
+            console.error('[MQTT] Fehler beim MinMax-Update:', err)
+          }
+          return
+        }
 
         try {
-          const json = JSON.parse(payload)
+          const json = JSON.parse(message)
           const flatten = (obj: any, prefix = ''): Record<string, string> =>
             Object.entries(obj).reduce((acc, [key, val]) => {
               const newKey = prefix ? `${prefix}.${key}` : key
@@ -118,9 +112,12 @@ function App() {
             messageQueue.current[`${topic}.${key}`] = val
           }
         } catch {
-          messageQueue.current[topic] = payload
+          messageQueue.current[topic] = message
         }
       })
+
+      client.on('error', err => console.error('[MQTT error]', err))
+      client.on('offline', () => console.warn('[MQTT offline]'))
     }
 
     return () => clearInterval(interval)
@@ -143,10 +140,11 @@ function App() {
       <div className={`${color} h-2 transition-all duration-1000 ease-in-out`} style={{ width: `${Math.min(100, (value / max) * 100)}%` }} />
     </div>
   )
+
   return (
     <main className="min-h-screen p-4 sm:p-6 bg-gray-950 text-white font-sans">
       <header className="mb-6 text-sm text-gray-400">Letztes Update: {lastUpdate || 'Lade...'}</header>
-      
+
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
         <div className="rounded-xl p-4 border border-gray-600 bg-gray-800">
           <h2 className="text-md font-bold mb-2">🧱 3D-Drucker</h2>
