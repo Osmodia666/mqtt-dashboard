@@ -13,6 +13,7 @@ const client = mqtt.connect(mqttConfig.host, {
   connectTimeout: 30_000,
   clientId: 'dashboard-client-' + Math.random().toString(16).substr(2, 8),
   keepalive: 60,
+  debug: true,
   clean: true
 })
 
