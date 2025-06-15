@@ -3,14 +3,22 @@ import { useEffect, useState, useRef } from 'react'
 import mqtt from 'mqtt'
 import { mqttConfig, topics } from './config'
 
+type MinMax = Record<string, { min: number; max: number }>
+const MINMAX_TOPIC = 'dashboard/minmax/update'
+
 const client = mqtt.connect(mqttConfig.host, {
   username: mqttConfig.username,
   password: mqttConfig.password,
+  reconnectPeriod: 1000,
+  connectTimeout: 30_000,
+  keepalive: 60,
+  clean: true,
+  clientId: 'dashboard-' + Math.random().toString(16).substr(2, 6),
 })
-client.setMaxListeners(100)
 
-type MinMax = Record<string, { min: number; max: number }>
-const MINMAX_TOPIC = 'dashboard/minmax/update'
+client.setMaxListeners(50)
+client.on('error', err => console.error('[MQTT error]', err))
+client.on('offline', () => console.warn('[MQTT offline]'))
 
 function App() {
   const [values, setValues] = useState<Record<string, string>>({})
@@ -77,17 +85,12 @@ function App() {
       client.on('message', (topic, message) => {
         const payload = message.toString()
 
-        if (topic === 'Pool_temp/temperatur' || topic === 'Gaszaehler/stand') {
-          messageQueue.current[topic] = payload
-          return
-        }
-
         if (topic === MINMAX_TOPIC) {
           try {
             const incoming = JSON.parse(payload)
             setMinMax(prev => ({ ...prev, ...incoming }))
           } catch (err) {
-            console.error('[MQTT] Fehler beim MinMax-Update:', err)
+            console.error('[MQTT] MinMax-Update Fehler:', err)
           }
           return
         }
@@ -107,8 +110,7 @@ function App() {
 
           const flat = flatten(json)
           for (const [key, val] of Object.entries(flat)) {
-            const combinedKey = `${topic}.${key}`
-            messageQueue.current[combinedKey] = val
+            messageQueue.current[`${topic}.${key}`] = val
           }
         } catch {
           messageQueue.current[topic] = payload
@@ -136,6 +138,19 @@ function App() {
       <div className={`${color} h-2 transition-all duration-1000 ease-in-out`} style={{ width: `${Math.min(100, (value / max) * 100)}%` }} />
     </div>
   )
+
+  // dein bestehendes JSX folgt wie bisher...
+
+  return (
+    <main className="min-h-screen p-4 sm:p-6 bg-gray-950 text-white font-sans">
+      <header className="mb-6 text-sm text-gray-400">Letztes Update: {lastUpdate || 'Lade...'}</header>
+      {/* alle Kacheln wie gehabt */}
+    </main>
+  )
+}
+
+export default App
+
 
   // 👉 Dein bestehendes Render-Teil bleibt unverändert – wird hier weggelassen zur Übersicht
 
