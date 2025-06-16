@@ -236,3 +236,74 @@ function App() {
             )
           })}
         </div>
+
+                {topics.filter(t =>
+          t.type !== 'group' &&
+          !['Ender 3 Pro', 'Sidewinder X1', 'Poolpumpe', 'Steckdose 1', 'Steckdose 2'].includes(t.label)
+        ).map(({ label, type, unit, favorite, statusTopic, publishTopic, topic }) => {
+          const key = statusTopic ?? topic
+          const raw = values[key]
+          const value = raw?.toUpperCase()
+          const num = parseFloat(raw)
+          const isNumber = type === 'number' && !isNaN(num)
+          const showMinMax = !label.includes('gesamt') && (
+            key.includes('power_L') || key.includes('Verbrauch_aktuell') || key.includes('Balkonkraftwerk')
+          )
+          const range = minMax[key] ?? { min: num, max: num }
+          const barColor = getBarColor(label, num)
+ 
+          return (
+            <div key={key} className={`rounded-xl p-4 border ${favorite ? 'border-yellow-400' : 'border-gray-600'} bg-gray-800`}>
+              <h2 className="text-md font-bold mb-2">{label}</h2>
+              {type === 'boolean' && (
+                <button
+                  className={`px-4 py-1 rounded text-white ${value === 'ON' ? 'bg-green-500' : 'bg-red-500'}`}
+                  onClick={() => toggleBoolean(publishTopic ?? key, value)}
+                >
+                  {value === 'ON' ? 'AN' : 'AUS'}
+                </button>
+              )}
+              {isNumber && (
+                <>
+                  <p className="text-2xl">{raw ?? '...'} {unit}</p>
+                  {showMinMax && progressBar(num, range.max > 0 ? range.max : 100, barColor)}
+                  {showMinMax && (
+                    <p className="text-xs text-gray-400">
+                      Min: {range.min.toFixed(1)} {unit} | Max: {range.max.toFixed(1)} {unit}
+                    </p>
+                  )}
+                </>
+              )}
+              {type === 'string' && <p className="text-lg">{raw ?? '...'}</p>}
+            </div>
+          )
+        })}
+      </div>
+ 
+      <div className="mt-10 grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {topics.filter(t => t.type === 'group').map(group => (
+          <div key={group.label} className="rounded-xl p-4 border border-gray-600 bg-gray-800">
+            <h2 className="text-lg font-bold mb-2">{group.label}</h2>
+            {group.keys?.map(({ label, key }) => {
+              const raw = values[key]
+              const num = raw !== undefined ? parseFloat(raw) : NaN
+              const range = minMax[key] ?? { min: num, max: num }
+ 
+              return (
+                <div key={key} className="mb-2">
+                  <div className="text-sm">{label}: {isNaN(num) ? '...' : `${num} ${group.unit}`}</div>
+                  {progressBar(num, group.label.includes('Spannung') ? 250 : 1000, 'bg-blue-500')}
+                  <div className="text-xs text-gray-400">
+                    Min: {range.min?.toFixed(1)} | Max: {range.max?.toFixed(1)}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        ))}
+      </div>
+    </main>
+  )
+}
+ 
+export default App
