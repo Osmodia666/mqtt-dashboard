@@ -72,7 +72,7 @@ function App() {
       if (Object.keys(influxPayload).length > 0) {
         client.publish(INFLUX_TOPIC, JSON.stringify(influxPayload))
       }
-      }
+    
 
     const interval = setInterval(flush, FLUSH_INTERVAL)
 
