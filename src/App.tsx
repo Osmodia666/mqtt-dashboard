@@ -103,7 +103,7 @@ const flush = () => {
         const json = JSON.parse(payload)
         const flatten = (obj: any, prefix = ''): Record<string, string> =>
           Object.entries(obj).reduce((acc, [key, val]) => {
-            const newKey = prefix ? ${prefix}.${key} : key
+            const newKey = prefix ? `${prefix}.${key}` : key
             if (typeof val === 'object' && val !== null) {
               Object.assign(acc, flatten(val, newKey))
             } else {
