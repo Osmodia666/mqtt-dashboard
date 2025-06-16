@@ -13,6 +13,8 @@ type MinMax = Record<string, { min: number; max: number }>
 const STORAGE_KEY = 'global_minmax_store'
 const LAST_RESET_KEY = 'global_minmax_store_reset'
 const MINMAX_TOPIC = 'dashboard/minmax/update'
+const INFLUX_TOPIC = 'influx/data'
+const FLUSH_INTERVAL = 10000
 
 function App() {
   const [values, setValues] = useState<Record<string, string>>({})
@@ -29,44 +31,53 @@ function App() {
       localStorage.removeItem(STORAGE_KEY)
     }
 
-const flush = () => {
-  const updates = { ...messageQueue.current }
-  messageQueue.current = {}
+    const flush = () => {
+      const updates = { ...messageQueue.current }
+      messageQueue.current = {}
 
-  if (Object.keys(updates).length > 0) {
-    setValues(prev => {
-      const updated = { ...prev, ...updates }
-      const nextMinMax: MinMax = { ...minMax }
+      if (Object.keys(updates).length > 0) {
+        setValues(prev => {
+          const updated = { ...prev, ...updates }
+          const nextMinMax: MinMax = { ...minMax }
+          const influxPayload: Record<string, number> = {}
 
-      for (const [key, val] of Object.entries(updates)) {
-        const num = parseFloat(val)
-        if (!isNaN(num) && (
-          key.includes('power_L') ||
-          key.includes('Verbrauch_aktuell') ||
-          key === 'Pool_temp/temperatur' ||
-          key.includes('Balkonkraftwerk') ||
-          key.includes('Voltage') ||
-          key.includes('Strom_L')
-        )) {
-          const current = nextMinMax[key] ?? { min: num, max: num }
-          nextMinMax[key] = {
-            min: Math.min(current.min, num),
-            max: Math.max(current.max, num),
+          for (const [key, val] of Object.entries(updates)) {
+            const num = parseFloat(val)
+            if (!isNaN(num)) {
+              influxPayload[key] = num
+
+              if (
+                key.includes('power_L') ||
+                key.includes('Verbrauch_aktuell') ||
+                key === 'Pool_temp/temperatur' ||
+                key.includes('Balkonkraftwerk') ||
+                key.includes('Voltage') ||
+                key.includes('Strom_L')
+              ) {
+                const current = nextMinMax[key] ?? { min: num, max: num }
+                nextMinMax[key] = {
+                  min: Math.min(current.min, num),
+                  max: Math.max(current.max, num),
+                }
+              }
+            }
           }
-        }
+
+          setMinMax(nextMinMax)
+
+          // sende MinMax separat über MQTT
+          client.publish(MINMAX_TOPIC, JSON.stringify(nextMinMax))
+
+          // sende aktuelle Werte als JSON an influx/data
+          client.publish(INFLUX_TOPIC, JSON.stringify(influxPayload))
+
+          return updated
+        })
+        setLastUpdate(new Date().toLocaleTimeString())
       }
+    }
 
-      setMinMax(nextMinMax)
-      // Statt localStorage → per MQTT an den zentralen Broker senden
-      client.publish(MINMAX_TOPIC, JSON.stringify(nextMinMax))
-      return updated
-    })
-    setLastUpdate(new Date().toLocaleTimeString())
-  }
-}
-
-
-    const interval = setInterval(flush, 300)
+    const interval = setInterval(flush, FLUSH_INTERVAL)
 
     client.on('connect', () => {
       client.publish('dashboard/minmax/request', '')
@@ -83,21 +94,16 @@ const flush = () => {
 
     client.on('message', (topic, message) => {
       const payload = message.toString()
-      if (topic === 'Pool_temp/temperatur' || topic === 'Gaszaehler/stand') {
-        messageQueue.current[topic] = payload
-        return
-      }
 
       if (topic === MINMAX_TOPIC) {
-  try {
-    const incoming = JSON.parse(payload)
-    setMinMax(prev => ({ ...prev, ...incoming }))
-  } catch (err) {
-    console.error('[MQTT] Fehler beim MinMax-Update:', err)
-  }
-  return
-}
-
+        try {
+          const incoming = JSON.parse(payload)
+          setMinMax(prev => ({ ...prev, ...incoming }))
+        } catch (err) {
+          console.error('[MQTT] Fehler beim MinMax-Update:', err)
+        }
+        return
+      }
 
       try {
         const json = JSON.parse(payload)
