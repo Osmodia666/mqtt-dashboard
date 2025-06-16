@@ -1,4 +1,4 @@
-"// src/App.tsx
+// src/App.tsx
 import { useEffect, useState, useRef } from 'react'
 import mqtt from 'mqtt'
 import { mqttConfig, topics } from './config'
