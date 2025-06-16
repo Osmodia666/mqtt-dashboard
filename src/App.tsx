@@ -35,42 +35,45 @@ function App() {
       const updates = { ...messageQueue.current }
       messageQueue.current = {}
 
-      if (Object.keys(updates).length > 0) {
-        setValues(prev => {
-          const updated = { ...prev, ...updates }
-          const nextMinMax: MinMax = { ...minMax }
-          const influxPayload: Record<string, number> = {}
+      if (Object.keys(updates).length === 0) return
 
-          for (const [key, val] of Object.entries(updates)) {
-            const num = parseFloat(val)
-            if (!isNaN(num)) {
-              influxPayload[key] = num
+      const updatedValues = { ...values, ...updates }
+      const nextMinMax: MinMax = { ...minMax }
+      const influxPayload: Record<string, number> = {}
 
-              if (
-                key.includes('power_L') ||
-                key.includes('Verbrauch_aktuell') ||
-                key === 'Pool_temp/temperatur' ||
-                key.includes('Balkonkraftwerk') ||
-                key.includes('Voltage') ||
-                key.includes('Strom_L')
-              ) {
-                const current = nextMinMax[key] ?? { min: num, max: num }
-                nextMinMax[key] = {
-                  min: Math.min(current.min, num),
-                  max: Math.max(current.max, num),
-                }
-              }
+      for (const [key, val] of Object.entries(updates)) {
+        const num = parseFloat(val)
+        if (!isNaN(num)) {
+          influxPayload[key] = num
+
+          if (
+            key.includes('power_L') ||
+            key.includes('Verbrauch_aktuell') ||
+            key === 'Pool_temp/temperatur' ||
+            key.includes('Balkonkraftwerk') ||
+            key.includes('Voltage') ||
+            key.includes('Strom_L')
+          ) {
+            const current = nextMinMax[key] ?? { min: num, max: num }
+            nextMinMax[key] = {
+              min: Math.min(current.min, num),
+              max: Math.max(current.max, num),
             }
           }
+        }
+      }
 
-          setMinMax(nextMinMax)
+      setValues(updatedValues)
+      setMinMax(nextMinMax)
+      setLastUpdate(new Date().toLocaleTimeString())
 
-          client.publish(MINMAX_TOPIC, JSON.stringify(nextMinMax))
-          client.publish(INFLUX_TOPIC, JSON.stringify(influxPayload))
+      if (Object.keys(nextMinMax).length > 0) {
+        client.publish(MINMAX_TOPIC, JSON.stringify(nextMinMax))
+      }
 
-          return updated
-        })
-        setLastUpdate(new Date().toLocaleTimeString())
+      if (Object.keys(influxPayload).length > 0) {
+        client.publish(INFLUX_TOPIC, JSON.stringify(influxPayload))
+      }
       }
     }
 
