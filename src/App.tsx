@@ -264,9 +264,7 @@ function App() {
       className={`px-4 py-1 rounded text-white ${value === 'ON' ? 'bg-green-500' : 'bg-red-500'}`}
       onClick={() => toggleBoolean(publishTopic ?? key, value)}
     >
-      {/* Button content here */}
     </button>
-  )}
               )}
               {isNumber && (
                 <>
@@ -291,7 +289,7 @@ function App() {
               const range = minMax[key] ?? { min: num, max: num }
               return (
                 <div key={key} className="mb-2">
-                  <div className="text-sm">{label}: {isNaN(num) ? '...' : ${num} ${group.unit}}</div>
+                  <div className="text-sm">{label}: {isNaN(num) ? '...' : `${num} ${group.unit}`}</div>
                   {progressBar(num, group.label.includes('Spannung') ? 250 : 1000, 'bg-blue-500')}
                   <div className="text-xs text-gray-400">Min: {range.min?.toFixed(1)} | Max: {range.max?.toFixed(1)}</div>
                 </div>
