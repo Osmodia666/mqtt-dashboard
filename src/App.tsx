@@ -113,7 +113,7 @@ const flush = () => {
           }, {})
         const flat = flatten(json)
         for (const [key, val] of Object.entries(flat)) {
-          const combinedKey = ${topic}.${key}
+          const combinedKey = `${topic}.${key}`
           messageQueue.current[combinedKey] = val
         }
       } catch {
