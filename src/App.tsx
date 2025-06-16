@@ -196,7 +196,7 @@ function App() {
 </button>
           )}
         </div>
-        <p className="mt-3">🌡️ Temperatur: {isNaN(val) ? '...' : ${val} °C}</p>
+       <p className="mt-3">🌡️ Temperatur: {isNaN(val) ? '...' : `${val} °C`}</p>
         {progressBar(val, 40, getBarColor('Pool Temperatur', val))}
         <p className="text-xs text-gray-400">Min: {range.min?.toFixed(1)} °C | Max: {range.max?.toFixed(1)} °C</p>
       </>
