@@ -14,7 +14,7 @@ const STORAGE_KEY = 'global_minmax_store'
 const LAST_RESET_KEY = 'global_minmax_store_reset'
 const MINMAX_TOPIC = 'dashboard/minmax/update'
 const INFLUX_TOPIC = 'influx/data'
-const FLUSH_INTERVAL = 10000
+const FLUSH_INTERVAL = 1000
 
 function App() {
   const [values, setValues] = useState<Record<string, string>>({})
@@ -91,6 +91,13 @@ function App() {
         }
       })
     })
+    
+  client.on('message', (topic, message) => {
+      const payload = message.toString()
+      if (topic === 'Pool_temp/temperatur' || topic === 'Gaszaehler/stand') {
+        messageQueue.current[topic] = payload
+        return
+      }
 
     client.on('message', (topic, message) => {
       const payload = message.toString()
