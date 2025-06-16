@@ -145,69 +145,94 @@ function App() {
       <div className={`${color} h-2 transition-all duration-1000 ease-in-out`} style={{ width: `${Math.min(100, (value / max) * 100)}%` }} />
     </div>
   )
-      client.on('message', (topic, msgBuffer) => {
-        const message = msgBuffer.toString()
-        console.log('[MQTT recv]', topic, message)
+  return (
+    <main className="min-h-screen p-4 sm:p-6 bg-gray-950 text-white font-sans">
+      <header className="mb-6 text-sm text-gray-400">Letztes Update: {lastUpdate || 'Lade...'}</header>
 
-        if (topic === MINMAX_TOPIC) {
-          try {
-            const incoming = JSON.parse(message)
-            setMinMax(prev => ({ ...prev, ...incoming }))
-          } catch (err) {
-            console.error('[MQTT] Fehler beim MinMax-Update:', err)
-          }
-          return
-        }
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+        {/* 3D-Drucker */}
+        <div className="rounded-xl p-4 border border-gray-600 bg-gray-800">
+          <h2 className="text-md font-bold mb-2">🧱 3D-Drucker</h2>
+          {['Ender 3 Pro', 'Sidewinder X1'].map((label, i) => {
+            const topic = topics.find(t => t.label === label)
+            if (!topic) return null
+            const val = values[topic.statusTopic]?.toUpperCase()
+            return (
+              <div key={label} className={`flex justify-between items-center ${i > 0 ? 'mt-3' : 'mt-1'}`}>
+                <span>{label}</span>
+                <button className={`px-4 py-1 rounded text-white ${val === 'ON' ? 'bg-green-500' : 'bg-red-500'}`}
+                  onClick={() => toggleBoolean(topic.publishTopic!, val)}>
+                  {val === 'ON' ? 'AN' : 'AUS'}
+                </button>
+              </div>
+            )
+          })}
+        </div>
 
-        // Sonderbehandlung für einfache, rohe Werte
-        if (topic === 'Pool_temp/temperatur' || topic === 'Gaszaehler/stand') {
-          messageQueue.current[topic] = message
-          return
-        }
+        {/* Pool */}
+        <div className="rounded-xl p-4 border border-gray-600 bg-gray-800">
+          <h2 className="text-md font-bold mb-2">🏊 Pool</h2>
+          {(() => {
+            const pumpe = topics.find(t => t.label === 'Poolpumpe')
+            const tempKey = 'Pool_temp/temperatur'
+            const raw = values[tempKey]
+            const val = raw !== undefined ? parseFloat(raw) : NaN
+            const range = minMax[tempKey] ?? { min: val, max: val }
 
-        try {
-          const json = JSON.parse(message)
-          const flatten = (obj: any, prefix = ''): Record<string, string> =>
-            Object.entries(obj).reduce((acc, [key, val]) => {
-              const newKey = prefix ? `${prefix}.${key}` : key
-              if (typeof val === 'object' && val !== null) {
-                Object.assign(acc, flatten(val, newKey))
-              } else {
-                acc[newKey] = String(val)
-              }
-              return acc
-            }, {})
+            return (
+              <>
+                <div className="flex justify-between items-center">
+                  <span>Pumpe</span>
+                  {pumpe && (
+                    <button className={`px-4 py-1 rounded text-white ${values[pumpe.statusTopic]?.toUpperCase() === 'ON' ? 'bg-green-500' : 'bg-red-500'}`}
+                      onClick={() => toggleBoolean(pumpe.publishTopic!, values[pumpe.statusTopic])}>
+                      {values[pumpe.statusTopic]?.toUpperCase() === 'ON' ? 'AN' : 'AUS'}
+                    </button>
+                  )}
+                </div>
+                <p className="mt-3">🌡️ Temperatur: {isNaN(val) ? '...' : `${val} °C`}</p>
+                {progressBar(val, 40, getBarColor('Pool Temperatur', val))}
+                <p className="text-xs text-gray-400">Min: {range.min?.toFixed(1)} °C | Max: {range.max?.toFixed(1)} °C</p>
+              </>
+            )
+          })()}
+        </div>
 
-          const flat = flatten(json)
-          for (const [key, val] of Object.entries(flat)) {
-            messageQueue.current[`${topic}.${key}`] = val
-          }
-        } catch {
-          messageQueue.current[topic] = message
-        }
-      })
+        {/* Zähler */}
+        <div className="rounded-xl p-4 border border-gray-600 bg-gray-800">
+          <h2 className="text-md font-bold mb-2">🎰 Zähler</h2>
+          <div className="flex flex-col space-y-3">
+            <p>⚡ Strom: {values['tele/Stromzähler/SENSOR.grid.Verbrauch_gesamt'] ?? '...'} kWh</p>
+            <p>🔥 Gas: {values['Gaszaehler/stand'] ?? '...'} m³</p>
+          </div>
+        </div>
 
-      client.on('error', err => console.error('[MQTT error]', err))
-      client.on('offline', () => console.warn('[MQTT offline]'))
-    }
+        {/* Erzeugung */}
+        <div className="rounded-xl p-4 border border-gray-600 bg-gray-800">
+          <h2 className="text-md font-bold mb-3">🔋 Erzeugung</h2>
+          <p>Gesamt: {(() => {
+            const key = 'tele/Balkonkraftwerk/SENSOR.ENERGY.EnergyPTotal.0'
+            const raw = values[key]
+            const num = parseFloat(raw)
+            return !isNaN(num) ? (num + 178.779).toFixed(3) : '...'
+          })()} kWh</p>
+        </div>
 
-    return () => clearInterval(interval)
-  }, [minMax])
-
-  const toggleBoolean = (publishTopic: string, current: string) => {
-    const next = current?.toUpperCase() === 'ON' ? 'OFF' : 'ON'
-    client.publish(publishTopic, next)
-  }
-
-  const getBarColor = (label: string, value: number) => {
-    if (label.includes('Verbrauch aktuell')) return value >= 2000 ? 'bg-red-600' : value >= 500 ? 'bg-yellow-400' : 'bg-green-500'
-    if (label.includes('Balkonkraftwerk')) return value > 450 ? 'bg-green-500' : value > 150 ? 'bg-yellow-400' : 'bg-red-600'
-    if (label.includes('Pool Temperatur')) return value > 23 ? 'bg-green-500' : value > 17 ? 'bg-yellow-400' : 'bg-blue-500'
-    return 'bg-blue-500'
-  }
-
-  const progressBar = (value: number, max = 100, color = 'bg-blue-500') => (
-    <div className="w-full bg-gray-300 rounded-full h-2 mt-2 overflow-hidden">
-      <div className={`${color} h-2 transition-all duration-1000 ease-in-out`} style={{ width: `${Math.min(100, (value / max) * 100)}%` }} />
-    </div>
-  )
+        {/* Steckdosen */}
+        <div className="rounded-xl p-4 border border-gray-600 bg-gray-800">
+          <h2 className="text-md font-bold mb-2">🔌 Steckdosen</h2>
+          {['Steckdose 1', 'Steckdose 2'].map((label, i) => {
+            const topic = topics.find(t => t.label === label)
+            if (!topic) return null
+            const val = values[topic.statusTopic]?.toUpperCase()
+            return (
+              <div key={label} className={`flex justify-between items-center ${i > 0 ? 'mt-3' : 'mt-1'}`}>
+                <span>{label}</span>
+                <button className={`px-4 py-1 rounded text-white ${val === 'ON' ? 'bg-green-500' : 'bg-red-500'}`}
+                  onClick={() => toggleBoolean(topic.publishTopic!, val)}>
+                  {val === 'ON' ? 'AN' : 'AUS'}
+                </button>
+              </div>
+            )
+          })}
+        </div>
