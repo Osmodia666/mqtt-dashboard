@@ -228,7 +228,8 @@ function App() {
             if (!topic) return null
             const val = values[topic.statusTopic]?.toUpperCase()
             return (
-              <div key={label} className={flex justify-between items-center ${i > 0 ? 'mt-3' : 'mt-1'}}>
+              <div key={label} className={`flex justify-between items-center ${i > 0 ? 'mt-3' : 'mt-1'}`}>
+
                 <span>{label}</span>
                 <button className={px-4 py-1 rounded text-white ${val === 'ON' ? 'bg-green-500' : 'bg-red-500'}}
                   onClick={() => toggleBoolean(topic.publishTopic!, val)}>
