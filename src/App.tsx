@@ -188,10 +188,12 @@ function App() {
         <div className="flex justify-between items-center">
           <span>Pumpe</span>
           {pumpe && (
-            <button className={px-4 py-1 rounded text-white ${values[pumpe.statusTopic]?.toUpperCase() === 'ON' ? 'bg-green-500' : 'bg-red-500'}}
-              onClick={() => toggleBoolean(pumpe.publishTopic!, values[pumpe.statusTopic])}>
-              {values[pumpe.statusTopic]?.toUpperCase() === 'ON' ? 'AN' : 'AUS'}
-            </button>
+           <button
+  className={`px-4 py-1 rounded text-white ${values[pumpe.statusTopic]?.toUpperCase() === 'ON' ? 'bg-green-500' : 'bg-red-500'}`}
+  onClick={() => toggleBoolean(pumpe.publishTopic!, values[pumpe.statusTopic])}
+>
+  {values[pumpe.statusTopic]?.toUpperCase() === 'ON' ? 'AN' : 'AUS'}
+</button>
           )}
         </div>
         <p className="mt-3">🌡️ Temperatur: {isNaN(val) ? '...' : ${val} °C}</p>
