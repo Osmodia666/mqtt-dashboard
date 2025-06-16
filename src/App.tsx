@@ -14,7 +14,7 @@ const STORAGE_KEY = 'global_minmax_store'
 const LAST_RESET_KEY = 'global_minmax_store_reset'
 const MINMAX_TOPIC = 'dashboard/minmax/update'
 const INFLUX_TOPIC = 'influx/data'
-const FLUSH_INTERVAL = 1000
+const FLUSH_INTERVAL = 10000
 
 function App() {
   const [values, setValues] = useState<Record<string, string>>({})
@@ -65,10 +65,7 @@ function App() {
 
           setMinMax(nextMinMax)
 
-          // sende MinMax separat über MQTT
           client.publish(MINMAX_TOPIC, JSON.stringify(nextMinMax))
-
-          // sende aktuelle Werte als JSON an influx/data
           client.publish(INFLUX_TOPIC, JSON.stringify(influxPayload))
 
           return updated
@@ -94,10 +91,12 @@ function App() {
 
     client.on('message', (topic, message) => {
       const payload = message.toString()
+      if (topic === 'Pool_temp/temperatur' || topic === 'Gaszaehler/stand') {
+        messageQueue.current[topic] = payload
+        return
+      }
 
       if (topic === MINMAX_TOPIC) {
-          if (topic === 'Pool_temp/temperatur' || topic === 'Gaszaehler/stand') {
-        messageQueue.current[topic] = payload
         try {
           const incoming = JSON.parse(payload)
           setMinMax(prev => ({ ...prev, ...incoming }))
@@ -109,8 +108,8 @@ function App() {
 
       try {
         const json = JSON.parse(payload)
-        const flatten = (obj: any, prefix = ''): Record<string, string> =>
-          Object.entries(obj).reduce((acc, [key, val]) => {
+        const flatten = (obj: any, prefix = ''): Record<string, string> => {
+          return Object.entries(obj).reduce((acc, [key, val]) => {
             const newKey = prefix ? `${prefix}.${key}` : key
             if (typeof val === 'object' && val !== null) {
               Object.assign(acc, flatten(val, newKey))
@@ -119,12 +118,13 @@ function App() {
             }
             return acc
           }, {})
+        }
         const flat = flatten(json)
         for (const [key, val] of Object.entries(flat)) {
           const combinedKey = `${topic}.${key}`
           messageQueue.current[combinedKey] = val
         }
-      } catch {
+      } catch (e) {
         messageQueue.current[topic] = payload
       }
     })
