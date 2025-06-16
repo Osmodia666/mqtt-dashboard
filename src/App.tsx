@@ -163,9 +163,9 @@ function App() {
             if (!topic) return null
             const val = values[topic.statusTopic]?.toUpperCase()
             return (
-              <div key={label} className={flex justify-between items-center ${i > 0 ? 'mt-3' : 'mt-1'}}>
+              <div key={label} className={`flex justify-between items-center ${i > 0 ? 'mt-3' : 'mt-1'}`}
                 <span>{label}</span>
-                <button className={px-4 py-1 rounded text-white ${val === 'ON' ? 'bg-green-500' : 'bg-red-500'}}
+                <button className={`px-4 py-1 rounded text-white ${val === 'ON' ? 'bg-green-500' : 'bg-red-500'}`}
                   onClick={() => toggleBoolean(topic.publishTopic!, val)}>
                   {val === 'ON' ? 'AN' : 'AUS'}
                 </button>
@@ -252,7 +252,7 @@ function App() {
           const range = minMax[key] ?? { min: num, max: num }
           const barColor = getBarColor(label, num)
           return (
-            <div key={key} className={rounded-xl p-4 border ${favorite ? 'border-yellow-400' : 'border-gray-600'} bg-gray-800}>
+            <div key={key} className={`rounded-xl p-4 border ${favorite ? 'border-yellow-400' : 'border-gray-600'} bg-gray-800`}
               <h2 className="text-md font-bold mb-2">{label}</h2>
               {type === 'boolean' && (
                 <button className={px-4 py-1 rounded text-white ${value === 'ON' ? 'bg-green-500' : 'bg-red-500'}} onClick={() => toggleBoolean(publishTopic ?? key, value)}>
