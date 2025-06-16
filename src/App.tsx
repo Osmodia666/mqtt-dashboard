@@ -257,12 +257,16 @@ function App() {
           const range = minMax[key] ?? { min: num, max: num }
           const barColor = getBarColor(label, num)
           return (
-            <div key={key} className={`rounded-xl p-4 border ${favorite ? 'border-yellow-400' : 'border-gray-600'} bg-gray-800`}
-              <h2 className="text-md font-bold mb-2">{label}</h2>
-              {type === 'boolean' && (
-                <button className={px-4 py-1 rounded text-white ${value === 'ON' ? 'bg-green-500' : 'bg-red-500'}} onClick={() => toggleBoolean(publishTopic ?? key, value)}>
-                  {value === 'ON' ? 'AN' : 'AUS'}
-                </button>
+            <div key={key} className={`rounded-xl p-4 border ${favorite ? 'border-yellow-400' : 'border-gray-600'} bg-gray-800`}>
+  <h2 className="text-md font-bold mb-2">{label}</h2>
+  {type === 'boolean' && (
+    <button
+      className={`px-4 py-1 rounded text-white ${value === 'ON' ? 'bg-green-500' : 'bg-red-500'}`}
+      onClick={() => toggleBoolean(publishTopic ?? key, value)}
+    >
+      {/* Button content here */}
+    </button>
+  )}
               )}
               {isNumber && (
                 <>
