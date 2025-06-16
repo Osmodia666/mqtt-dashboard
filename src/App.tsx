@@ -1,4 +1,3 @@
-// src/App.tsx
 import { useEffect, useState, useRef } from 'react'
 import mqtt from 'mqtt'
 import { mqttConfig, topics } from './config'
@@ -10,29 +9,20 @@ const client = mqtt.connect(mqttConfig.host, {
 client.setMaxListeners(100)
 
 type MinMax = Record<string, { min: number; max: number }>
-const STORAGE_KEY = 'global_minmax_store'
-const LAST_RESET_KEY = 'global_minmax_store_reset'
 const MINMAX_TOPIC = 'dashboard/minmax/update'
 const INFLUX_TOPIC = 'influx/data'
 const FLUSH_INTERVAL = 10000
+const QUEUE_FLUSH_INTERVAL = 1000 // 1 second for queued topics
 
 function App() {
   const [values, setValues] = useState<Record<string, string>>({})
   const [lastUpdate, setLastUpdate] = useState('')
   const [minMax, setMinMax] = useState<MinMax>({})
-  // For batching influx data, if you want to keep batching
   const influxQueue = useRef<Record<string, number>>({})
+  // Only queue the special topics
+  const messageQueue = useRef<Record<string, string>>({})
 
   useEffect(() => {
-    const now = Date.now()
-    const lastReset = parseInt(localStorage.getItem(LAST_RESET_KEY) || '0', 10)
-    if (now - lastReset > 86400000) {
-      setMinMax({})
-      localStorage.setItem(LAST_RESET_KEY, String(now))
-      localStorage.removeItem(STORAGE_KEY)
-    }
-
-    // MQTT connect event
     client.on('connect', () => {
       client.publish('dashboard/minmax/request', '')
       const allTopics = topics.map(t => t.statusTopic || t.topic).filter(Boolean)
@@ -46,9 +36,14 @@ function App() {
       })
     })
 
-    // MQTT message event - process immediately!
     client.on('message', (topic, message) => {
       const payload = message.toString()
+
+      // Special handling for these two topics: queue them
+      if (topic === 'Pool_temp/temperatur' || topic === 'Gaszaehler/stand') {
+        messageQueue.current[topic] = payload
+        return
+      }
 
       if (topic === MINMAX_TOPIC) {
         try {
@@ -84,14 +79,14 @@ function App() {
         updates[topic] = payload
       }
 
-      // Update values state immediately
+      // Update values state immediately for all other topics
       setValues(prev => {
         const merged = { ...prev, ...updates }
         setLastUpdate(new Date().toLocaleTimeString())
         return merged
       })
 
-      // Update minMax state immediately if relevant
+      // Update minMax state
       setMinMax(prev => {
         let changed = false
         const next = { ...prev }
@@ -127,8 +122,55 @@ function App() {
       }
     })
 
+    // Flush queued messages for the two special topics every second
+    const queueInterval = setInterval(() => {
+      if (Object.keys(messageQueue.current).length > 0) {
+        setValues(prev => {
+          const merged = { ...prev, ...messageQueue.current }
+          setLastUpdate(new Date().toLocaleTimeString())
+          return merged
+        })
+
+        setMinMax(prev => {
+          let changed = false
+          const next = { ...prev }
+          for (const [key, val] of Object.entries(messageQueue.current)) {
+            const num = parseFloat(val)
+            if (!isNaN(num) &&
+              (
+                key.includes('power_L') ||
+                key.includes('Verbrauch_aktuell') ||
+                key === 'Pool_temp/temperatur' ||
+                key.includes('Balkonkraftwerk') ||
+                key.includes('Voltage') ||
+                key.includes('Strom_L')
+              )
+            ) {
+              const current = next[key] ?? { min: num, max: num }
+              next[key] = {
+                min: Math.min(current.min, num),
+                max: Math.max(current.max, num),
+              }
+              changed = true
+            }
+          }
+          return changed ? next : prev
+        })
+
+        // Also batch influx data for these queued topics
+        for (const [key, val] of Object.entries(messageQueue.current)) {
+          const num = parseFloat(val)
+          if (!isNaN(num)) {
+            influxQueue.current[key] = num
+          }
+        }
+
+        messageQueue.current = {}
+      }
+    }, QUEUE_FLUSH_INTERVAL)
+
     // Batch send influx data every FLUSH_INTERVAL, if you want
-    const interval = setInterval(() => {
+    const influxInterval = setInterval(() => {
       const influxPayload = { ...influxQueue.current }
       influxQueue.current = {}
       if (Object.keys(influxPayload).length > 0) {
@@ -136,7 +178,10 @@ function App() {
       }
     }, FLUSH_INTERVAL)
 
-    return () => clearInterval(interval)
+    return () => {
+      clearInterval(queueInterval)
+      clearInterval(influxInterval)
+    }
   }, [])
 
   const toggleBoolean = (publishTopic: string, current: string) => {
