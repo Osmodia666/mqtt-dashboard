@@ -73,7 +73,6 @@ function App() {
         client.publish(INFLUX_TOPIC, JSON.stringify(influxPayload))
       }
       }
-    }
 
     const interval = setInterval(flush, FLUSH_INTERVAL)
 
