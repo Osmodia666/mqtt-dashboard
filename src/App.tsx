@@ -91,18 +91,13 @@ function App() {
         }
       })
     })
-    
-  client.on('message', (topic, message) => {
-      const payload = message.toString()
-      if (topic === 'Pool_temp/temperatur' || topic === 'Gaszaehler/stand') {
-        messageQueue.current[topic] = payload
-        return
-      }
 
     client.on('message', (topic, message) => {
       const payload = message.toString()
 
       if (topic === MINMAX_TOPIC) {
+          if (topic === 'Pool_temp/temperatur' || topic === 'Gaszaehler/stand') {
+        messageQueue.current[topic] = payload
         try {
           const incoming = JSON.parse(payload)
           setMinMax(prev => ({ ...prev, ...incoming }))
