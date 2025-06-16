@@ -6,12 +6,15 @@ import { mqttConfig, topics } from './config'
 const client = mqtt.connect(mqttConfig.host, {
   username: mqttConfig.username,
   password: mqttConfig.password,
+  clientId: 'dashboard-client-' + Math.random().toString(16).substr(2, 8),
+  reconnectPeriod: 1000,
+  connectTimeout: 30_000,
+  keepalive: 60,
+  clean: true,
 })
 client.setMaxListeners(100)
 
 type MinMax = Record<string, { min: number; max: number }>
-const STORAGE_KEY = 'global_minmax_store'
-const LAST_RESET_KEY = 'global_minmax_store_reset'
 const MINMAX_TOPIC = 'dashboard/minmax/update'
 
 function App() {
@@ -19,110 +22,116 @@ function App() {
   const [lastUpdate, setLastUpdate] = useState('')
   const [minMax, setMinMax] = useState<MinMax>({})
   const messageQueue = useRef<Record<string, string>>({})
+  const initialized = useRef(false)
 
   useEffect(() => {
-    const now = Date.now()
-    const lastReset = parseInt(localStorage.getItem(LAST_RESET_KEY) || '0', 10)
-    if (now - lastReset > 86400000) {
-      setMinMax({})
-      localStorage.setItem(LAST_RESET_KEY, String(now))
-      localStorage.removeItem(STORAGE_KEY)
-    }
+    const flush = () => {
+      const updates = { ...messageQueue.current }
+      messageQueue.current = {}
 
-const flush = () => {
-  const updates = { ...messageQueue.current }
-  messageQueue.current = {}
+      if (Object.keys(updates).length > 0) {
+        setValues(prev => {
+          const updated = { ...prev, ...updates }
+          const nextMinMax: MinMax = { ...minMax }
 
-  if (Object.keys(updates).length > 0) {
-    setValues(prev => {
-      const updated = { ...prev, ...updates }
-      const nextMinMax: MinMax = { ...minMax }
-
-      for (const [key, val] of Object.entries(updates)) {
-        const num = parseFloat(val)
-        if (!isNaN(num) && (
-          key.includes('power_L') ||
-          key.includes('Verbrauch_aktuell') ||
-          key === 'Pool_temp/temperatur' ||
-          key.includes('Balkonkraftwerk') ||
-          key.includes('Voltage') ||
-          key.includes('Strom_L')
-        )) {
-          const current = nextMinMax[key] ?? { min: num, max: num }
-          nextMinMax[key] = {
-            min: Math.min(current.min, num),
-            max: Math.max(current.max, num),
+          for (const [key, val] of Object.entries(updates)) {
+            const num = parseFloat(val)
+            if (!isNaN(num) && (
+              key.includes('power_L') ||
+              key.includes('Verbrauch_aktuell') ||
+              key === 'Pool_temp/temperatur' ||
+              key.includes('Balkonkraftwerk') ||
+              key.includes('Voltage') ||
+              key.includes('Strom_L')
+            )) {
+              const current = nextMinMax[key] ?? { min: num, max: num }
+              nextMinMax[key] = {
+                min: Math.min(current.min, num),
+                max: Math.max(current.max, num),
+              }
+            }
           }
-        }
+
+          setMinMax(nextMinMax)
+          client.publish(MINMAX_TOPIC, JSON.stringify(nextMinMax), { retain: true })
+          return updated
+        })
+        setLastUpdate(new Date().toLocaleTimeString())
       }
-
-      setMinMax(nextMinMax)
-      // Statt localStorage → per MQTT an den zentralen Broker senden
-      client.publish(MINMAX_TOPIC, JSON.stringify(nextMinMax))
-      return updated
-    })
-    setLastUpdate(new Date().toLocaleTimeString())
-  }
-}
-
+    }
 
     const interval = setInterval(flush, 300)
 
-    client.on('connect', () => {
-      client.publish('dashboard/minmax/request', '')
-      const allTopics = topics.map(t => t.statusTopic || t.topic).filter(Boolean)
-      client.subscribe([...allTopics, '#', MINMAX_TOPIC])
-      topics.forEach(({ publishTopic }) => {
-        if (publishTopic?.includes('/POWER')) client.publish(publishTopic, '')
-        if (publishTopic) {
-          const base = publishTopic.split('/')[1]
-          client.publish(cmnd/${base}/state, '')
+    if (!initialized.current) {
+      initialized.current = true
+
+      client.on('connect', () => {
+        console.log('✅ MQTT connected')
+        const allTopics = topics.map(t => t.statusTopic || t.topic).filter(Boolean)
+        client.subscribe([...allTopics, MINMAX_TOPIC])
+        client.publish('dashboard/minmax/request', '')
+
+        topics.forEach(({ publishTopic }) => {
+          if (publishTopic?.includes('/POWER')) client.publish(publishTopic, '')
+          if (publishTopic) {
+            const base = publishTopic.split('/')[1]
+            client.publish(`cmnd/${base}/state`, '')
+          }
+        })
+      })
+
+      client.on('message', (topic, msgBuffer) => {
+        const payload = msgBuffer.toString()
+        console.log('[MQTT recv]', topic, payload)
+
+        // Separat behandeln
+        if (topic === 'Pool_temp/temperatur' || topic === 'Gaszaehler/stand') {
+          messageQueue.current[topic] = payload
+          return
+        }
+
+        // MinMax von anderen Clients übernehmen
+        if (topic === MINMAX_TOPIC) {
+          try {
+            const incoming = JSON.parse(payload)
+            setMinMax(prev => ({ ...prev, ...incoming }))
+          } catch (err) {
+            console.error('[MQTT] Fehler beim MinMax-Update:', err)
+          }
+          return
+        }
+
+        // JSON flatten & speichern
+        try {
+          const json = JSON.parse(payload)
+          const flatten = (obj: any, prefix = ''): Record<string, string> =>
+            Object.entries(obj).reduce((acc, [key, val]) => {
+              const newKey = prefix ? `${prefix}.${key}` : key
+              if (typeof val === 'object' && val !== null) {
+                Object.assign(acc, flatten(val, newKey))
+              } else {
+                acc[newKey] = String(val)
+              }
+              return acc
+            }, {})
+
+          const flat = flatten(json)
+          for (const [key, val] of Object.entries(flat)) {
+            const combinedKey = `${topic}.${key}`
+            messageQueue.current[combinedKey] = val
+          }
+        } catch {
+          // Fallback für einfache String-Werte
+          messageQueue.current[topic] = payload
         }
       })
 
-    client.on('message', (topic, message) => {
-      const payload = message.toString()
-      if (topic === 'Pool_temp/temperatur' || topic === 'Gaszaehler/stand') {
-        messageQueue.current[topic] = payload
-        return
-      }
-
-      if (topic === MINMAX_TOPIC) {
-  try {
-    const incoming = JSON.parse(payload)
-    setMinMax(prev => ({ ...prev, ...incoming }))
-  } catch (err) {
-    console.error('[MQTT] Fehler beim MinMax-Update:', err)
-  }
-  return
-}
-
-
-      try {
-        const json = JSON.parse(payload)
-        const flatten = (obj: any, prefix = ''): Record<string, string> =>
-          Object.entries(obj).reduce((acc, [key, val]) => {
-            const newKey = prefix ? ${prefix}.${key} : key
-            if (typeof val === 'object' && val !== null) {
-              Object.assign(acc, flatten(val, newKey))
-            } else {
-              acc[newKey] = String(val)
-            }
-            return acc
-          }, {})
-        const flat = flatten(json)
-        for (const [key, val] of Object.entries(flat)) {
-          const combinedKey = ${topic}.${key}
-          messageQueue.current[combinedKey] = val
-        }
-      } catch {
-        messageQueue.current[topic] = payload
-      }
-    })
+      client.on('error', err => console.error('[MQTT error]', err))
+      client.on('offline', () => console.warn('[MQTT offline]'))
+    }
 
     return () => clearInterval(interval)
   }, [minMax])
-
   const toggleBoolean = (publishTopic: string, current: string) => {
     const next = current?.toUpperCase() === 'ON' ? 'OFF' : 'ON'
     client.publish(publishTopic, next)
@@ -137,7 +146,7 @@ const flush = () => {
 
   const progressBar = (value: number, max = 100, color = 'bg-blue-500') => (
     <div className="w-full bg-gray-300 rounded-full h-2 mt-2 overflow-hidden">
-      <div className={${color} h-2 transition-all duration-1000 ease-in-out} style={{ width: ${Math.min(100, (value / max) * 100)}% }} />
+      <div className={`${color} h-2 transition-all duration-1000 ease-in-out`} style={{ width: `${Math.min(100, (value / max) * 100)}%` }} />
     </div>
   )
 
@@ -145,6 +154,7 @@ const flush = () => {
     <main className="min-h-screen p-4 sm:p-6 bg-gray-950 text-white font-sans">
       <header className="mb-6 text-sm text-gray-400">Letztes Update: {lastUpdate || 'Lade...'}</header>
 
+  
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
         <div className="rounded-xl p-4 border border-gray-600 bg-gray-800">
           <h2 className="text-md font-bold mb-2">🧱 3D-Drucker</h2>
@@ -285,4 +295,4 @@ const flush = () => {
   )
 }
 
-export default App "
+export default App
