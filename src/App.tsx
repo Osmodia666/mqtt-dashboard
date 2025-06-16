@@ -66,10 +66,8 @@ function App() {
       setValues(updatedValues)
       setMinMax(nextMinMax)
       setLastUpdate(new Date().toLocaleTimeString())
-
-      if (Object.keys(nextMinMax).length > 0) {
-        client.publish(MINMAX_TOPIC, JSON.stringify(nextMinMax))
-      }
+    }
+    
 
       if (Object.keys(influxPayload).length > 0) {
         client.publish(INFLUX_TOPIC, JSON.stringify(influxPayload))
