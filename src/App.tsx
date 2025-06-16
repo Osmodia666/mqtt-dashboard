@@ -1,3 +1,4 @@
+// src/App.tsx
 import { useEffect, useState, useRef } from 'react'
 import mqtt from 'mqtt'
 import { mqttConfig, topics } from './config'
@@ -12,15 +13,12 @@ type MinMax = Record<string, { min: number; max: number }>
 const MINMAX_TOPIC = 'dashboard/minmax/update'
 const INFLUX_TOPIC = 'influx/data'
 const FLUSH_INTERVAL = 10000
-const QUEUE_FLUSH_INTERVAL = 1000 // 1 second for queued topics
 
 function App() {
   const [values, setValues] = useState<Record<string, string>>({})
   const [lastUpdate, setLastUpdate] = useState('')
   const [minMax, setMinMax] = useState<MinMax>({})
   const influxQueue = useRef<Record<string, number>>({})
-  // Only queue the special topics
-  const messageQueue = useRef<Record<string, string>>({})
 
   useEffect(() => {
     client.on('connect', () => {
@@ -39,9 +37,36 @@ function App() {
     client.on('message', (topic, message) => {
       const payload = message.toString()
 
-      // Special handling for these two topics: queue them
+      // Update these two topics immediately
       if (topic === 'Pool_temp/temperatur' || topic === 'Gaszaehler/stand') {
-        messageQueue.current[topic] = payload
+        setValues(prev => {
+          const merged = { ...prev, [topic]: payload }
+          setLastUpdate(new Date().toLocaleTimeString())
+          return merged
+        })
+
+        // Optionally update minMax
+        setMinMax(prev => {
+          const num = parseFloat(payload)
+          if (!isNaN(num)) {
+            const current = prev[topic] ?? { min: num, max: num }
+            return {
+              ...prev,
+              [topic]: {
+                min: Math.min(current.min, num),
+                max: Math.max(current.max, num),
+              }
+            }
+          }
+          return prev
+        })
+
+        // Optionally add to influxQueue
+        const num = parseFloat(payload)
+        if (!isNaN(num)) {
+          influxQueue.current[topic] = num
+        }
+
         return
       }
 
@@ -122,53 +147,6 @@ function App() {
       }
     })
 
-    // Flush queued messages for the two special topics every second
-    const queueInterval = setInterval(() => {
-      if (Object.keys(messageQueue.current).length > 0) {
-        setValues(prev => {
-          const merged = { ...prev, ...messageQueue.current }
-          setLastUpdate(new Date().toLocaleTimeString())
-          return merged
-        })
-
-        setMinMax(prev => {
-          let changed = false
-          const next = { ...prev }
-          for (const [key, val] of Object.entries(messageQueue.current)) {
-            const num = parseFloat(val)
-            if (!isNaN(num) &&
-              (
-                key.includes('power_L') ||
-                key.includes('Verbrauch_aktuell') ||
-                key === 'Pool_temp/temperatur' ||
-                key.includes('Balkonkraftwerk') ||
-                key.includes('Voltage') ||
-                key.includes('Strom_L')
-              )
-            ) {
-              const current = next[key] ?? { min: num, max: num }
-              next[key] = {
-                min: Math.min(current.min, num),
-                max: Math.max(current.max, num),
-              }
-              changed = true
-            }
-          }
-          return changed ? next : prev
-        })
-
-        // Also batch influx data for these queued topics
-        for (const [key, val] of Object.entries(messageQueue.current)) {
-          const num = parseFloat(val)
-          if (!isNaN(num)) {
-            influxQueue.current[key] = num
-          }
-        }
-
-        messageQueue.current = {}
-      }
-    }, QUEUE_FLUSH_INTERVAL)
-
     // Batch send influx data every FLUSH_INTERVAL, if you want
     const influxInterval = setInterval(() => {
       const influxPayload = { ...influxQueue.current }
@@ -179,7 +157,6 @@ function App() {
     }, FLUSH_INTERVAL)
 
     return () => {
-      clearInterval(queueInterval)
       clearInterval(influxInterval)
     }
   }, [])
