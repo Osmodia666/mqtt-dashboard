@@ -14,13 +14,14 @@ const STORAGE_KEY = 'global_minmax_store'
 const LAST_RESET_KEY = 'global_minmax_store_reset'
 const MINMAX_TOPIC = 'dashboard/minmax/update'
 const INFLUX_TOPIC = 'influx/data'
-const FLUSH_INTERVAL = 1000
+const FLUSH_INTERVAL = 10000
 
 function App() {
   const [values, setValues] = useState<Record<string, string>>({})
   const [lastUpdate, setLastUpdate] = useState('')
   const [minMax, setMinMax] = useState<MinMax>({})
-  const messageQueue = useRef<Record<string, string>>({})
+  // For batching influx data, if you want to keep batching
+  const influxQueue = useRef<Record<string, number>>({})
 
   useEffect(() => {
     const now = Date.now()
@@ -31,50 +32,7 @@ function App() {
       localStorage.removeItem(STORAGE_KEY)
     }
 
-const flush = () => {
-  const updates = { ...messageQueue.current }
-  messageQueue.current = {}
-
-  if (Object.keys(updates).length === 0) return
-
-  const updatedValues = { ...values, ...updates }
-  const nextMinMax: MinMax = { ...minMax }
-  const influxPayload: Record<string, number> = {}
-
-  for (const [key, val] of Object.entries(updates)) {
-    const num = parseFloat(val)
-    if (!isNaN(num)) {
-      influxPayload[key] = num
-
-      if (
-        key.includes('power_L') ||
-        key.includes('Verbrauch_aktuell') ||
-        key === 'Pool_temp/temperatur' ||
-        key.includes('Balkonkraftwerk') ||
-        key.includes('Voltage') ||
-        key.includes('Strom_L')
-      ) {
-        const current = nextMinMax[key] ?? { min: num, max: num }
-        nextMinMax[key] = {
-          min: Math.min(current.min, num),
-          max: Math.max(current.max, num),
-        }
-      }
-    }
-  }
-
-  setValues(updatedValues)
-  setMinMax(nextMinMax)
-  setLastUpdate(new Date().toLocaleTimeString())
-
-  // This should be inside the function!
-  if (Object.keys(influxPayload).length > 0) {
-    client.publish(INFLUX_TOPIC, JSON.stringify(influxPayload))
-  }
-}
-
-    const interval = setInterval(flush, FLUSH_INTERVAL)
-
+    // MQTT connect event
     client.on('connect', () => {
       client.publish('dashboard/minmax/request', '')
       const allTopics = topics.map(t => t.statusTopic || t.topic).filter(Boolean)
@@ -88,12 +46,9 @@ const flush = () => {
       })
     })
 
+    // MQTT message event - process immediately!
     client.on('message', (topic, message) => {
       const payload = message.toString()
-      if (topic === 'Pool_temp/temperatur' || topic === 'Gaszaehler/stand') {
-        messageQueue.current[topic] = payload
-        return
-      }
 
       if (topic === MINMAX_TOPIC) {
         try {
@@ -105,6 +60,8 @@ const flush = () => {
         return
       }
 
+      // Handle flattened JSON MQTT payloads
+      let updates: Record<string, string> = {}
       try {
         const json = JSON.parse(payload)
         const flatten = (obj: any, prefix = ''): Record<string, string> => {
@@ -121,15 +78,66 @@ const flush = () => {
         const flat = flatten(json)
         for (const [key, val] of Object.entries(flat)) {
           const combinedKey = `${topic}.${key}`
-          messageQueue.current[combinedKey] = val
+          updates[combinedKey] = val
         }
       } catch (e) {
-        messageQueue.current[topic] = payload
+        updates[topic] = payload
+      }
+
+      // Update values state immediately
+      setValues(prev => {
+        const merged = { ...prev, ...updates }
+        setLastUpdate(new Date().toLocaleTimeString())
+        return merged
+      })
+
+      // Update minMax state immediately if relevant
+      setMinMax(prev => {
+        let changed = false
+        const next = { ...prev }
+        for (const [key, val] of Object.entries(updates)) {
+          const num = parseFloat(val)
+          if (!isNaN(num) &&
+            (
+              key.includes('power_L') ||
+              key.includes('Verbrauch_aktuell') ||
+              key === 'Pool_temp/temperatur' ||
+              key.includes('Balkonkraftwerk') ||
+              key.includes('Voltage') ||
+              key.includes('Strom_L')
+            )
+          ) {
+            const current = next[key] ?? { min: num, max: num }
+            next[key] = {
+              min: Math.min(current.min, num),
+              max: Math.max(current.max, num),
+            }
+            changed = true
+          }
+        }
+        return changed ? next : prev
+      })
+
+      // Batch influx payload if needed
+      for (const [key, val] of Object.entries(updates)) {
+        const num = parseFloat(val)
+        if (!isNaN(num)) {
+          influxQueue.current[key] = num
+        }
       }
     })
 
+    // Batch send influx data every FLUSH_INTERVAL, if you want
+    const interval = setInterval(() => {
+      const influxPayload = { ...influxQueue.current }
+      influxQueue.current = {}
+      if (Object.keys(influxPayload).length > 0) {
+        client.publish(INFLUX_TOPIC, JSON.stringify(influxPayload))
+      }
+    }, FLUSH_INTERVAL)
+
     return () => clearInterval(interval)
-  }, [minMax])
+  }, [])
 
   const toggleBoolean = (publishTopic: string, current: string) => {
     const next = current?.toUpperCase() === 'ON' ? 'OFF' : 'ON'
@@ -172,52 +180,51 @@ const flush = () => {
           })}
         </div>
 
-<div className="rounded-xl p-4 border border-gray-600 bg-gray-800">
-  <h2 className="text-md font-bold mb-2">🏊 Pool</h2>
-  {(() => {
-    const pumpe = topics.find(t => t.label === 'Poolpumpe')
-    const tempKey = 'Pool_temp/temperatur'
-    const raw = values[tempKey]
-    const val = raw !== undefined ? parseFloat(raw) : NaN
-    const range = minMax[tempKey] ?? { min: val, max: val }
+        <div className="rounded-xl p-4 border border-gray-600 bg-gray-800">
+          <h2 className="text-md font-bold mb-2">🏊 Pool</h2>
+          {(() => {
+            const pumpe = topics.find(t => t.label === 'Poolpumpe')
+            const tempKey = 'Pool_temp/temperatur'
+            const raw = values[tempKey]
+            const val = raw !== undefined ? parseFloat(raw) : NaN
+            const range = minMax[tempKey] ?? { min: val, max: val }
 
-    return (
-      <>
-        <div className="flex justify-between items-center">
-          <span>Pumpe</span>
-          {pumpe && (
-            <button className={`px-4 py-1 rounded text-white ${values[pumpe.statusTopic]?.toUpperCase() === 'ON' ? 'bg-green-500' : 'bg-red-500'}`}
-              onClick={() => toggleBoolean(pumpe.publishTopic!, values[pumpe.statusTopic])}>
-              {values[pumpe.statusTopic]?.toUpperCase() === 'ON' ? 'AN' : 'AUS'}
-            </button>
-          )}
+            return (
+              <>
+                <div className="flex justify-between items-center">
+                  <span>Pumpe</span>
+                  {pumpe && (
+                    <button className={`px-4 py-1 rounded text-white ${values[pumpe.statusTopic]?.toUpperCase() === 'ON' ? 'bg-green-500' : 'bg-red-500'}`}
+                      onClick={() => toggleBoolean(pumpe.publishTopic!, values[pumpe.statusTopic])}>
+                      {values[pumpe.statusTopic]?.toUpperCase() === 'ON' ? 'AN' : 'AUS'}
+                    </button>
+                  )}
+                </div>
+                <p className="mt-3">🌡️ Temperatur: {isNaN(val) ? '...' : `${val} °C`}</p>
+                {progressBar(val, 40, getBarColor('Pool Temperatur', val))}
+                <p className="text-xs text-gray-400">Min: {range.min?.toFixed(1)} °C | Max: {range.max?.toFixed(1)} °C</p>
+              </>
+            )
+          })()}
         </div>
-        <p className="mt-3">🌡️ Temperatur: {isNaN(val) ? '...' : `${val} °C`}</p>
-        {progressBar(val, 40, getBarColor('Pool Temperatur', val))}
-        <p className="text-xs text-gray-400">Min: {range.min?.toFixed(1)} °C | Max: {range.max?.toFixed(1)} °C</p>
-      </>
-    )
-  })()}
-</div>
 
+        <div className="rounded-xl p-4 border border-gray-600 bg-gray-800">
+          <h2 className="text-md font-bold mb-2">🎰 Zähler</h2>
+          <div className="flex flex-col space-y-3">
+            <p>⚡ Strom: {values['tele/Stromzähler/SENSOR.grid.Verbrauch_gesamt'] ?? '...'} kWh</p>
+            <p>🔥 Gas: {values['Gaszaehler/stand'] ?? '...'} m³</p>
+          </div>
+        </div>
 
-  <div className="rounded-xl p-4 border border-gray-600 bg-gray-800">
-  <h2 className="text-md font-bold mb-2">🎰 Zähler</h2>
-  <div className="flex flex-col space-y-3">
-      <p>⚡ Strom: {values['tele/Stromzähler/SENSOR.grid.Verbrauch_gesamt'] ?? '...'} kWh</p>
-    <p>🔥 Gas: {values['Gaszaehler/stand'] ?? '...'} m³</p>
-  </div>
-</div>
-
-<div className="rounded-xl p-4 border border-gray-600 bg-gray-800">
-  <h2 className="text-md font-bold mb-3">🔋 Erzeugung</h2>
-  <p>Gesamt: {(() => {
-    const key = 'tele/Balkonkraftwerk/SENSOR.ENERGY.EnergyPTotal.0'
-    const raw = values[key]
-    const num = parseFloat(raw)
-    return !isNaN(num) ? (num + 178.779).toFixed(3) : '...'
-  })()} kWh</p>
-</div>
+        <div className="rounded-xl p-4 border border-gray-600 bg-gray-800">
+          <h2 className="text-md font-bold mb-3">🔋 Erzeugung</h2>
+          <p>Gesamt: {(() => {
+            const key = 'tele/Balkonkraftwerk/SENSOR.ENERGY.EnergyPTotal.0'
+            const raw = values[key]
+            const num = parseFloat(raw)
+            return !isNaN(num) ? (num + 178.779).toFixed(3) : '...'
+          })()} kWh</p>
+        </div>
 
         <div className="rounded-xl p-4 border border-gray-600 bg-gray-800">
           <h2 className="text-md font-bold mb-2">🔌 Steckdosen</h2>
