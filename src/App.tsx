@@ -79,7 +79,6 @@ const flush = () => {
           client.publish(cmnd/${base}/state, '')
         }
       })
-    })
 
     client.on('message', (topic, message) => {
       const payload = message.toString()
