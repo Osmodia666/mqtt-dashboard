@@ -1,77 +1,94 @@
-// src/App.tsx
+// src/App.tsx – Teil 1 von 3
 import { useEffect, useState, useRef } from 'react'
 import mqtt from 'mqtt'
+import { InfluxDB, Point } from '@influxdata/influxdb-client-browser'
 import { mqttConfig, topics } from './config'
+
+type MinMax = Record<string, { min: number; max: number }>
+const MINMAX_TOPIC = 'dashboard/minmax/update'
+
+// InfluxDB-Initiierung (z. B. über iobroker-Adapter erreichbar)
+const influx = new InfluxDB({ url: 'http://localhost:8086', token: 'DEIN_TOKEN' })
+const writeApi = influx.getWriteApi('dein_org', 'dein_bucket')
 
 const client = mqtt.connect(mqttConfig.host, {
   username: mqttConfig.username,
   password: mqttConfig.password,
+  clientId: 'dashboard-client-' + Math.random().toString(16).substr(2, 8),
+  reconnectPeriod: 1000,
+  connectTimeout: 30000,
+  keepalive: 60,
+  clean: true,
 })
-client.setMaxListeners(100)
-
-type MinMax = Record<string, { min: number; max: number }>
-const STORAGE_KEY = 'global_minmax_store'
-const LAST_RESET_KEY = 'global_minmax_store_reset'
-const MINMAX_TOPIC = 'dashboard/minmax/update'
+client.setMaxListeners(50)
 
 function App() {
   const [values, setValues] = useState<Record<string, string>>({})
   const [lastUpdate, setLastUpdate] = useState('')
   const [minMax, setMinMax] = useState<MinMax>({})
   const messageQueue = useRef<Record<string, string>>({})
+  const initialized = useRef(false)
 
   useEffect(() => {
-    const now = Date.now()
-    const lastReset = parseInt(localStorage.getItem(LAST_RESET_KEY) || '0', 10)
-    if (now - lastReset > 86400000) {
-      setMinMax({})
-      localStorage.setItem(LAST_RESET_KEY, String(now))
-      localStorage.removeItem(STORAGE_KEY)
+    const flush = () => {
+      const updates = { ...messageQueue.current }
+      messageQueue.current = {}
+      if (Object.keys(updates).length > 0) {
+        setValues(prev => {
+          const updated = { ...prev, ...updates }
+          const nextMinMax: MinMax = { ...minMax }
+
+          // InfluxDB-Point erstellen und speichern
+          Object.entries(updates).forEach(([key, val]) => {
+            const num = parseFloat(val)
+            const p = new Point('mqtt_data')
+              .tag('topic', key)
+              .stringField('raw', val)
+            if (!isNaN(num)) p.floatField('value', num)
+            writeApi.writePoint(p)
+            if (!isNaN(num) && (
+              key.includes('power_L') ||
+              key.includes('Verbrauch_aktuell') ||
+              key === 'Pool_temp/temperatur' ||
+              key.includes('Balkonkraftwerk') ||
+              key.includes('Voltage') ||
+              key.includes('Strom_L')
+            )) {
+              const curr = nextMinMax[key] ?? { min: num, max: num }
+              nextMinMax[key] = { min: Math.min(curr.min, num), max: Math.max(curr.max, num) }
+            }
+          })
+
+          setMinMax(nextMinMax)
+          client.publish(MINMAX_TOPIC, JSON.stringify(nextMinMax), { retain: true })
+          return updated
+        })
+        setLastUpdate(new Date().toLocaleTimeString())
+      }
     }
 
-const flush = () => {
-  const updates = { ...messageQueue.current }
-  messageQueue.current = {}
-
-  if (Object.keys(updates).length > 0) {
-    setValues(prev => {
-      const updated = { ...prev, ...updates }
-      const nextMinMax: MinMax = { ...minMax }
-
-      for (const [key, val] of Object.entries(updates)) {
-        const num = parseFloat(val)
-        if (!isNaN(num) && (
-          key.includes('power_L') ||
-          key.includes('Verbrauch_aktuell') ||
-          key === 'Pool_temp/temperatur' ||
-          key.includes('Balkonkraftwerk') ||
-          key.includes('Voltage') ||
-          key.includes('Strom_L')
-        )) {
-          const current = nextMinMax[key] ?? { min: num, max: num }
-          nextMinMax[key] = {
-            min: Math.min(current.min, num),
-            max: Math.max(current.max, num),
-          }
-        }
-      }
-
-      setMinMax(nextMinMax)
-      // Statt localStorage → per MQTT an den zentralen Broker senden
-      client.publish(MINMAX_TOPIC, JSON.stringify(nextMinMax))
-      return updated
-    })
-    setLastUpdate(new Date().toLocaleTimeString())
-  }
-}
-
-
     const interval = setInterval(flush, 300)
+    return () => {
+      clearInterval(interval)
+      writeApi
+        .close()
+        .catch(e => console.error('InfluxDB write error', e))
+    }
+  }, [minMax])
+// src/App.tsx – Teil 2 von 3
+  useEffect(() => {
+    if (initialized.current) return
+    initialized.current = true
 
     client.on('connect', () => {
+      console.log('✅ MQTT connected')
+      const allTopics = topics
+        .map(t => t.statusTopic || t.topic)
+        .concat(topics.map(t => t.topic))
+        .filter(Boolean)
+      client.subscribe([...allTopics, MINMAX_TOPIC])
       client.publish('dashboard/minmax/request', '')
-      const allTopics = topics.map(t => t.statusTopic || t.topic).filter(Boolean)
-      client.subscribe([...allTopics, '#', MINMAX_TOPIC])
+
       topics.forEach(({ publishTopic }) => {
         if (publishTopic?.includes('/POWER')) client.publish(publishTopic, '')
         if (publishTopic) {
@@ -81,54 +98,46 @@ const flush = () => {
       })
     })
 
-    client.on('message', (topic, message) => {
-      const payload = message.toString()
-      if (topic === 'Pool_temp/temperatur' || topic === 'Gaszaehler/stand') {
-        messageQueue.current[topic] = payload
+    client.on('message', (topic, msgBuffer) => {
+      const message = msgBuffer.toString()
+      console.log('[MQTT recv]', topic, message)
+      if (topic === MINMAX_TOPIC) {
+        try {
+          const incoming = JSON.parse(message)
+          setMinMax(prev => ({ ...prev, ...incoming }))
+        } catch (err) {
+          console.error('[MQTT] Fehler beim MinMax-Update:', err)
+        }
         return
       }
 
-      if (topic === MINMAX_TOPIC) {
-  try {
-    const incoming = JSON.parse(payload)
-    setMinMax(prev => ({ ...prev, ...incoming }))
-  } catch (err) {
-    console.error('[MQTT] Fehler beim MinMax-Update:', err)
-  }
-  return
-}
-
-
       try {
-        const json = JSON.parse(payload)
+        const json = JSON.parse(message)
         const flatten = (obj: any, prefix = ''): Record<string, string> =>
-          Object.entries(obj).reduce((acc, [key, val]) => {
-            const newKey = prefix ? `${prefix}.${key}` : key
-            if (typeof val === 'object' && val !== null) {
-              Object.assign(acc, flatten(val, newKey))
-            } else {
-              acc[newKey] = String(val)
-            }
+          Object.entries(obj).reduce((acc, [k, v]) => {
+            const newKey = prefix ? `${prefix}.${k}` : k
+            if (v && typeof v === 'object') Object.assign(acc, flatten(v, newKey))
+            else acc[newKey] = String(v)
             return acc
           }, {})
         const flat = flatten(json)
-        for (const [key, val] of Object.entries(flat)) {
-          const combinedKey = `${topic}.${key}`
-          messageQueue.current[combinedKey] = val
+        for (const [k, v] of Object.entries(flat)) {
+          messageQueue.current[`${topic}.${k}`] = v
         }
       } catch {
-        messageQueue.current[topic] = payload
+        messageQueue.current[topic] = message
       }
     })
 
-    return () => clearInterval(interval)
-  }, [minMax])
+    client.on('error', err => console.error('[MQTT error]', err))
+    client.on('offline', () => console.warn('[MQTT offline]'))
+  }, [])
 
   const toggleBoolean = (publishTopic: string, current: string) => {
     const next = current?.toUpperCase() === 'ON' ? 'OFF' : 'ON'
     client.publish(publishTopic, next)
   }
-
+// src/App.tsx – Teil 3 von 3
   const getBarColor = (label: string, value: number) => {
     if (label.includes('Verbrauch aktuell')) return value >= 2000 ? 'bg-red-600' : value >= 500 ? 'bg-yellow-400' : 'bg-green-500'
     if (label.includes('Balkonkraftwerk')) return value > 450 ? 'bg-green-500' : value > 150 ? 'bg-yellow-400' : 'bg-red-600'
@@ -138,13 +147,15 @@ const flush = () => {
 
   const progressBar = (value: number, max = 100, color = 'bg-blue-500') => (
     <div className="w-full bg-gray-300 rounded-full h-2 mt-2 overflow-hidden">
-      <div className={`${color} h-2 transition-all duration-1000 ease-in-out`} style={{ width: `${Math.min(100, (value / max) * 100)}%` }} />
+      <div className={`${color} h-2 transition-all duration-1000 ease-in-out`}
+           style={{ width: `${Math.min(100, (value / max) * 100)}%` }} />
     </div>
   )
 
   return (
     <main className="min-h-screen p-4 sm:p-6 bg-gray-950 text-white font-sans">
       <header className="mb-6 text-sm text-gray-400">Letztes Update: {lastUpdate || 'Lade...'}</header>
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
 
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
         <div className="rounded-xl p-4 border border-gray-600 bg-gray-800">
@@ -164,7 +175,7 @@ const flush = () => {
             )
           })}
         </div>
-
+ 
 <div className="rounded-xl p-4 border border-gray-600 bg-gray-800">
   <h2 className="text-md font-bold mb-2">🏊 Pool</h2>
   {(() => {
@@ -173,7 +184,7 @@ const flush = () => {
     const raw = values[tempKey]
     const val = raw !== undefined ? parseFloat(raw) : NaN
     const range = minMax[tempKey] ?? { min: val, max: val }
-
+ 
     return (
       <>
         <div className="flex justify-between items-center">
@@ -192,8 +203,8 @@ const flush = () => {
     )
   })()}
 </div>
-
-
+ 
+ 
   <div className="rounded-xl p-4 border border-gray-600 bg-gray-800">
   <h2 className="text-md font-bold mb-2">🎰 Zähler</h2>
   <div className="flex flex-col space-y-3">
@@ -201,7 +212,7 @@ const flush = () => {
     <p>🔥 Gas: {values['Gaszaehler/stand'] ?? '...'} m³</p>
   </div>
 </div>
-
+ 
 <div className="rounded-xl p-4 border border-gray-600 bg-gray-800">
   <h2 className="text-md font-bold mb-3">🔋 Erzeugung</h2>
   <p>Gesamt: {(() => {
@@ -211,7 +222,7 @@ const flush = () => {
     return !isNaN(num) ? (num + 178.779).toFixed(3) : '...'
   })()} kWh</p>
 </div>
-
+ 
         <div className="rounded-xl p-4 border border-gray-600 bg-gray-800">
           <h2 className="text-md font-bold mb-2">🔌 Steckdosen</h2>
           {['Steckdose 1', 'Steckdose 2'].map((label, i) => {
@@ -229,7 +240,7 @@ const flush = () => {
             )
           })}
         </div>
-
+ 
         {topics.filter(t =>
           t.type !== 'group' &&
           !['Ender 3 Pro', 'Sidewinder X1', 'Poolpumpe', 'Steckdose 1', 'Steckdose 2'].includes(t.label)
@@ -262,7 +273,7 @@ const flush = () => {
           )
         })}
       </div>
-
+ 
       <div className="mt-10 grid grid-cols-1 sm:grid-cols-3 gap-4">
         {topics.filter(t => t.type === 'group').map(group => (
           <div key={group.label} className="rounded-xl p-4 border border-gray-600 bg-gray-800">
