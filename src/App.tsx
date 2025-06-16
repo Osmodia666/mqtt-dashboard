@@ -67,13 +67,13 @@ function App() {
 
       client.on('connect', () => {
         console.log('✅ MQTT connected')
-        const allTopics = topics
-  .map(t => t.statusTopic)
-  .filter(Boolean);
+      const allTopics = Array.from(new Set(
+  topics.flatMap(t => [t.statusTopic, t.topic]).filter(Boolean)
+))
+client.subscribe([...allTopics, MINMAX_TOPIC], err => {
+  console.log('🎯 Subscribed topics:', allTopics, 'Error?', err)
+})
 
-        client.subscribe(allTopics, err => {
-  console.log('🎯 Subscribed topics:', allTopics, 'Error?', err);
-});
       client.publish('dashboard/minmax/request', '')
 
         topics.forEach(({ publishTopic }) => {
