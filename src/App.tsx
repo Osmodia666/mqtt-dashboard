@@ -303,9 +303,9 @@ function App() {
 
         {/* Balkonkraftwerk Erzeugung (detailed card) */}
         <div className={cardBase}>
-          <h2 className="text-lg font-extrabold mb-1 flex items-center gap-2">🔋 Balkonkraftwerk Erzeugung</h2>
+          <h2 className="text-lg font-extrabold mb-1 flex items-center gap-2">🔋 Str</h2>
           <div>
-            <span className="font-semibold">Verbrauch aktuell: </span>
+            <span className="font-semibold">Erzeugung: </span>
             {(() => {
               const key = 'tele/Balkonkraftwerk/SENSOR.ENERGY.Power.0'
               const raw = values[key]
