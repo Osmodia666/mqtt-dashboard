@@ -9,7 +9,13 @@ const client = mqtt.connect(mqttConfig.host, {
 })
 client.setMaxListeners(100)
 
-type MinMax = Record<string, { min: number; max: number }>
+// Updated MinMax type with time tracking
+type MinMax = Record<string, {
+  min: number,
+  minTime: string,
+  max: number,
+  maxTime: string
+}>
 const MINMAX_TOPIC = 'dashboard/minmax/update'
 const INFLUX_TOPIC = 'influx/data'
 const FLUSH_INTERVAL = 10000
@@ -19,6 +25,49 @@ function App() {
   const [lastUpdate, setLastUpdate] = useState('')
   const [minMax, setMinMax] = useState<MinMax>({})
   const influxQueue = useRef<Record<string, number>>({})
+
+  // Helper for updating min/max with time
+  function updateMinMax(key: string, val: string) {
+    const num = parseFloat(val)
+    if (
+      !isNaN(num) &&
+      (
+        key.includes('power_L') ||
+        key.includes('Verbrauch_aktuell') ||
+        key === 'Pool_temp/temperatur' ||
+        key.includes('Balkonkraftwerk') ||
+        key.includes('Voltage') ||
+        key.includes('Strom_L')
+      )
+    ) {
+      const now = new Date().toLocaleTimeString()
+      setMinMax(prev => {
+        const current = prev[key]
+        if (!current) {
+          return { ...prev, [key]: { min: num, minTime: now, max: num, maxTime: now } }
+        }
+        let updated = false
+        let min = current.min
+        let minTime = current.minTime
+        let max = current.max
+        let maxTime = current.maxTime
+        if (num < min) {
+          min = num
+          minTime = now
+          updated = true
+        }
+        if (num > max) {
+          max = num
+          maxTime = now
+          updated = true
+        }
+        if (updated) {
+          return { ...prev, [key]: { min, minTime, max, maxTime } }
+        }
+        return prev
+      })
+    }
+  }
 
   useEffect(() => {
     client.on('connect', () => {
@@ -45,21 +94,7 @@ function App() {
           return merged
         })
 
-        // Optionally update minMax
-        setMinMax(prev => {
-          const num = parseFloat(payload)
-          if (!isNaN(num)) {
-            const current = prev[topic] ?? { min: num, max: num }
-            return {
-              ...prev,
-              [topic]: {
-                min: Math.min(current.min, num),
-                max: Math.max(current.max, num),
-              }
-            }
-          }
-          return prev
-        })
+        updateMinMax(topic, payload)
 
         // Optionally add to influxQueue
         const num = parseFloat(payload)
@@ -73,7 +108,24 @@ function App() {
       if (topic === MINMAX_TOPIC) {
         try {
           const incoming = JSON.parse(payload)
-          setMinMax(prev => ({ ...prev, ...incoming }))
+          setMinMax(prev => {
+            // If minTime/maxTime is missing in incoming, keep previous time or set empty string
+            const merged: MinMax = { ...prev }
+            for (const key in incoming) {
+              if (typeof incoming[key] === 'object' && incoming[key] !== null) {
+                const inc = incoming[key]
+                // Fallback to previous time if not provided by backend
+                const prevTimes = prev[key] || { minTime: '', maxTime: '' }
+                merged[key] = {
+                  min: inc.min,
+                  minTime: inc.minTime || prevTimes.minTime || '',
+                  max: inc.max,
+                  maxTime: inc.maxTime || prevTimes.maxTime || ''
+                }
+              }
+            }
+            return merged
+          })
         } catch (err) {
           console.error('[MQTT] Fehler beim MinMax-Update:', err)
         }
@@ -111,31 +163,9 @@ function App() {
         return merged
       })
 
-      // Update minMax state
-      setMinMax(prev => {
-        let changed = false
-        const next = { ...prev }
-        for (const [key, val] of Object.entries(updates)) {
-          const num = parseFloat(val)
-          if (!isNaN(num) &&
-            (
-              key.includes('power_L') ||
-              key.includes('Verbrauch_aktuell') ||
-              key === 'Pool_temp/temperatur' ||
-              key.includes('Balkonkraftwerk') ||
-              key.includes('Voltage') ||
-              key.includes('Strom_L')
-            )
-          ) {
-            const current = next[key] ?? { min: num, max: num }
-            next[key] = {
-              min: Math.min(current.min, num),
-              max: Math.max(current.max, num),
-            }
-            changed = true
-          }
-        }
-        return changed ? next : prev
+      // Update minMax state with time for all updates
+      Object.entries(updates).forEach(([key, val]) => {
+        updateMinMax(key, val)
       })
 
       // Batch influx payload if needed
@@ -179,6 +209,11 @@ function App() {
     </div>
   )
 
+  // Helper to get min/max object, fallback if not present
+  const getRange = (key: string, value: number) => (
+    minMax[key] ?? { min: value, minTime: '', max: value, maxTime: '' }
+  )
+
   return (
     <main className="min-h-screen p-4 sm:p-6 bg-gray-950 text-white font-sans">
       <header className="mb-6 text-sm text-gray-400">Letztes Update: {lastUpdate || 'Lade...'}</header>
@@ -209,7 +244,7 @@ function App() {
             const tempKey = 'Pool_temp/temperatur'
             const raw = values[tempKey]
             const val = raw !== undefined ? parseFloat(raw) : NaN
-            const range = minMax[tempKey] ?? { min: val, max: val }
+            const range = getRange(tempKey, val)
 
             return (
               <>
@@ -224,7 +259,11 @@ function App() {
                 </div>
                 <p className="mt-3">🌡️ Temperatur: {isNaN(val) ? '...' : `${val} °C`}</p>
                 {progressBar(val, 40, getBarColor('Pool Temperatur', val))}
-                <p className="text-xs text-gray-400">Min: {range.min?.toFixed(1)} °C | Max: {range.max?.toFixed(1)} °C</p>
+                <p className="text-xs text-gray-400">
+                  Min: {range.min?.toFixed(1)} °C {range.minTime ? `(${range.minTime})` : ''}
+                  {' | '}
+                  Max: {range.max?.toFixed(1)} °C {range.maxTime ? `(${range.maxTime})` : ''}
+                </p>
               </>
             )
           })()}
@@ -276,7 +315,7 @@ function App() {
           const num = parseFloat(raw)
           const isNumber = type === 'number' && !isNaN(num)
           const showMinMax = !label.includes('gesamt') && (key.includes('power_L') || key.includes('Verbrauch_aktuell') || key.includes('Balkonkraftwerk'))
-          const range = minMax[key] ?? { min: num, max: num }
+          const range = getRange(key, num)
           const barColor = getBarColor(label, num)
           return (
             <div key={key} className={`rounded-xl p-4 border ${favorite ? 'border-yellow-400' : 'border-gray-600'} bg-gray-800`}>
@@ -290,7 +329,13 @@ function App() {
                 <>
                   <p className="text-2xl">{raw ?? '...'} {unit}</p>
                   {showMinMax && progressBar(num, range.max > 0 ? range.max : 100, barColor)}
-                  {showMinMax && <p className="text-xs text-gray-400">Min: {range.min.toFixed(1)} {unit} | Max: {range.max.toFixed(1)} {unit}</p>}
+                  {showMinMax && (
+                    <p className="text-xs text-gray-400">
+                      Min: {range.min?.toFixed(1)} {unit} {range.minTime ? `(${range.minTime})` : ''}
+                      {' | '}
+                      Max: {range.max?.toFixed(1)} {unit} {range.maxTime ? `(${range.maxTime})` : ''}
+                    </p>
+                  )}
                 </>
               )}
               {type === 'string' && <p className="text-lg">{raw ?? '...'}</p>}
@@ -306,12 +351,16 @@ function App() {
             {group.keys?.map(({ label, key }) => {
               const raw = values[key]
               const num = raw !== undefined ? parseFloat(raw) : NaN
-              const range = minMax[key] ?? { min: num, max: num }
+              const range = getRange(key, num)
               return (
                 <div key={key} className="mb-2">
                   <div className="text-sm">{label}: {isNaN(num) ? '...' : `${num} ${group.unit}`}</div>
                   {progressBar(num, group.label.includes('Spannung') ? 250 : 1000, 'bg-blue-500')}
-                  <div className="text-xs text-gray-400">Min: {range.min?.toFixed(1)} | Max: {range.max?.toFixed(1)}</div>
+                  <div className="text-xs text-gray-400">
+                    Min: {range.min?.toFixed(1)} {group.unit} {range.minTime ? `(${range.minTime})` : ''}
+                    {' | '}
+                    Max: {range.max?.toFixed(1)} {group.unit} {range.maxTime ? `(${range.maxTime})` : ''}
+                  </div>
                 </div>
               )
             })}
