@@ -203,8 +203,10 @@ function App() {
     minMax[key] ?? { min: value, minTime: '', max: value, maxTime: '' }
   )
 
-  // Utility for better card backgrounds and spacing
   const cardBase = "rounded-2xl p-6 border border-gray-700 bg-[#232a36] shadow-lg flex flex-col gap-3 min-h-[180px]"
+
+  // All steckdosen for merging: Steckdose 1/2, Doppelsteckdose, Teichpumpe
+  const steckdosenLabels = ['Steckdose 1', 'Steckdose 2', 'Doppelsteckdose', 'Teichpumpe']
 
   return (
     <main className="min-h-screen p-4 sm:p-8 bg-[#171c23] text-white font-sans">
@@ -300,36 +302,31 @@ function App() {
           </p>
         </div>
 
-      {/* Steckdosen */}
-<div className={cardBase}>
-  <h2 className="text-lg font-extrabold mb-1 flex items-center gap-2">🔌 Steckdosen</h2>
-  {topics
-    .filter(t =>
-      ['Steckdose 1', 'Steckdose 2', 'Doppelsteckdose', 'Teichpumpe'].includes(t.label)
-    )
-    .map((topic, i) => {
-      const val = values[topic.statusTopic]?.toUpperCase()
-      return (
-        <div key={topic.label} className={`flex justify-between items-center ${i > 0 ? 'mt-2' : 'mt-0'}`}>
-          <span className="tracking-tight">{topic.label}</span>
-          <button
-            className={`px-5 py-1 rounded-2xl font-bold shadow-sm text-white ${val === 'ON' ? 'bg-green-500' : 'bg-red-500'}`}
-            onClick={() => toggleBoolean(topic.publishTopic!, val)}
-          >
-            {val === 'ON' ? 'AN' : 'AUS'}
-          </button>
+        {/* Steckdosen - merged */}
+        <div className={cardBase}>
+          <h2 className="text-lg font-extrabold mb-1 flex items-center gap-2">🔌 Steckdosen</h2>
+          {topics
+            .filter(t => steckdosenLabels.includes(t.label))
+            .map((topic, i) => {
+              const val = values[topic.statusTopic]?.toUpperCase()
+              return (
+                <div key={topic.label} className={`flex justify-between items-center ${i > 0 ? 'mt-2' : 'mt-0'}`}>
+                  <span className="tracking-tight">{topic.label}</span>
+                  <button
+                    className={`px-5 py-1 rounded-2xl font-bold shadow-sm text-white ${val === 'ON' ? 'bg-green-500' : 'bg-red-500'}`}
+                    onClick={() => toggleBoolean(topic.publishTopic!, val)}
+                  >
+                    {val === 'ON' ? 'AN' : 'AUS'}
+                  </button>
+                </div>
+              )
+            })}
         </div>
-      )
-    })}
-</div>
-
-        {/* Remove the static Doppelsteckdose card! */}
 
         {/* Additional "group" and "number" cards */}
         {topics.filter(t =>
           t.type !== 'group' &&
-          !['Ender 3 Pro', 'Sidewinder X1', 'Poolpumpe', 'Steckdose 1', 'Steckdose 2'].includes(t.label) &&
-          !t.label.toLowerCase().includes("doppelsteckdose") // Ensure no duplicate
+          !['Ender 3 Pro', 'Sidewinder X1', 'Poolpumpe', ...steckdosenLabels].includes(t.label)
         ).map(({ label, type, unit, favorite, statusTopic, publishTopic, topic }) => {
           const key = statusTopic ?? topic
           let raw = values[key]
