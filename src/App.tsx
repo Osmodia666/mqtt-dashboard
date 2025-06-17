@@ -9,7 +9,6 @@ const client = mqtt.connect(mqttConfig.host, {
 })
 client.setMaxListeners(100)
 
-// Updated MinMax type with time tracking
 type MinMax = Record<string, {
   min: number,
   minTime: string,
@@ -26,7 +25,7 @@ function App() {
   const [minMax, setMinMax] = useState<MinMax>({})
   const influxQueue = useRef<Record<string, number>>({})
 
-  // Helper for updating min/max with time
+  // Helper for updating min/max with time (HH:MM)
   function updateMinMax(key: string, val: string) {
     const num = parseFloat(val)
     if (
@@ -40,7 +39,7 @@ function App() {
         key.includes('Strom_L')
       )
     ) {
-      const now = new Date().toLocaleTimeString()
+      const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
       setMinMax(prev => {
         const current = prev[key]
         if (!current) {
@@ -90,7 +89,7 @@ function App() {
       if (topic === 'Pool_temp/temperatur' || topic === 'Gaszaehler/stand') {
         setValues(prev => {
           const merged = { ...prev, [topic]: payload }
-          setLastUpdate(new Date().toLocaleTimeString())
+          setLastUpdate(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }))
           return merged
         })
 
@@ -114,7 +113,6 @@ function App() {
             for (const key in incoming) {
               if (typeof incoming[key] === 'object' && incoming[key] !== null) {
                 const inc = incoming[key]
-                // Fallback to previous time if not provided by backend
                 const prevTimes = prev[key] || { minTime: '', maxTime: '' }
                 merged[key] = {
                   min: inc.min,
@@ -159,7 +157,7 @@ function App() {
       // Update values state immediately for all other topics
       setValues(prev => {
         const merged = { ...prev, ...updates }
-        setLastUpdate(new Date().toLocaleTimeString())
+        setLastUpdate(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }))
         return merged
       })
 
@@ -209,7 +207,6 @@ function App() {
     </div>
   )
 
-  // Helper to get min/max object, fallback if not present
   const getRange = (key: string, value: number) => (
     minMax[key] ?? { min: value, minTime: '', max: value, maxTime: '' }
   )
