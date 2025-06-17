@@ -16,7 +16,7 @@ type MinMax = Record<string, {
 }>
 const MINMAX_TOPIC = 'dashboard/minmax/update'
 const INFLUX_TOPIC = 'influx/data'
-const FLUSH_INTERVAL = 1000
+const FLUSH_INTERVAL = 10000
 
 function App() {
   const [values, setValues] = useState<Record<string, string>>({})
