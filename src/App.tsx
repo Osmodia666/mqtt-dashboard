@@ -286,35 +286,38 @@ function App() {
               <span className="text-xl">🔥</span>
               <span>Gas: <span className="font-bold">{values['Gaszaehler/stand'] ?? '...'} m³</span></span>
             </div>
+            {/* Balkonkraftwerk Gesamt moved here */}
+            <div className="flex items-center gap-2 mt-2">
+              <span className="text-xl">🔋</span>
+              <span>Balkonkraftwerk Gesamt: <span className="font-bold">
+                {(() => {
+                  const key = 'tele/Balkonkraftwerk/SENSOR.ENERGY.EnergyPTotal.0'
+                  const raw = values[key]
+                  const num = parseFloat(raw)
+                  return !isNaN(num) ? (num + 178.779).toFixed(3) : '...'
+                })()} kWh
+              </span></span>
+            </div>
           </div>
         </div>
 
-        {/* Balkonkraftwerk Erzeugung (single, detailed card) */}
+        {/* Balkonkraftwerk Erzeugung (detailed card) */}
         <div className={cardBase}>
           <h2 className="text-lg font-extrabold mb-1 flex items-center gap-2">🔋 Balkonkraftwerk Erzeugung</h2>
-          <div className="mb-2">
-            <span className="font-semibold">Gesamt: </span>
+          <div>
+            <span className="font-semibold">Verbrauch aktuell: </span>
             {(() => {
-              const key = 'tele/Balkonkraftwerk/SENSOR.ENERGY.EnergyPTotal.0'
+              const key = 'tele/Balkonkraftwerk/SENSOR.ENERGY.Power.0'
               const raw = values[key]
               const num = parseFloat(raw)
-              return !isNaN(num) ? (num + 178.779).toFixed(3) : '...'
-            })()} kWh
-          </div>
-          <div>
-            <span className="font-semibold">Aktuell: </span>
-            {(() => {
-              const powerKey = Object.keys(values).find(k => k.includes('Stromzähler') && k.includes('Verbrauch_aktuell'))
-              const value = powerKey && values[powerKey] ? parseFloat(values[powerKey]) : NaN
-              return !isNaN(value) ? `${value} W` : '...'
+              return !isNaN(num) ? `${num} W` : '...'
             })()}
           </div>
           {(() => {
-            const powerKey = Object.keys(values).find(k => k.includes('Stromzähler') && k.includes('Verbrauch_aktuell'))
-            if (!powerKey) return null
-            const num = parseFloat(values[powerKey])
-            const range = getRange(powerKey, num)
-            const barColor = getBarColor('Stromzähler', num)
+            const key = 'tele/Balkonkraftwerk/SENSOR.ENERGY.Power.0'
+            const num = parseFloat(values[key])
+            const range = getRange(key, num)
+            const barColor = getBarColor('Balkonkraftwerk', num)
             return (
               <>
                 {progressBar(num, range.max > 0 ? range.max : 1000, barColor)}
