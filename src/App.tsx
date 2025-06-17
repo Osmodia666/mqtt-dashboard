@@ -205,8 +205,8 @@ function App() {
 
   const cardBase = "rounded-2xl p-6 border border-gray-700 bg-[#232a36] shadow-lg flex flex-col gap-3 min-h-[180px]"
 
-  // All steckdosen for merging: Steckdose 1/2, Doppelsteckdose, Teichpumpe
-  const steckdosenLabels = ['Steckdose 1', 'Steckdose 2', 'Doppelsteckdose', 'Teichpumpe']
+  // All steckdosen for merging: Steckdose 1/2, Doppelsteckdose
+  const steckdosenLabels = ['Steckdose 1', 'Steckdose 2', 'Doppelsteckdose']
 
   return (
     <main className="min-h-screen p-4 sm:p-8 bg-[#171c23] text-white font-sans">
@@ -304,7 +304,7 @@ function App() {
           <div>
             <span className="font-semibold">Aktuell: </span>
             {(() => {
-              const powerKey = Object.keys(values).find(k => k.includes('Balkonkraftwerk') && k.includes('Power.0'))
+              const powerKey = Object.keys(values).find(k => k.includes('Balkonkraftwerk') && k.includes('power_L1'))
               const value = powerKey && values[powerKey] ? parseFloat(values[powerKey]) : NaN
               return !isNaN(value) ? `${value} W` : '...'
             })()}
@@ -349,11 +349,31 @@ function App() {
             })}
         </div>
 
+        {/* Schalter (Beleuchtung + Teichpumpe) */}
+        <div className={cardBase}>
+          <h2 className="text-lg font-extrabold mb-1 flex items-center gap-2">🎛️ Schalter</h2>
+          {['Beleuchtung', 'Teichpumpe'].map((label, i) => {
+            const topic = topics.find(t => t.label === label)
+            if (!topic) return null
+            const val = values[topic.statusTopic]?.toUpperCase()
+            return (
+              <div key={label} className="flex justify-between items-center mt-2">
+                <span className="tracking-tight">{label}</span>
+                <button
+                  className={`px-5 py-1 rounded-2xl font-bold shadow-sm text-white ${val === 'ON' ? 'bg-green-500' : 'bg-red-500'}`}
+                  onClick={() => toggleBoolean(topic.publishTopic!, val)}
+                >
+                  {val === 'ON' ? 'AN' : 'AUS'}
+                </button>
+              </div>
+            )
+          })}
+        </div>
+
         {/* Additional "group" and "number" cards */}
         {topics.filter(t =>
           t.type !== 'group' &&
-          !['Ender 3 Pro', 'Sidewinder X1', 'Poolpumpe', ...steckdosenLabels].includes(t.label) &&
-          !['Balkonkraftwerk Erzeugung', 'Balkonkraftwerk'].includes(t.label)
+          !['Ender 3 Pro', 'Sidewinder X1', 'Poolpumpe', ...steckdosenLabels, 'Beleuchtung', 'Teichpumpe', 'Balkonkraftwerk Erzeugung', 'Balkonkraftwerk'].includes(t.label)
         ).map(({ label, type, unit, favorite, statusTopic, publishTopic, topic }) => {
           const key = statusTopic ?? topic
           let raw = values[key]
