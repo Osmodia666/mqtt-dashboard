@@ -289,17 +289,43 @@ function App() {
           </div>
         </div>
 
-        {/* Erzeugung */}
+        {/* Balkonkraftwerk Erzeugung */}
         <div className={cardBase}>
-          <h2 className="text-lg font-extrabold mb-1 flex items-center gap-2">🔋 Erzeugung</h2>
-          <p className="text-base font-semibold">
-            Gesamt: {(() => {
+          <h2 className="text-lg font-extrabold mb-1 flex items-center gap-2">🔋 Balkonkraftwerk Erzeugung</h2>
+          <div className="mb-2">
+            <span className="font-semibold">Gesamt: </span>
+            {(() => {
               const key = 'tele/Balkonkraftwerk/SENSOR.ENERGY.EnergyPTotal.0'
               const raw = values[key]
               const num = parseFloat(raw)
               return !isNaN(num) ? (num + 178.779).toFixed(3) : '...'
             })()} kWh
-          </p>
+          </div>
+          <div>
+            <span className="font-semibold">Aktuell: </span>
+            {(() => {
+              const powerKey = Object.keys(values).find(k => k.includes('Balkonkraftwerk') && k.includes('power_L1'))
+              const value = powerKey && values[powerKey] ? parseFloat(values[powerKey]) : NaN
+              return !isNaN(value) ? `${value} W` : '...'
+            })()}
+          </div>
+          {(() => {
+            const powerKey = Object.keys(values).find(k => k.includes('Balkonkraftwerk') && k.includes('power_L1'))
+            if (!powerKey) return null
+            const num = parseFloat(values[powerKey])
+            const range = getRange(powerKey, num)
+            const barColor = getBarColor('Balkonkraftwerk', num)
+            return (
+              <>
+                {progressBar(num, range.max > 0 ? range.max : 1000, barColor)}
+                <p className="text-xs text-gray-300 font-mono tracking-tighter">
+                  Min: {range.min?.toFixed(1)} W {range.minTime ? `(${range.minTime})` : ''}
+                  {' | '}
+                  Max: {range.max?.toFixed(1)} W {range.maxTime ? `(${range.maxTime})` : ''}
+                </p>
+              </>
+            )
+          })()}
         </div>
 
         {/* Steckdosen - merged */}
@@ -326,7 +352,8 @@ function App() {
         {/* Additional "group" and "number" cards */}
         {topics.filter(t =>
           t.type !== 'group' &&
-          !['Ender 3 Pro', 'Sidewinder X1', 'Poolpumpe', ...steckdosenLabels].includes(t.label)
+          !['Ender 3 Pro', 'Sidewinder X1', 'Poolpumpe', ...steckdosenLabels].includes(t.label) &&
+          !['Balkonkraftwerk Erzeugung', 'Balkonkraftwerk'].includes(t.label)
         ).map(({ label, type, unit, favorite, statusTopic, publishTopic, topic }) => {
           const key = statusTopic ?? topic
           let raw = values[key]
