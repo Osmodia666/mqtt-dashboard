@@ -1,10 +1,3 @@
-// src/config.ts
-export const mqttConfig = {
-  host: 'wss://cyberdyne.chickenkiller.com:8884',
-  username: 'christopher',
-  password: 'v6Vrhy6u4reJsng',
-}
-
 export const topics = [
   {
     label: 'Ender 3 Pro',
@@ -56,19 +49,19 @@ export const topics = [
     statusTopic: 'stat/Poolpumpe/POWER',
     publishTopic: 'cmnd/Poolpumpe/POWER',
   },
-  {
-    label: 'Verbrauch aktuell:',
-    type: 'number',
-    unit: 'W',
-    statusTopic: 'tele/Stromzähler/SENSOR.grid.Verbrauch_aktuell',
-  },
-  {
-    label: 'Balkonkraftwerk Erzeugung:',
-    type: 'number',
-    unit: 'W',
-    statusTopic: 'tele/Balkonkraftwerk/SENSOR.ENERGY.Power.0',
-  },
-    // ✅ Gruppiert: Leistung
+  // {
+  //   label: 'Verbrauch aktuell:',
+  //   type: 'number',
+  //   unit: 'W',
+  //   statusTopic: 'tele/Stromzähler/SENSOR.grid.Verbrauch_aktuell',
+  // },
+  // {
+  //   label: 'Balkonkraftwerk Erzeugung:',
+  //   type: 'number',
+  //   unit: 'W',
+  //   statusTopic: 'tele/Balkonkraftwerk/SENSOR.ENERGY.Power.0',
+  // },
+  // ✅ Gruppiert: Leistung
   {
     label: 'Leistung L1–L3',
     type: 'group',
@@ -80,16 +73,16 @@ export const topics = [
     ],
   },
   // ✅ Gruppiert: Spannung
-{
-  label: 'Spannung L1–L3',
-  type: 'group',
-  unit: 'V',
-  keys: [
-    { label: 'L1', key: 'tele/Stromzähler/SENSOR.grid.Spannung_L1' },
-    { label: 'L2', key: 'tele/Stromzähler/SENSOR.grid.Spannung_L2' },
-    { label: 'L3', key: 'tele/Stromzähler/SENSOR.grid.Spannung_L3' },
-  ],
-},
+  {
+    label: 'Spannung L1–L3',
+    type: 'group',
+    unit: 'V',
+    keys: [
+      { label: 'L1', key: 'tele/Stromzähler/SENSOR.grid.Spannung_L1' },
+      { label: 'L2', key: 'tele/Stromzähler/SENSOR.grid.Spannung_L2' },
+      { label: 'L3', key: 'tele/Stromzähler/SENSOR.grid.Spannung_L3' },
+    ],
+  },
   // ✅ Gruppiert: Strom
   {
     label: 'Strom L1–L3',
