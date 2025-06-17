@@ -182,7 +182,7 @@ function App() {
   }
 
   const getBarColor = (label: string, value: number) => {
-    if (label.includes('Verbrauch aktuell')) return value >= 2000 ? 'bg-red-600' : value >= 500 ? 'bg-yellow-400' : 'bg-green-500'
+    if (label.includes('Aktuell')) return value >= 2000 ? 'bg-red-600' : value >= 500 ? 'bg-yellow-400' : 'bg-green-500'
     if (label.includes('Balkonkraftwerk')) return value > 450 ? 'bg-green-500' : value > 150 ? 'bg-yellow-400' : 'bg-red-600'
     if (label.includes('Pool Temperatur')) {
       if (value > 25) return 'bg-red-600'
