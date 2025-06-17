@@ -304,10 +304,10 @@ function App() {
 
         {/* Strom (Erzeugung + Verbrauch aktuell) */}
         <div className={cardBase}>
-          <h2 className="text-lg font-extrabold mb-1 flex items-center gap-2">🔋 Strom</h2>
+          <h2 className="text-lg font-extrabold mb-1 flex items-center gap-2">⚡Strom</h2>
           {/* Erzeugung */}
           <div>
-            <span className="font-semibold">Erzeugung: </span>
+            <span className="font-semibold">🔋Balkonkraftwerk: </span>
             {(() => {
               const key = 'tele/Balkonkraftwerk/SENSOR.ENERGY.Power.0'
               const raw = values[key]
@@ -334,7 +334,7 @@ function App() {
 
           {/* Verbrauch aktuell */}
           <div className="mt-4">
-            <span className="font-semibold">Verbrauch aktuell: </span>
+            <span className="font-semibold">Verbrauch: </span>
             {(() => {
               const key = 'tele/Stromzähler/SENSOR.grid.Verbrauch_aktuell'
               const raw = values[key]
