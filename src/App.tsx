@@ -291,7 +291,7 @@ function App() {
 
         {/* Balkonkraftwerk Erzeugung */}
         <div className={cardBase}>
-          <h2 className="text-lg font-extrabold mb-1 flex items-center gap-2">🔋 Balkonkraftwerk Erzeugung</h2>
+          <h2 className="text-lg font-extrabold mb-1 flex items-center gap-2">🔋 Balkonkraftwerk</h2>
           <div className="mb-2">
             <span className="font-semibold">Gesamt: </span>
             {(() => {
@@ -304,7 +304,7 @@ function App() {
           <div>
             <span className="font-semibold">Aktuell: </span>
             {(() => {
-              const powerKey = Object.keys(values).find(k => k.includes('Stromzähler') && k.includes('Verbrauch_aktuell'))
+              const powerKey = Object.keys(values).find(k => k.includes('Balkonkraftwerk') && k.includes('ENERGY.Power.0'))
               const value = powerKey && values[powerKey] ? parseFloat(values[powerKey]) : NaN
               return !isNaN(value) ? `${value} W` : '...'
             })()}
