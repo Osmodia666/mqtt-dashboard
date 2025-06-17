@@ -304,7 +304,7 @@ function App() {
           <div>
             <span className="font-semibold">Aktuell: </span>
             {(() => {
-              const powerKey = Object.keys(values).find(k => k.includes('Balkonkraftwerk') && k.includes('power_L1'))
+              const powerKey = Object.keys(values).find(k => k.includes('Balkonkraftwerk') && k.includes('Power.0'))
               const value = powerKey && values[powerKey] ? parseFloat(values[powerKey]) : NaN
               return !isNaN(value) ? `${value} W` : '...'
             })()}
