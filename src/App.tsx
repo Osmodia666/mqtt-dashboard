@@ -303,7 +303,7 @@ function App() {
 
         {/* Balkonkraftwerk Erzeugung (detailed card) */}
         <div className={cardBase}>
-          <h2 className="text-lg font-extrabold mb-1 flex items-center gap-2">🔋 Str</h2>
+          <h2 className="text-lg font-extrabold mb-1 flex items-center gap-2">🔋 Strom</h2>
           <div>
             <span className="font-semibold">Erzeugung: </span>
             {(() => {
