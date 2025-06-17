@@ -204,14 +204,19 @@ function App() {
   )
 
   // Utility for better card backgrounds and spacing
-  const cardBase = "rounded-2xl p-5 border border-gray-700 bg-[#232a36] shadow-lg flex flex-col gap-3"
+  const cardBase = "rounded-2xl p-6 border border-gray-700 bg-[#232a36] shadow-lg flex flex-col gap-3 min-h-[180px]"
 
   return (
     <main className="min-h-screen p-4 sm:p-8 bg-[#171c23] text-white font-sans">
       <header className="mb-8 text-sm text-gray-400 font-semibold tracking-wide">
         Letztes Update: {lastUpdate || 'Lade...'}
       </header>
-      <div className="grid grid-cols-1 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
+      <div
+        className="grid gap-6"
+        style={{
+          gridTemplateColumns: "repeat(auto-fit, minmax(290px, 1fr))",
+        }}
+      >
         {/* 3D-Drucker */}
         <div className={cardBase}>
           <h2 className="text-lg font-extrabold mb-1 flex items-center gap-2">🧱 3D-Drucker</h2>
@@ -314,16 +319,13 @@ function App() {
           })}
         </div>
 
-        {/* Doppelsteckdose */}
-        <div className={cardBase}>
-          <h2 className="text-lg font-extrabold mb-1 flex items-center gap-2">🔌 Doppelsteckdose</h2>
-          <button className="px-5 py-1 rounded-2xl font-bold shadow-sm text-white bg-green-500 w-min">AN</button>
-        </div>
+        {/* Remove the static Doppelsteckdose card! */}
 
         {/* Additional "group" and "number" cards */}
         {topics.filter(t =>
           t.type !== 'group' &&
-          !['Ender 3 Pro', 'Sidewinder X1', 'Poolpumpe', 'Steckdose 1', 'Steckdose 2'].includes(t.label)
+          !['Ender 3 Pro', 'Sidewinder X1', 'Poolpumpe', 'Steckdose 1', 'Steckdose 2'].includes(t.label) &&
+          !t.label.toLowerCase().includes("doppelsteckdose") // Ensure no duplicate
         ).map(({ label, type, unit, favorite, statusTopic, publishTopic, topic }) => {
           const key = statusTopic ?? topic
           let raw = values[key]
@@ -361,7 +363,11 @@ function App() {
       </div>
 
       {/* Grouped cards */}
-      <div className="mt-10 grid grid-cols-1 sm:grid-cols-3 gap-6">
+      <div className="mt-10 grid gap-6"
+        style={{
+          gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))",
+        }}
+      >
         {topics.filter(t => t.type === 'group').map(group => (
           <div key={group.label} className={cardBase}>
             <h2 className="text-lg font-bold mb-2">{group.label}</h2>
