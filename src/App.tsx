@@ -182,7 +182,8 @@ function App() {
   }
 
   const getBarColor = (label: string, value: number) => {
-    if (label.includes('Aktuell')) return value >= 2000 ? 'bg-red-600' : value >= 500 ? 'bg-yellow-400' : 'bg-green-500'
+    // Updated to explicitly match "Verbrauch Aktuell"
+    if (label.toLowerCase().includes('verbrauch')) return value >= 2000 ? 'bg-red-600' : value >= 500 ? 'bg-yellow-400' : 'bg-green-500'
     if (label.includes('Balkonkraftwerk')) return value > 450 ? 'bg-green-500' : value > 150 ? 'bg-yellow-400' : 'bg-red-600'
     if (label.includes('Pool Temperatur')) {
       if (value > 25) return 'bg-red-600'
@@ -301,9 +302,10 @@ function App() {
           </div>
         </div>
 
-        {/* Balkonkraftwerk Erzeugung (detailed card) */}
+        {/* Strom (Erzeugung + Verbrauch aktuell) */}
         <div className={cardBase}>
           <h2 className="text-lg font-extrabold mb-1 flex items-center gap-2">🔋 Strom</h2>
+          {/* Erzeugung */}
           <div>
             <span className="font-semibold">Erzeugung: </span>
             {(() => {
@@ -329,6 +331,33 @@ function App() {
               </>
             )
           })()}
+
+          {/* Verbrauch aktuell */}
+          <div className="mt-4">
+            <span className="font-semibold">Verbrauch aktuell: </span>
+            {(() => {
+              const key = 'tele/Stromzähler/SENSOR.grid.Verbrauch_aktuell'
+              const raw = values[key]
+              const num = parseFloat(raw)
+              return !isNaN(num) ? `${num} W` : '...'
+            })()}
+            {(() => {
+              const key = 'tele/Stromzähler/SENSOR.grid.Verbrauch_aktuell'
+              const num = parseFloat(values[key])
+              const range = getRange(key, num)
+              const barColor = getBarColor('Verbrauch Aktuell', num)
+              return (
+                <>
+                  {progressBar(num, range.max > 0 ? range.max : 5000, barColor)}
+                  <p className="text-xs text-gray-300 font-mono tracking-tighter">
+                    Min: {range.min?.toFixed(1)} W {range.minTime ? `(${range.minTime})` : ''}
+                    {' | '}
+                    Max: {range.max?.toFixed(1)} W {range.maxTime ? `(${range.maxTime})` : ''}
+                  </p>
+                </>
+              )
+            })()}
+          </div>
         </div>
 
         {/* Steckdosen - merged */}
