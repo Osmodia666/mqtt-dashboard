@@ -304,17 +304,17 @@ function App() {
           <div>
             <span className="font-semibold">Aktuell: </span>
             {(() => {
-              const powerKey = Object.keys(values).find(k => k.includes('Balkonkraftwerk') && k.includes('power_L1'))
+              const powerKey = Object.keys(values).find(k => k.includes('Stromzähler') && k.includes('Verbrauch_aktuell'))
               const value = powerKey && values[powerKey] ? parseFloat(values[powerKey]) : NaN
               return !isNaN(value) ? `${value} W` : '...'
             })()}
           </div>
           {(() => {
-            const powerKey = Object.keys(values).find(k => k.includes('Balkonkraftwerk') && k.includes('power_L1'))
+            const powerKey = Object.keys(values).find(k => k.includes('Stromzähler') && k.includes('Verbrauch_aktuell'))
             if (!powerKey) return null
             const num = parseFloat(values[powerKey])
             const range = getRange(powerKey, num)
-            const barColor = getBarColor('Balkonkraftwerk', num)
+            const barColor = getBarColor('Stromzähler', num)
             return (
               <>
                 {progressBar(num, range.max > 0 ? range.max : 1000, barColor)}
