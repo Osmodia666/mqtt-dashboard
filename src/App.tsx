@@ -1,4 +1,3 @@
-// src/App.tsx
 import { useEffect, useState, useRef } from 'react'
 import mqtt from 'mqtt'
 import { mqttConfig, topics } from './config'
@@ -19,11 +18,42 @@ const MINMAX_TOPIC = 'dashboard/minmax/update'
 const INFLUX_TOPIC = 'influx/data'
 const FLUSH_INTERVAL = 10000
 
+// --- MiniBarGraph component ---
+function MiniBarGraph({ data, height = 24, color = "#60a5fa" }: { data: number[], height?: number, color?: string }) {
+  if (!data.length) return null
+  const max = Math.max(...data)
+  const min = Math.min(...data)
+  const range = max - min || 1
+  return (
+    <svg width="100%" height={height} viewBox={`0 0 ${data.length} ${height}`}>
+      {data.map((v, i) => (
+        <rect
+          key={i}
+          x={i}
+          y={height - ((v - min) / range) * height}
+          width="1"
+          height={((v - min) / range) * height}
+          fill={color}
+        />
+      ))}
+    </svg>
+  )
+}
+// --- End MiniBarGraph component ---
+
 function App() {
   const [values, setValues] = useState<Record<string, string>>({})
   const [lastUpdate, setLastUpdate] = useState('')
   const [minMax, setMinMax] = useState<MinMax>({})
   const influxQueue = useRef<Record<string, number>>({})
+
+  // History arrays for sparklines
+  const POOL_HISTORY_LEN = 30
+  const VERBRAUCH_HISTORY_LEN = 30
+  const ERZEUGUNG_HISTORY_LEN = 30
+  const [poolTempHistory, setPoolTempHistory] = useState<number[]>([])
+  const [verbrauchHistory, setVerbrauchHistory] = useState<number[]>([])
+  const [erzeugungHistory, setErzeugungHistory] = useState<number[]>([])
 
   // Helper for updating min/max with time (HH:MM)
   function updateMinMax(key: string, val: string) {
@@ -85,6 +115,38 @@ function App() {
     client.on('message', (topic, message) => {
       const payload = message.toString()
 
+      // --- Track history for sparklines ---
+      // Pool Temperatur
+      if (topic === 'Pool_temp/temperatur') {
+        const num = parseFloat(payload)
+        if (!isNaN(num)) {
+          setPoolTempHistory(prev => {
+            const next = [...prev.slice(-POOL_HISTORY_LEN + 1), num]
+            return next
+          })
+        }
+      }
+      // Verbrauch aktuell (search for key in values or topic)
+      if (topic.includes('Verbrauch_aktuell')) {
+        const num = parseFloat(payload)
+        if (!isNaN(num)) {
+          setVerbrauchHistory(prev => {
+            const next = [...prev.slice(-VERBRAUCH_HISTORY_LEN + 1), num]
+            return next
+          })
+        }
+      }
+      // Erzeugung aktuell (Balkonkraftwerk power)
+      if (topic.includes('Balkonkraftwerk') && topic.includes('power_L1')) {
+        const num = parseFloat(payload)
+        if (!isNaN(num)) {
+          setErzeugungHistory(prev => {
+            const next = [...prev.slice(-ERZEUGUNG_HISTORY_LEN + 1), num]
+            return next
+          })
+        }
+      }
+
       // Update these two topics immediately
       if (topic === 'Pool_temp/temperatur' || topic === 'Gaszaehler/stand') {
         setValues(prev => {
@@ -108,7 +170,6 @@ function App() {
         try {
           const incoming = JSON.parse(payload)
           setMinMax(prev => {
-            // If minTime/maxTime is missing in incoming, keep previous time or set empty string
             const merged: MinMax = { ...prev }
             for (const key in incoming) {
               if (typeof incoming[key] === 'object' && incoming[key] !== null) {
@@ -154,6 +215,22 @@ function App() {
         updates[topic] = payload
       }
 
+      // For Verbrauch aktuell and Erzeugung aktuell in JSON payloads
+      Object.entries(updates).forEach(([key, val]) => {
+        if (key.includes('Verbrauch_aktuell')) {
+          const num = parseFloat(val)
+          if (!isNaN(num)) {
+            setVerbrauchHistory(prev => [...prev.slice(-VERBRAUCH_HISTORY_LEN + 1), num])
+          }
+        }
+        if (key.includes('Balkonkraftwerk') && key.includes('power_L1')) {
+          const num = parseFloat(val)
+          if (!isNaN(num)) {
+            setErzeugungHistory(prev => [...prev.slice(-ERZEUGUNG_HISTORY_LEN + 1), num])
+          }
+        }
+      })
+
       // Update values state immediately for all other topics
       setValues(prev => {
         const merged = { ...prev, ...updates }
@@ -198,10 +275,10 @@ function App() {
     if (label.includes('Verbrauch aktuell')) return value >= 2000 ? 'bg-red-600' : value >= 500 ? 'bg-yellow-400' : 'bg-green-500'
     if (label.includes('Balkonkraftwerk')) return value > 450 ? 'bg-green-500' : value > 150 ? 'bg-yellow-400' : 'bg-red-600'
     if (label.includes('Pool Temperatur')) {
-    if (value > 25) return 'bg-red-600'
-    if (value > 23) return 'bg-green-500'
-    if (value > 17) return 'bg-yellow-400'
-    return 'bg-blue-500'
+      if (value > 25) return 'bg-red-600'
+      if (value > 23) return 'bg-green-500'
+      if (value > 17) return 'bg-yellow-400'
+      return 'bg-blue-500'
     }
     return 'bg-blue-500'
   }
@@ -215,6 +292,11 @@ function App() {
   const getRange = (key: string, value: number) => (
     minMax[key] ?? { min: value, minTime: '', max: value, maxTime: '' }
   )
+
+  // --- Helper to get Verbrauch aktuell and Erzeugung aktuell value keys ---
+  // You may want to adjust these selectors depending on your topics config!
+  const verbrauchKey = Object.keys(values).find(k => k.includes('Verbrauch_aktuell')) || ''
+  const erzeugungKey = Object.keys(values).find(k => k.includes('Balkonkraftwerk') && k.includes('power_L1')) || ''
 
   return (
     <main className="min-h-screen p-4 sm:p-6 bg-gray-950 text-white font-sans">
@@ -266,6 +348,9 @@ function App() {
                   {' | '}
                   Max: {range.max?.toFixed(1)} °C {range.maxTime ? `(${range.maxTime})` : ''}
                 </p>
+                <div className="mt-1">
+                  <MiniBarGraph data={poolTempHistory} color="#fbbf24" height={24} />
+                </div>
               </>
             )
           })()}
@@ -280,36 +365,60 @@ function App() {
         </div>
 
         <div className="rounded-xl p-4 border border-gray-600 bg-gray-800">
-          <h2 className="text-md font-bold mb-3">🔋 Erzeugung</h2>
-          <p>Gesamt: {(() => {
-            const key = 'tele/Balkonkraftwerk/SENSOR.ENERGY.EnergyPTotal.0'
-            const raw = values[key]
-            const num = parseFloat(raw)
-            return !isNaN(num) ? (num + 178.779).toFixed(3) : '...'
-          })()} kWh</p>
+          <h2 className="text-md font-bold mb-2">⚡ Verbrauch aktuell</h2>
+          <p>
+            {verbrauchKey && values[verbrauchKey] !== undefined
+              ? `${parseFloat(values[verbrauchKey]).toFixed(0)} W`
+              : '...'}
+          </p>
+          <p className="text-xs text-gray-400">
+            {(() => {
+              const num = verbrauchKey ? parseFloat(values[verbrauchKey]) : NaN
+              const range = getRange(verbrauchKey, num)
+              return (
+                <>
+                  Min: {range.min?.toFixed(0)} W {range.minTime ? `(${range.minTime})` : ''}
+                  {' | '}
+                  Max: {range.max?.toFixed(0)} W {range.maxTime ? `(${range.maxTime})` : ''}
+                </>
+              )
+            })()}
+          </p>
+          <div className="mt-1">
+            <MiniBarGraph data={verbrauchHistory} color="#38bdf8" height={24} />
+          </div>
         </div>
 
         <div className="rounded-xl p-4 border border-gray-600 bg-gray-800">
-          <h2 className="text-md font-bold mb-2">🔌 Steckdosen</h2>
-          {['Steckdose 1', 'Steckdose 2'].map((label, i) => {
-            const topic = topics.find(t => t.label === label)
-            if (!topic) return null
-            const val = values[topic.statusTopic]?.toUpperCase()
-            return (
-              <div key={label} className={`flex justify-between items-center ${i > 0 ? 'mt-3' : 'mt-1'}`}>
-                <span>{label}</span>
-                <button className={`px-4 py-1 rounded text-white ${val === 'ON' ? 'bg-green-500' : 'bg-red-500'}`}
-                  onClick={() => toggleBoolean(topic.publishTopic!, val)}>
-                  {val === 'ON' ? 'AN' : 'AUS'}
-                </button>
-              </div>
-            )
-          })}
+          <h2 className="text-md font-bold mb-2">🔋 Erzeugung aktuell</h2>
+          <p>
+            {erzeugungKey && values[erzeugungKey] !== undefined
+              ? `${parseFloat(values[erzeugungKey]).toFixed(0)} W`
+              : '...'}
+          </p>
+          <p className="text-xs text-gray-400">
+            {(() => {
+              const num = erzeugungKey ? parseFloat(values[erzeugungKey]) : NaN
+              const range = getRange(erzeugungKey, num)
+              return (
+                <>
+                  Min: {range.min?.toFixed(0)} W {range.minTime ? `(${range.minTime})` : ''}
+                  {' | '}
+                  Max: {range.max?.toFixed(0)} W {range.maxTime ? `(${range.maxTime})` : ''}
+                </>
+              )
+            })()}
+          </p>
+          <div className="mt-1">
+            <MiniBarGraph data={erzeugungHistory} color="#34d399" height={24} />
+          </div>
         </div>
 
+        {/* ...rest of your cards as before... */}
         {topics.filter(t =>
           t.type !== 'group' &&
-          !['Ender 3 Pro', 'Sidewinder X1', 'Poolpumpe', 'Steckdose 1', 'Steckdose 2'].includes(t.label)
+          !['Ender 3 Pro', 'Sidewinder X1', 'Poolpumpe', 'Steckdose 1', 'Steckdose 2'].includes(t.label) &&
+          !['Verbrauch aktuell', 'Erzeugung aktuell'].includes(t.label)
         ).map(({ label, type, unit, favorite, statusTopic, publishTopic, topic }) => {
           const key = statusTopic ?? topic
           let raw = values[key]
