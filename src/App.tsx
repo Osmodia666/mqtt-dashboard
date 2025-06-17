@@ -289,9 +289,9 @@ function App() {
           </div>
         </div>
 
-        {/* Balkonkraftwerk Erzeugung */}
+        {/* Balkonkraftwerk Erzeugung (single, detailed card) */}
         <div className={cardBase}>
-          <h2 className="text-lg font-extrabold mb-1 flex items-center gap-2">🔋 Balkonkraftwerk</h2>
+          <h2 className="text-lg font-extrabold mb-1 flex items-center gap-2">🔋 Balkonkraftwerk Erzeugung</h2>
           <div className="mb-2">
             <span className="font-semibold">Gesamt: </span>
             {(() => {
@@ -304,7 +304,7 @@ function App() {
           <div>
             <span className="font-semibold">Aktuell: </span>
             {(() => {
-              const powerKey = Object.keys(values).find(k => k.includes('Balkonkraftwerk') && k.includes('ENERGY.Power.0'))
+              const powerKey = Object.keys(values).find(k => k.includes('Stromzähler') && k.includes('Verbrauch_aktuell'))
               const value = powerKey && values[powerKey] ? parseFloat(values[powerKey]) : NaN
               return !isNaN(value) ? `${value} W` : '...'
             })()}
@@ -370,7 +370,7 @@ function App() {
           })}
         </div>
 
-        {/* Additional "group" and "number" cards */}
+        {/* Additional cards - FILTERED so "Balkonkraftwerk Erzeugung" and "Balkonkraftwerk" are removed */}
         {topics.filter(t =>
           t.type !== 'group' &&
           !['Ender 3 Pro', 'Sidewinder X1', 'Poolpumpe', ...steckdosenLabels, 'Beleuchtung', 'Teichpumpe', 'Balkonkraftwerk Erzeugung', 'Balkonkraftwerk'].includes(t.label)
