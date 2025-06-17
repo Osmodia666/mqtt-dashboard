@@ -1,4 +1,3 @@
-// src/App.tsx
 import { useEffect, useState, useRef } from 'react'
 import mqtt from 'mqtt'
 import { mqttConfig, topics } from './config'
@@ -25,7 +24,6 @@ function App() {
   const [minMax, setMinMax] = useState<MinMax>({})
   const influxQueue = useRef<Record<string, number>>({})
 
-  // Helper for updating min/max with time (HH:MM)
   function updateMinMax(key: string, val: string) {
     const num = parseFloat(val)
     if (
@@ -85,22 +83,17 @@ function App() {
     client.on('message', (topic, message) => {
       const payload = message.toString()
 
-      // Update these two topics immediately
       if (topic === 'Pool_temp/temperatur' || topic === 'Gaszaehler/stand') {
         setValues(prev => {
           const merged = { ...prev, [topic]: payload }
           setLastUpdate(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }))
           return merged
         })
-
         updateMinMax(topic, payload)
-
-        // Optionally add to influxQueue
         const num = parseFloat(payload)
         if (!isNaN(num)) {
           influxQueue.current[topic] = num
         }
-
         return
       }
 
@@ -108,7 +101,6 @@ function App() {
         try {
           const incoming = JSON.parse(payload)
           setMinMax(prev => {
-            // If minTime/maxTime is missing in incoming, keep previous time or set empty string
             const merged: MinMax = { ...prev }
             for (const key in incoming) {
               if (typeof incoming[key] === 'object' && incoming[key] !== null) {
@@ -130,7 +122,6 @@ function App() {
         return
       }
 
-      // Handle flattened JSON MQTT payloads
       let updates: Record<string, string> = {}
       try {
         const json = JSON.parse(payload)
@@ -154,19 +145,16 @@ function App() {
         updates[topic] = payload
       }
 
-      // Update values state immediately for all other topics
       setValues(prev => {
         const merged = { ...prev, ...updates }
         setLastUpdate(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }))
         return merged
       })
 
-      // Update minMax state with time for all updates
       Object.entries(updates).forEach(([key, val]) => {
         updateMinMax(key, val)
       })
 
-      // Batch influx payload if needed
       for (const [key, val] of Object.entries(updates)) {
         const num = parseFloat(val)
         if (!isNaN(num)) {
@@ -175,7 +163,6 @@ function App() {
       }
     })
 
-    // Batch send influx data every FLUSH_INTERVAL, if you want
     const influxInterval = setInterval(() => {
       const influxPayload = { ...influxQueue.current }
       influxQueue.current = {}
@@ -198,17 +185,17 @@ function App() {
     if (label.includes('Verbrauch aktuell')) return value >= 2000 ? 'bg-red-600' : value >= 500 ? 'bg-yellow-400' : 'bg-green-500'
     if (label.includes('Balkonkraftwerk')) return value > 450 ? 'bg-green-500' : value > 150 ? 'bg-yellow-400' : 'bg-red-600'
     if (label.includes('Pool Temperatur')) {
-    if (value > 25) return 'bg-red-600'
-    if (value > 23) return 'bg-green-500'
-    if (value > 17) return 'bg-yellow-400'
-    return 'bg-blue-500'
-    }
+      if (value > 25) return 'bg-red-600'
+      if (value > 23) return 'bg-green-500'
+      if (value > 17) return 'bg-yellow-400'
       return 'bg-blue-500'
+    }
+    return 'bg-blue-500'
   }
 
   const progressBar = (value: number, max = 100, color = 'bg-blue-500') => (
-    <div className="w-full bg-gray-300 rounded-full h-2 mt-2 overflow-hidden">
-      <div className={`${color} h-2 transition-all duration-1000 ease-in-out`} style={{ width: `${Math.min(100, (value / max) * 100)}%` }} />
+    <div className="w-full bg-gray-700 rounded-full h-2 mt-2 overflow-hidden">
+      <div className={`${color} h-2 rounded-full transition-all duration-1000 ease-in-out`} style={{ width: `${Math.min(100, (value / max) * 100)}%` }} />
     </div>
   )
 
@@ -216,21 +203,26 @@ function App() {
     minMax[key] ?? { min: value, minTime: '', max: value, maxTime: '' }
   )
 
-  return (
-    <main className="min-h-screen p-4 sm:p-6 bg-gray-950 text-white font-sans">
-      <header className="mb-6 text-sm text-gray-400">Letztes Update: {lastUpdate || 'Lade...'}</header>
+  // Utility for better card backgrounds and spacing
+  const cardBase = "rounded-2xl p-5 border border-gray-700 bg-[#232a36] shadow-lg flex flex-col gap-3"
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-        <div className="rounded-xl p-4 border border-gray-600 bg-gray-800">
-          <h2 className="text-md font-bold mb-2">🧱 3D-Drucker</h2>
+  return (
+    <main className="min-h-screen p-4 sm:p-8 bg-[#171c23] text-white font-sans">
+      <header className="mb-8 text-sm text-gray-400 font-semibold tracking-wide">
+        Letztes Update: {lastUpdate || 'Lade...'}
+      </header>
+      <div className="grid grid-cols-1 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
+        {/* 3D-Drucker */}
+        <div className={cardBase}>
+          <h2 className="text-lg font-extrabold mb-1 flex items-center gap-2">🧱 3D-Drucker</h2>
           {['Ender 3 Pro', 'Sidewinder X1'].map((label, i) => {
             const topic = topics.find(t => t.label === label)
             if (!topic) return null
             const val = values[topic.statusTopic]?.toUpperCase()
             return (
-              <div key={label} className={`flex justify-between items-center ${i > 0 ? 'mt-3' : 'mt-1'}`}>
-                <span>{label}</span>
-                <button className={`px-4 py-1 rounded text-white ${val === 'ON' ? 'bg-green-500' : 'bg-red-500'}`}
+              <div key={label} className={`flex justify-between items-center ${i > 0 ? 'mt-2' : 'mt-0'}`}>
+                <span className="tracking-tight">{label}</span>
+                <button className={`px-5 py-1 rounded-2xl font-bold shadow-sm text-white ${val === 'ON' ? 'bg-green-500' : 'bg-red-500'}`}
                   onClick={() => toggleBoolean(topic.publishTopic!, val)}>
                   {val === 'ON' ? 'AN' : 'AUS'}
                 </button>
@@ -239,8 +231,9 @@ function App() {
           })}
         </div>
 
-        <div className="rounded-xl p-4 border border-gray-600 bg-gray-800">
-          <h2 className="text-md font-bold mb-2">🏊 Pool</h2>
+        {/* Pool */}
+        <div className={cardBase}>
+          <h2 className="text-lg font-extrabold mb-1 flex items-center gap-2">🏊 Pool</h2>
           {(() => {
             const pumpe = topics.find(t => t.label === 'Poolpumpe')
             const tempKey = 'Pool_temp/temperatur'
@@ -251,17 +244,20 @@ function App() {
             return (
               <>
                 <div className="flex justify-between items-center">
-                  <span>Pumpe</span>
+                  <span className="tracking-tight">Pumpe</span>
                   {pumpe && (
-                    <button className={`px-4 py-1 rounded text-white ${values[pumpe.statusTopic]?.toUpperCase() === 'ON' ? 'bg-green-500' : 'bg-red-500'}`}
+                    <button className={`px-5 py-1 rounded-2xl font-bold shadow-sm text-white ${values[pumpe.statusTopic]?.toUpperCase() === 'ON' ? 'bg-green-500' : 'bg-red-500'}`}
                       onClick={() => toggleBoolean(pumpe.publishTopic!, values[pumpe.statusTopic])}>
                       {values[pumpe.statusTopic]?.toUpperCase() === 'ON' ? 'AN' : 'AUS'}
                     </button>
                   )}
                 </div>
-                <p className="mt-3">🌡️ Temperatur: {isNaN(val) ? '...' : `${val} °C`}</p>
+                <p className="mt-2 flex items-center gap-1 text-base font-semibold">
+                  <span className="text-2xl">🌡️</span>
+                  Temperatur: <span className={val > 25 ? "text-red-400 font-bold" : ""}>{isNaN(val) ? '...' : `${val} °C`}</span>
+                </p>
                 {progressBar(val, 40, getBarColor('Pool Temperatur', val))}
-                <p className="text-xs text-gray-400">
+                <p className="text-xs text-gray-300 font-mono tracking-tighter">
                   Min: {range.min?.toFixed(1)} °C {range.minTime ? `(${range.minTime})` : ''}
                   {' | '}
                   Max: {range.max?.toFixed(1)} °C {range.maxTime ? `(${range.maxTime})` : ''}
@@ -271,34 +267,45 @@ function App() {
           })()}
         </div>
 
-        <div className="rounded-xl p-4 border border-gray-600 bg-gray-800">
-          <h2 className="text-md font-bold mb-2">🎰 Zähler</h2>
-          <div className="flex flex-col space-y-3">
-            <p>⚡ Strom: {values['tele/Stromzähler/SENSOR.grid.Verbrauch_gesamt'] ?? '...'} kWh</p>
-            <p>🔥 Gas: {values['Gaszaehler/stand'] ?? '...'} m³</p>
+        {/* Zähler */}
+        <div className={cardBase}>
+          <h2 className="text-lg font-extrabold mb-1 flex items-center gap-2">🧮 Zähler</h2>
+          <div className="space-y-2 text-base">
+            <div className="flex items-center gap-2">
+              <span className="text-xl">⚡</span>
+              <span>Strom: <span className="font-bold">{values['tele/Stromzähler/SENSOR.grid.Verbrauch_gesamt'] ?? '...'} kWh</span></span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xl">🔥</span>
+              <span>Gas: <span className="font-bold">{values['Gaszaehler/stand'] ?? '...'} m³</span></span>
+            </div>
           </div>
         </div>
 
-        <div className="rounded-xl p-4 border border-gray-600 bg-gray-800">
-          <h2 className="text-md font-bold mb-3">🔋 Erzeugung</h2>
-          <p>Gesamt: {(() => {
-            const key = 'tele/Balkonkraftwerk/SENSOR.ENERGY.EnergyPTotal.0'
-            const raw = values[key]
-            const num = parseFloat(raw)
-            return !isNaN(num) ? (num + 178.779).toFixed(3) : '...'
-          })()} kWh</p>
+        {/* Erzeugung */}
+        <div className={cardBase}>
+          <h2 className="text-lg font-extrabold mb-1 flex items-center gap-2">🔋 Erzeugung</h2>
+          <p className="text-base font-semibold">
+            Gesamt: {(() => {
+              const key = 'tele/Balkonkraftwerk/SENSOR.ENERGY.EnergyPTotal.0'
+              const raw = values[key]
+              const num = parseFloat(raw)
+              return !isNaN(num) ? (num + 178.779).toFixed(3) : '...'
+            })()} kWh
+          </p>
         </div>
 
-        <div className="rounded-xl p-4 border border-gray-600 bg-gray-800">
-          <h2 className="text-md font-bold mb-2">🔌 Steckdosen</h2>
+        {/* Steckdosen */}
+        <div className={cardBase}>
+          <h2 className="text-lg font-extrabold mb-1 flex items-center gap-2">🔌 Steckdosen</h2>
           {['Steckdose 1', 'Steckdose 2'].map((label, i) => {
             const topic = topics.find(t => t.label === label)
             if (!topic) return null
             const val = values[topic.statusTopic]?.toUpperCase()
             return (
-              <div key={label} className={`flex justify-between items-center ${i > 0 ? 'mt-3' : 'mt-1'}`}>
-                <span>{label}</span>
-                <button className={`px-4 py-1 rounded text-white ${val === 'ON' ? 'bg-green-500' : 'bg-red-500'}`}
+              <div key={label} className={`flex justify-between items-center ${i > 0 ? 'mt-2' : 'mt-0'}`}>
+                <span className="tracking-tight">{label}</span>
+                <button className={`px-5 py-1 rounded-2xl font-bold shadow-sm text-white ${val === 'ON' ? 'bg-green-500' : 'bg-red-500'}`}
                   onClick={() => toggleBoolean(topic.publishTopic!, val)}>
                   {val === 'ON' ? 'AN' : 'AUS'}
                 </button>
@@ -307,6 +314,13 @@ function App() {
           })}
         </div>
 
+        {/* Doppelsteckdose */}
+        <div className={cardBase}>
+          <h2 className="text-lg font-extrabold mb-1 flex items-center gap-2">🔌 Doppelsteckdose</h2>
+          <button className="px-5 py-1 rounded-2xl font-bold shadow-sm text-white bg-green-500 w-min">AN</button>
+        </div>
+
+        {/* Additional "group" and "number" cards */}
         {topics.filter(t =>
           t.type !== 'group' &&
           !['Ender 3 Pro', 'Sidewinder X1', 'Poolpumpe', 'Steckdose 1', 'Steckdose 2'].includes(t.label)
@@ -320,19 +334,19 @@ function App() {
           const range = getRange(key, num)
           const barColor = getBarColor(label, num)
           return (
-            <div key={key} className={`rounded-xl p-4 border ${favorite ? 'border-yellow-400' : 'border-gray-600'} bg-gray-800`}>
-              <h2 className="text-md font-bold mb-2">{label}</h2>
+            <div key={key} className={`${cardBase} ${favorite ? 'border-yellow-400' : 'border-gray-700'}`}>
+              <h2 className="text-md font-bold mb-1">{label}</h2>
               {type === 'boolean' && (
-                <button className={`px-4 py-1 rounded text-white ${value === 'ON' ? 'bg-green-500' : 'bg-red-500'}`} onClick={() => toggleBoolean(publishTopic ?? key, value)}>
+                <button className={`px-5 py-1 rounded-2xl font-bold shadow-sm text-white ${value === 'ON' ? 'bg-green-500' : 'bg-red-500'}`} onClick={() => toggleBoolean(publishTopic ?? key, value)}>
                   {value === 'ON' ? 'AN' : 'AUS'}
                 </button>
               )}
               {isNumber && (
                 <>
-                  <p className="text-2xl">{raw ?? '...'} {unit}</p>
+                  <p className="text-2xl font-semibold">{raw ?? '...'} {unit}</p>
                   {showMinMax && progressBar(num, range.max > 0 ? range.max : 100, barColor)}
                   {showMinMax && (
-                    <p className="text-xs text-gray-400">
+                    <p className="text-xs text-gray-300 font-mono tracking-tighter">
                       Min: {range.min?.toFixed(1)} {unit} {range.minTime ? `(${range.minTime})` : ''}
                       {' | '}
                       Max: {range.max?.toFixed(1)} {unit} {range.maxTime ? `(${range.maxTime})` : ''}
@@ -346,9 +360,10 @@ function App() {
         })}
       </div>
 
-      <div className="mt-10 grid grid-cols-1 sm:grid-cols-3 gap-4">
+      {/* Grouped cards */}
+      <div className="mt-10 grid grid-cols-1 sm:grid-cols-3 gap-6">
         {topics.filter(t => t.type === 'group').map(group => (
-          <div key={group.label} className="rounded-xl p-4 border border-gray-600 bg-gray-800">
+          <div key={group.label} className={cardBase}>
             <h2 className="text-lg font-bold mb-2">{group.label}</h2>
             {group.keys?.map(({ label, key }) => {
               const raw = values[key]
@@ -356,9 +371,9 @@ function App() {
               const range = getRange(key, num)
               return (
                 <div key={key} className="mb-2">
-                  <div className="text-sm">{label}: {isNaN(num) ? '...' : `${num} ${group.unit}`}</div>
+                  <div className="text-sm font-semibold">{label}: <span className="font-mono">{isNaN(num) ? '...' : `${num} ${group.unit}`}</span></div>
                   {progressBar(num, group.label.includes('Spannung') ? 250 : 1000, 'bg-blue-500')}
-                  <div className="text-xs text-gray-400">
+                  <div className="text-xs text-gray-300 font-mono">
                     Min: {range.min?.toFixed(1)} {group.unit} {range.minTime ? `(${range.minTime})` : ''}
                     {' | '}
                     Max: {range.max?.toFixed(1)} {group.unit} {range.maxTime ? `(${range.maxTime})` : ''}
