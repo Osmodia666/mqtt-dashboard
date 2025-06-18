@@ -95,6 +95,111 @@ async function fetchMinMaxForKeys(keys: string[]): Promise<MinMax> {
   return minmax
 }
 
+function App() {
+  const [values, setValues] = useState<Record<string, string>>({})
+  const [lastUpdate, setLastUpdate] = useState('')
+  const [minMax, setMinMax] = useState<MinMax>({})
+  const influxQueue = useRef<Record<string, number>>({})
+
+  // Function for updating min/max in state (if you use it)
+  function updateMinMax(key: string, val: string) {
+    const num = parseFloat(val)
+    if (!isNaN(num)) {
+      setMinMax(prev => {
+        const current = prev[key]
+        const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
+        if (!current) {
+          return { ...prev, [key]: { min: num, minTime: now, max: num, maxTime: now } }
+        }
+        let updated = false
+        let min = current.min
+        let minTime = current.minTime
+        let max = current.max
+        let maxTime = current.maxTime
+        if (num < min) {
+          min = num
+          minTime = now
+          updated = true
+        }
+        if (num > max) {
+          max = num
+          maxTime = now
+          updated = true
+        }
+        if (updated) {
+          return { ...prev, [key]: { min, minTime, max, maxTime } }
+        }
+        return prev
+      })
+    }
+  }
+
+  useEffect(() => {
+    // Fetch min/max from backend on mount
+    fetchMinMaxForKeys(MINMAX_KEYS).then(setMinMax)
+
+    client.on('connect', () => {
+      client.publish('dashboard/minmax/request', '')
+      const allTopics = topics.map(t => t.statusTopic || t.topic).filter(Boolean)
+      client.subscribe([...allTopics, '#', 'dashboard/minmax/update'])
+      topics.forEach(({ publishTopic }) => {
+        if (publishTopic?.includes('/POWER')) client.publish(publishTopic, '')
+        if (publishTopic) {
+          const base = publishTopic.split('/')[1]
+          client.publish(`cmnd/${base}/state`, '')
+        }
+      })
+    })
+
+    client.on('message', (topic, message) => {
+      const payload = message.toString()
+
+      // If this is an influx/data package, unpack it and update everything
+      if (topic === 'influx/data') {
+        try {
+          const json = JSON.parse(payload)
+          for (const [key, val] of Object.entries(json)) {
+            setValues(prev => {
+              const merged = { ...prev, [key]: val as string }
+              setLastUpdate(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }))
+              return merged
+            })
+            updateMinMax(key, String(val))
+            const num = parseFloat(String(val))
+            if (!isNaN(num)) {
+              influxQueue.current[key] = num
+            }
+          }
+        } catch (e) {
+          // ignore
+        }
+        return
+      }
+
+      // Otherwise handle single-value topics as before
+      let updates: Record<string, string> = {}
+      try {
+        const json = JSON.parse(payload)
+        // flatten nested JSON
+        const flatten = (obj: any, prefix = ''): Record<string, string> => {
+          return Object.entries(obj).reduce((acc, [key, val]) => {
+            const newKey = prefix ? `${prefix}.${key}` : key
+            if (typeof val === 'object' && val !== null) {
+              Object.assign(acc, flatten(val, newKey))
+            } else {
+              acc[newKey] = String(val)
+            }
+            return acc
+          }, {})
+        }
+        const flat = flatten(json)
+        for (const [key, val] of Object.entries(flat)) {
+          const combinedKey = `${topic}.${key}`
+          updates[combinedKey] = val
+        }
+      } catch (e) {
+        updates[topic] = payload
+      }
 
       setValues(prev => {
         const merged = { ...prev, ...updates }
@@ -118,9 +223,9 @@ async function fetchMinMaxForKeys(keys: string[]): Promise<MinMax> {
       const influxPayload = { ...influxQueue.current }
       influxQueue.current = {}
       if (Object.keys(influxPayload).length > 0) {
-        client.publish(INFLUX_TOPIC, JSON.stringify(influxPayload))
+        client.publish('influx/data', JSON.stringify(influxPayload))
       }
-    }, FLUSH_INTERVAL)
+    }, 10000)
 
     return () => {
       clearInterval(influxInterval)
@@ -153,7 +258,6 @@ async function fetchMinMaxForKeys(keys: string[]): Promise<MinMax> {
   const getRange = (key: string, value: number) => (
     minMax[key] ?? { min: value, minTime: '', max: value, maxTime: '' }
   )
-
   const cardBase = "rounded-2xl p-6 border border-gray-700 bg-[#232a36] shadow-lg flex flex-col gap-3 min-h-[180px]"
 
   // All steckdosen for merging: Steckdose 1/2, Doppelsteckdose
