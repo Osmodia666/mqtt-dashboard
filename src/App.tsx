@@ -16,19 +16,19 @@ type MinMax = Record<string, {
 }>
 
 const MINMAX_KEYS = [
-  "mqtt.0.tele.Stromzaehler.SENSOR.grid.Verbrauch_aktuell",
+  "tasmota/discovery/840D8EB0D6CD/sensors.sn.grid.Verbrauch_aktuell",
   "mqtt.0.Pool_temp.temperatur",
   "mqtt.0.Gaszaehler.stand",
   "tele/Balkonkraftwerk/SENSOR.ENERGY.Power.0",
-  "tele/Stromzähler/SENSOR.grid.power_L1",
-  "tele/Stromzähler/SENSOR.grid.power_L2",
-  "tele/Stromzähler/SENSOR.grid.power_L3",
-  "tele/Stromzähler/SENSOR.grid.Spannung_L1",
-  "tele/Stromzähler/SENSOR.grid.Spannung_L2",
-  "tele/Stromzähler/SENSOR.grid.Spannung_L3",
-  "tele/Stromzähler/SENSOR.grid.Strom_L1",
-  "tele/Stromzähler/SENSOR.grid.Strom_L2",
-  "tele/Stromzähler/SENSOR.grid.Strom_L3",
+  "tasmota/discovery/840D8EB0D6CD/sensors.sn.grid.power_L1",
+  "tasmota/discovery/840D8EB0D6CD/sensors.sn.grid.power_L2",
+  "tasmota/discovery/840D8EB0D6CD/sensors.sn.grid.power_L3",
+  "tasmota/discovery/840D8EB0D6CD/sensors.sn.grid.Spannung_L1",
+  "tasmota/discovery/840D8EB0D6CD/sensors.sn.grid.Spannung_L2",
+  "tasmota/discovery/840D8EB0D6CD/sensors.sn.grid.Spannung_L3",
+  "tasmota/discovery/840D8EB0D6CD/sensors.sn.grid.Strom_L1",
+  "tasmota/discovery/840D8EB0D6CD/sensors.sn.grid.Strom_L2",
+  "tasmota/discovery/840D8EB0D6CD/sensors.sn.grid.Strom_L3",
 ]
 
 const MINMAX_BACKEND = "http://cyberdyne.chickenkiller.com:4000" // CHANGE THIS to your Pi's IP
