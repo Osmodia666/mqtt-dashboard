@@ -14,6 +14,39 @@ type MinMax = Record<string, {
   max: number,
   maxTime: string
 }>
+
+const MINMAX_KEYS = [
+  "tasmota/discovery/840D8EB0D6CD/sensors.sn.grid.power_L1",
+  "tasmota/discovery/840D8EB0D6CD/sensors.sn.grid.power_L2",
+  "tasmota/discovery/840D8EB0D6CD/sensors.sn.grid.power_L3",
+  // Add more keys as needed...
+]
+
+const MINMAX_BACKEND = "http://<YOUR_PI_IP>:4000" // CHANGE THIS to your Pi's IP
+
+async function fetchMinMaxForKeys(keys: string[]): Promise<MinMax> {
+  const minmax: MinMax = {}
+  for (const key of keys) {
+    try {
+      const res = await fetch(`${MINMAX_BACKEND}/minmax?key=${encodeURIComponent(key)}`)
+      const data = await res.json()
+      minmax[key] = {
+        min: data.min ?? 0,
+        minTime: data.minTime
+          ? new Date(data.minTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
+          : '',
+        max: data.max ?? 0,
+        maxTime: data.maxTime
+          ? new Date(data.maxTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
+          : '',
+      }
+    } catch (e) {
+      // fallback: just skip if error
+    }
+  }
+  return minmax
+}
+
 const MINMAX_TOPIC = 'dashboard/minmax/update'
 const INFLUX_TOPIC = 'influx/data'
 const FLUSH_INTERVAL = 10000
@@ -26,20 +59,10 @@ function App() {
 
   function updateMinMax(key: string, val: string) {
     const num = parseFloat(val)
-    if (
-      !isNaN(num) &&
-      (
-        key.includes('power_L') ||
-        key.includes('Verbrauch_aktuell') ||
-        key === 'Pool_temp/temperatur' ||
-        key.includes('Balkonkraftwerk') ||
-        key.includes('Voltage') ||
-        key.includes('Strom_L')
-      )
-    ) {
-      const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
+    if (!isNaN(num)) {
       setMinMax(prev => {
         const current = prev[key]
+        const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
         if (!current) {
           return { ...prev, [key]: { min: num, minTime: now, max: num, maxTime: now } }
         }
@@ -67,6 +90,9 @@ function App() {
   }
 
   useEffect(() => {
+    // Fetch min/max from backend on mount
+    fetchMinMaxForKeys(MINMAX_KEYS).then(setMinMax)
+
     client.on('connect', () => {
       client.publish('dashboard/minmax/request', '')
       const allTopics = topics.map(t => t.statusTopic || t.topic).filter(Boolean)
@@ -83,48 +109,33 @@ function App() {
     client.on('message', (topic, message) => {
       const payload = message.toString()
 
-      if (topic === 'Pool_temp/temperatur' || topic === 'Gaszaehler/stand') {
-        setValues(prev => {
-          const merged = { ...prev, [topic]: payload }
-          setLastUpdate(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }))
-          return merged
-        })
-        updateMinMax(topic, payload)
-        const num = parseFloat(payload)
-        if (!isNaN(num)) {
-          influxQueue.current[topic] = num
-        }
-        return
-      }
-
-      if (topic === MINMAX_TOPIC) {
+      // If this is an influx/data package, unpack it and update everything
+      if (topic === INFLUX_TOPIC) {
         try {
-          const incoming = JSON.parse(payload)
-          setMinMax(prev => {
-            const merged: MinMax = { ...prev }
-            for (const key in incoming) {
-              if (typeof incoming[key] === 'object' && incoming[key] !== null) {
-                const inc = incoming[key]
-                const prevTimes = prev[key] || { minTime: '', maxTime: '' }
-                merged[key] = {
-                  min: inc.min,
-                  minTime: inc.minTime || prevTimes.minTime || '',
-                  max: inc.max,
-                  maxTime: inc.maxTime || prevTimes.maxTime || ''
-                }
-              }
+          const json = JSON.parse(payload)
+          for (const [key, val] of Object.entries(json)) {
+            setValues(prev => {
+              const merged = { ...prev, [key]: val as string }
+              setLastUpdate(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }))
+              return merged
+            })
+            updateMinMax(key, String(val))
+            const num = parseFloat(String(val))
+            if (!isNaN(num)) {
+              influxQueue.current[key] = num
             }
-            return merged
-          })
-        } catch (err) {
-          console.error('[MQTT] Fehler beim MinMax-Update:', err)
+          }
+        } catch (e) {
+          // ignore
         }
         return
       }
 
+      // Otherwise handle single-value topics as before
       let updates: Record<string, string> = {}
       try {
         const json = JSON.parse(payload)
+        // flatten nested JSON
         const flatten = (obj: any, prefix = ''): Record<string, string> => {
           return Object.entries(obj).reduce((acc, [key, val]) => {
             const newKey = prefix ? `${prefix}.${key}` : key
@@ -182,7 +193,6 @@ function App() {
   }
 
   const getBarColor = (label: string, value: number) => {
-    // Updated to explicitly match "Verbrauch Aktuell"
     if (label.toLowerCase().includes('verbrauch')) return value >= 2000 ? 'bg-red-600' : value >= 500 ? 'bg-yellow-400' : 'bg-green-500'
     if (label.includes('Balkonkraftwerk')) return value > 450 ? 'bg-green-500' : value > 150 ? 'bg-yellow-400' : 'bg-red-600'
     if (label.includes('Pool Temperatur')) {
