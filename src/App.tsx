@@ -277,7 +277,7 @@ function App() {
 
         {/* Zähler */}
         <div className={cardBase}>
-          <h2 className="text-lg font-extrabold mb-1 flex items-center gap-2">🧮 Zähler</h2>
+          <h2 className="text-lg font-extrabold mb-1 flex items-center gap-2">📊 Zähler</h2>
           <div className="space-y-2 text-base">
             <div className="flex items-center gap-2">
               <span className="text-xl">⚡</span>
