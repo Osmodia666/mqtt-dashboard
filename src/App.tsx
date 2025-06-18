@@ -15,29 +15,68 @@ type MinMax = Record<string, {
   maxTime: string
 }>
 
-const MINMAX_KEYS = [
-  "tasmota/discovery/840D8EB0D6CD/sensors.sn.grid.Verbrauch_aktuell",
-  "mqtt.0.Pool_temp.temperatur",
-  "mqtt.0.Gaszaehler.stand",
-  "tele/Balkonkraftwerk/SENSOR.ENERGY.Power.0",
-  "tasmota/discovery/840D8EB0D6CD/sensors.sn.grid.power_L1",
-  "tasmota/discovery/840D8EB0D6CD/sensors.sn.grid.power_L2",
-  "tasmota/discovery/840D8EB0D6CD/sensors.sn.grid.power_L3",
-  "tasmota/discovery/840D8EB0D6CD/sensors.sn.grid.Spannung_L1",
-  "tasmota/discovery/840D8EB0D6CD/sensors.sn.grid.Spannung_L2",
-  "tasmota/discovery/840D8EB0D6CD/sensors.sn.grid.Spannung_L3",
-  "tasmota/discovery/840D8EB0D6CD/sensors.sn.grid.Strom_L1",
-  "tasmota/discovery/840D8EB0D6CD/sensors.sn.grid.Strom_L2",
-  "tasmota/discovery/840D8EB0D6CD/sensors.sn.grid.Strom_L3",
-]
+// For each logical key, list all possible (measurement, field) pairs
+const MINMAX_ALIASES: Record<string, {measurement: string, field: string}[]> = {
+  "tele/Stromzähler/SENSOR.grid.power_L1": [
+    { measurement: "influx/data", field: "tasmota/discovery/840D8EB0D6CD/sensors.sn.grid.power_L1" },
+    { measurement: "influx/data", field: "tele/Stromzähler/SENSOR.grid.power_L1" }
+  ],
+  "tele/Stromzähler/SENSOR.grid.power_L2": [
+    { measurement: "influx/data", field: "tasmota/discovery/840D8EB0D6CD/sensors.sn.grid.power_L2" },
+    { measurement: "influx/data", field: "tele/Stromzähler/SENSOR.grid.power_L2" }
+  ],
+  "tele/Stromzähler/SENSOR.grid.power_L3": [
+    { measurement: "influx/data", field: "tasmota/discovery/840D8EB0D6CD/sensors.sn.grid.power_L3" },
+    { measurement: "influx/data", field: "tele/Stromzähler/SENSOR.grid.power_L3" }
+  ],
+  "tele/Stromzähler/SENSOR.grid.Spannung_L1": [
+    { measurement: "influx/data", field: "tasmota/discovery/840D8EB0D6CD/sensors.sn.grid.Spannung_L1" },
+    { measurement: "influx/data", field: "tele/Stromzähler/SENSOR.grid.Spannung_L1" }
+  ],
+  "tele/Stromzähler/SENSOR.grid.Spannung_L2": [
+    { measurement: "influx/data", field: "tasmota/discovery/840D8EB0D6CD/sensors.sn.grid.Spannung_L2" },
+    { measurement: "influx/data", field: "tele/Stromzähler/SENSOR.grid.Spannung_L2" }
+  ],
+  "tele/Stromzähler/SENSOR.grid.Spannung_L3": [
+    { measurement: "influx/data", field: "tasmota/discovery/840D8EB0D6CD/sensors.sn.grid.Spannung_L3" },
+    { measurement: "influx/data", field: "tele/Stromzähler/SENSOR.grid.Spannung_L3" }
+  ],
+  "tele/Stromzähler/SENSOR.grid.Strom_L1": [
+    { measurement: "influx/data", field: "tasmota/discovery/840D8EB0D6CD/sensors.sn.grid.Strom_L1" },
+    { measurement: "influx/data", field: "tele/Stromzähler/SENSOR.grid.Strom_L1" }
+  ],
+  "tele/Stromzähler/SENSOR.grid.Strom_L2": [
+    { measurement: "influx/data", field: "tasmota/discovery/840D8EB0D6CD/sensors.sn.grid.Strom_L2" },
+    { measurement: "influx/data", field: "tele/Stromzähler/SENSOR.grid.Strom_L2" }
+  ],
+  "tele/Stromzähler/SENSOR.grid.Strom_L3": [
+    { measurement: "influx/data", field: "tasmota/discovery/840D8EB0D6CD/sensors.sn.grid.Strom_L3" },
+    { measurement: "influx/data", field: "tele/Stromzähler/SENSOR.grid.Strom_L3" }
+  ],
+  "tasmota/discovery/840D8EB0D6CD/sensors.sn.grid.Verbrauch_aktuell": [
+    { measurement: "influx/data", field: "tasmota/discovery/840D8EB0D6CD/sensors.sn.grid.Verbrauch_aktuell" }
+  ],
+  "mqtt.0.Pool_temp.temperatur": [
+    { measurement: "mqtt.0.Pool_temp.temperatur", field: "value" }
+  ],
+  "mqtt.0.Gaszaehler.stand": [
+    { measurement: "mqtt.0.Gaszaehler.stand", field: "value" }
+  ],
+  "tele/Balkonkraftwerk/SENSOR.ENERGY.Power.0": [
+    { measurement: "tele/Balkonkraftwerk/SENSOR.ENERGY.Power.0", field: "value" }
+  ]
+}
 
+const MINMAX_KEYS = Object.keys(MINMAX_ALIASES)
 const MINMAX_BACKEND = "http://cyberdyne.chickenkiller.com:4000" // CHANGE THIS to your Pi's IP
 
 async function fetchMinMaxForKeys(keys: string[]): Promise<MinMax> {
   const minmax: MinMax = {}
   for (const key of keys) {
+    const aliases = MINMAX_ALIASES[key]
+      .map(({measurement, field}) => `${measurement}|${field}`).join(',')
     try {
-      const res = await fetch(`${MINMAX_BACKEND}/minmax?topic=${encodeURIComponent(key)}`)
+      const res = await fetch(`${MINMAX_BACKEND}/minmax-agg?aliases=${encodeURIComponent(aliases)}`)
       const data = await res.json()
       minmax[key] = {
         min: data.min ?? 0,
@@ -56,114 +95,11 @@ async function fetchMinMaxForKeys(keys: string[]): Promise<MinMax> {
   return minmax
 }
 
-const MINMAX_TOPIC = 'dashboard/minmax/update'
-const INFLUX_TOPIC = 'influx/data'
-const FLUSH_INTERVAL = 10000
+// ... your App component code stays the same, including updateMinMax, useEffect, etc ...
+// Just replace the fetchMinMaxForKeys function and the MINMAX_KEYS definition as above.
+// The rest of your UI and logic can stay unchanged.
 
-function App() {
-  const [values, setValues] = useState<Record<string, string>>({})
-  const [lastUpdate, setLastUpdate] = useState('')
-  const [minMax, setMinMax] = useState<MinMax>({})
-  const influxQueue = useRef<Record<string, number>>({})
-
-  function updateMinMax(key: string, val: string) {
-    const num = parseFloat(val)
-    if (!isNaN(num)) {
-      setMinMax(prev => {
-        const current = prev[key]
-        const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
-        if (!current) {
-          return { ...prev, [key]: { min: num, minTime: now, max: num, maxTime: now } }
-        }
-        let updated = false
-        let min = current.min
-        let minTime = current.minTime
-        let max = current.max
-        let maxTime = current.maxTime
-        if (num < min) {
-          min = num
-          minTime = now
-          updated = true
-        }
-        if (num > max) {
-          max = num
-          maxTime = now
-          updated = true
-        }
-        if (updated) {
-          return { ...prev, [key]: { min, minTime, max, maxTime } }
-        }
-        return prev
-      })
-    }
-  }
-
-  useEffect(() => {
-    // Fetch min/max from backend on mount
-    fetchMinMaxForKeys(MINMAX_KEYS).then(setMinMax)
-
-    client.on('connect', () => {
-      client.publish('dashboard/minmax/request', '')
-      const allTopics = topics.map(t => t.statusTopic || t.topic).filter(Boolean)
-      client.subscribe([...allTopics, '#', MINMAX_TOPIC])
-      topics.forEach(({ publishTopic }) => {
-        if (publishTopic?.includes('/POWER')) client.publish(publishTopic, '')
-        if (publishTopic) {
-          const base = publishTopic.split('/')[1]
-          client.publish(`cmnd/${base}/state`, '')
-        }
-      })
-    })
-
-    client.on('message', (topic, message) => {
-      const payload = message.toString()
-
-      // If this is an influx/data package, unpack it and update everything
-      if (topic === INFLUX_TOPIC) {
-        try {
-          const json = JSON.parse(payload)
-          for (const [key, val] of Object.entries(json)) {
-            setValues(prev => {
-              const merged = { ...prev, [key]: val as string }
-              setLastUpdate(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }))
-              return merged
-            })
-            updateMinMax(key, String(val))
-            const num = parseFloat(String(val))
-            if (!isNaN(num)) {
-              influxQueue.current[key] = num
-            }
-          }
-        } catch (e) {
-          // ignore
-        }
-        return
-      }
-
-      // Otherwise handle single-value topics as before
-      let updates: Record<string, string> = {}
-      try {
-        const json = JSON.parse(payload)
-        // flatten nested JSON
-        const flatten = (obj: any, prefix = ''): Record<string, string> => {
-          return Object.entries(obj).reduce((acc, [key, val]) => {
-            const newKey = prefix ? `${prefix}.${key}` : key
-            if (typeof val === 'object' && val !== null) {
-              Object.assign(acc, flatten(val, newKey))
-            } else {
-              acc[newKey] = String(val)
-            }
-            return acc
-          }, {})
-        }
-        const flat = flatten(json)
-        for (const [key, val] of Object.entries(flat)) {
-          const combinedKey = `${topic}.${key}`
-          updates[combinedKey] = val
-        }
-      } catch (e) {
-        updates[topic] = payload
-      }
+export default App
 
       setValues(prev => {
         const merged = { ...prev, ...updates }
