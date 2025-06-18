@@ -37,7 +37,7 @@ async function fetchMinMaxForKeys(keys: string[]): Promise<MinMax> {
   const minmax: MinMax = {}
   for (const key of keys) {
     try {
-      const res = await fetch(`${MINMAX_BACKEND}/minmax?key=${encodeURIComponent(key)}`)
+      const res = await fetch(`${MINMAX_BACKEND}/minmax?topic=${encodeURIComponent(key)}`)
       const data = await res.json()
       minmax[key] = {
         min: data.min ?? 0,
