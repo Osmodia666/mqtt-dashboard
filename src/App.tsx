@@ -290,7 +290,7 @@ function App() {
             {/* Balkonkraftwerk Gesamt moved here */}
             <div className="flex items-center gap-2 mt-2">
               <span className="text-xl">🔋</span>
-              <span>Balkonkraftwerk Gesamt: <span className="font-bold">
+              <span>Balkonkraftwerk: <span className="font-bold">
                 {(() => {
                   const key = 'tele/Balkonkraftwerk/SENSOR.ENERGY.EnergyPTotal.0'
                   const raw = values[key]
@@ -307,7 +307,7 @@ function App() {
           <h2 className="text-lg font-extrabold mb-1 flex items-center gap-2">⚡Strom</h2>
           {/* Erzeugung */}
           <div>
-            <span className="font-semibold">🔋Balkonkraftwerk: </span>
+            <span className="font-semibold">🔋 Balkonkraftwerk: </span>
             {(() => {
               const key = 'tele/Balkonkraftwerk/SENSOR.ENERGY.Power.0'
               const raw = values[key]
@@ -334,7 +334,7 @@ function App() {
 
           {/* Verbrauch aktuell */}
           <div className="mt-4">
-            <span className="font-semibold">Verbrauch: </span>
+            <span className="font-semibold">⚡ Verbrauch: </span>
             {(() => {
               const key = 'tele/Stromzähler/SENSOR.grid.Verbrauch_aktuell'
               const raw = values[key]
