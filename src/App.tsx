@@ -95,11 +95,6 @@ async function fetchMinMaxForKeys(keys: string[]): Promise<MinMax> {
   return minmax
 }
 
-// ... your App component code stays the same, including updateMinMax, useEffect, etc ...
-// Just replace the fetchMinMaxForKeys function and the MINMAX_KEYS definition as above.
-// The rest of your UI and logic can stay unchanged.
-
-export default App
 
       setValues(prev => {
         const merged = { ...prev, ...updates }
