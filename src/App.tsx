@@ -17,6 +17,8 @@ type MinMax = Record<string, {
 
 const MINMAX_KEYS = [
   "mqtt.0.tele.Stromzaehler.SENSOR.grid.Verbrauch_aktuell",
+  "mqtt.0.Pool_temp.temperatur",
+  "mqtt.0.Gaszaehler.stand",
   "tele/Balkonkraftwerk/SENSOR.ENERGY.Power.0",
   "tele/Stromzähler/SENSOR.grid.power_L1",
   "tele/Stromzähler/SENSOR.grid.power_L2",
