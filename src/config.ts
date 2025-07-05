@@ -56,19 +56,31 @@ export const topics = [
     statusTopic: 'stat/Poolpumpe/POWER',
     publishTopic: 'cmnd/Poolpumpe/POWER',
   },
-  // {
-  //   label: 'Verbrauch aktuell:',
-  //   type: 'number',
-  //   unit: 'W',
-  //   statusTopic: 'tele/Stromzähler/SENSOR.grid.Verbrauch_aktuell',
-  // },
-  // {
-  //   label: 'Balkonkraftwerk Erzeugung:',
-  //   type: 'number',
-  //   unit: 'W',
-  //   statusTopic: 'tele/Balkonkraftwerk/SENSOR.ENERGY.Power.0',
-  // },
-  // ✅ Gruppiert: Leistung
+  {
+    label: 'Verbrauch aktuell',
+    type: 'number',
+    unit: 'W',
+    statusTopic: 'tele/Stromzähler/SENSOR.grid.Verbrauch_aktuell',
+    favorite: true,
+  },
+  {
+    label: 'Verbrauch gesamt',
+    type: 'number',
+    unit: 'kWh',
+    statusTopic: 'tele/Stromzähler/SENSOR.grid.Verbrauch_gesamt',
+  },
+  //{
+    //label: 'Eingespeist gesamt',
+    //type: 'number',
+   // unit: 'kWh',
+    //statusTopic: 'tele/Stromzähler/SENSOR.grid.Eingespeist_gesamt',
+ // },
+  //{
+    //label: 'Balkonkraftwerk Erzeugung',
+   // type: 'number',
+    //unit: 'W',
+   // statusTopic: 'tele/Balkonkraftwerk/SENSOR.ENERGY.Power.0',
+ // },
   {
     label: 'Leistung L1–L3',
     type: 'group',
@@ -79,7 +91,6 @@ export const topics = [
       { label: 'L3', key: 'tele/Stromzähler/SENSOR.grid.power_L3' },
     ],
   },
-  // ✅ Gruppiert: Spannung
   {
     label: 'Spannung L1–L3',
     type: 'group',
@@ -90,7 +101,6 @@ export const topics = [
       { label: 'L3', key: 'tele/Stromzähler/SENSOR.grid.Spannung_L3' },
     ],
   },
-  // ✅ Gruppiert: Strom
   {
     label: 'Strom L1–L3',
     type: 'group',
