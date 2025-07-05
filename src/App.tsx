@@ -217,14 +217,22 @@ function App() {
         </div>
 
         <div className="rounded-xl p-4 border border-gray-600 bg-gray-800">
-          <h2 className="text-md font-bold mb-3">🔋 Erzeugung</h2>
-          <p>Gesamt: {(() => {
-            const key = 'tele/Balkonkraftwerk/SENSOR.ENERGY.EnergyPTotal.0'
-            const raw = values[key]
-            const num = parseFloat(raw)
-            return !isNaN(num) ? (num + 178.779).toFixed(3) : '...'
-          })()} kWh</p>
-        </div>
+  <h2 className="text-md font-bold mb-3">🔋 Erzeugung</h2>
+  <p>Gesamt: {(() => {
+    const key = 'tele/Balkonkraftwerk/SENSOR.ENERGY.EnergyPTotal.0'
+    const raw = values[key]
+    const num = parseFloat(raw)
+    return !isNaN(num) ? (num + 178.779).toFixed(3) : '...'
+  })()} kWh</p>
+  <p>
+    Erzeugung Aktuell: {(() => {
+      const key = 'tele/Balkonkraftwerk/SENSOR.ENERGY.Power.0'
+      const raw = values[key]
+      const num = parseFloat(raw)
+      return !isNaN(num) ? `${num} W` : '...'
+    })()}
+  </p>
+</div>
 
         <div className="rounded-xl p-4 border border-gray-600 bg-gray-800">
           <h2 className="text-md font-bold mb-2">🔌 Steckdosen</h2>
