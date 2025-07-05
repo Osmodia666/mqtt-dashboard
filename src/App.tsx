@@ -13,6 +13,7 @@ function App() {
   const [lastUpdate, setLastUpdate] = useState('')
   const [minMax, setMinMax] = useState<MinMax>({})
   const messageQueue = useRef<Record<string, string>>({})
+  const minMaxInitialized = useRef(false)
   const clientRef = useRef<any>(null)
 
   useEffect(() => {
@@ -24,7 +25,6 @@ function App() {
       localStorage.removeItem(STORAGE_KEY)
     }
 
-    // MQTT-Client im useEffect initialisieren
     const client = mqtt.connect(mqttConfig.host, {
       username: mqttConfig.username,
       password: mqttConfig.password,
@@ -48,55 +48,21 @@ function App() {
       console.error('MQTT Fehler:', err)
     })
 
-    const flush = () => {
-      const updates = { ...messageQueue.current }
-      messageQueue.current = {}
-
-      if (Object.keys(updates).length > 0) {
-        setValues(prev => {
-          const updated = { ...prev, ...updates }
-          const nextMinMax: MinMax = { ...minMax }
-
-          for (const [key, val] of Object.entries(updates)) {
-            const num = parseFloat(val)
-            if (!isNaN(num) && (
-              key.includes('power_L') ||
-              key.includes('Verbrauch_aktuell') ||
-              key === 'Pool_temp/temperatur' ||
-              key.includes('Balkonkraftwerk') ||
-              key.includes('Voltage') ||
-              key.includes('Strom_L')
-            )) {
-              const current = nextMinMax[key] ?? { min: num, max: num }
-              nextMinMax[key] = {
-                min: Math.min(current.min, num),
-                max: Math.max(current.max, num),
-              }
-            }
-          }
-
-          setMinMax(nextMinMax)
-          client.publish(MINMAX_TOPIC, JSON.stringify(nextMinMax))
-          return updated
-        })
-        setLastUpdate(new Date().toLocaleTimeString())
-      }
-    }
-
-    const interval = setInterval(flush, 100)
-
     client.on('message', (topic, message) => {
       const payload = message.toString()
       if (topic === 'Pool_temp/temperatur' || topic === 'Gaszaehler/stand') {
         messageQueue.current[topic] = payload
-        flush() // Sofortiges Update
         return
       }
 
       if (topic === MINMAX_TOPIC) {
         try {
           const incoming = JSON.parse(payload)
-          setMinMax(prev => ({ ...prev, ...incoming }))
+          // Nur beim ersten Mal übernehmen!
+          if (!minMaxInitialized.current) {
+            setMinMax(incoming)
+            minMaxInitialized.current = true
+          }
         } catch (err) {
           console.error('[MQTT] Fehler beim MinMax-Update:', err)
         }
@@ -120,23 +86,56 @@ function App() {
           const combinedKey = `${topic}.${key}`
           messageQueue.current[combinedKey] = val
         }
-        flush() // Sofortiges Update
       } catch {
         messageQueue.current[topic] = payload
-        flush() // Sofortiges Update
       }
     })
+
+    const flush = () => {
+      const updates = { ...messageQueue.current }
+      messageQueue.current = {}
+
+      if (Object.keys(updates).length > 0) {
+        setValues(prev => {
+          const updated = { ...prev, ...updates }
+          setMinMax(prevMinMax => {
+            const nextMinMax: MinMax = { ...prevMinMax }
+            for (const [key, val] of Object.entries(updates)) {
+              const num = parseFloat(val)
+              if (!isNaN(num) && (
+                key.includes('power_L') ||
+                key.includes('Verbrauch_aktuell') ||
+                key === 'Pool_temp/temperatur' ||
+                key.includes('Balkonkraftwerk') ||
+                key.includes('Voltage') ||
+                key.includes('Strom_L')
+              )) {
+                const current = nextMinMax[key] ?? { min: num, max: num }
+                nextMinMax[key] = {
+                  min: Math.min(current.min, num),
+                  max: Math.max(current.max, num),
+                }
+              }
+            }
+            client.publish(MINMAX_TOPIC, JSON.stringify(nextMinMax))
+            return nextMinMax
+          })
+          setLastUpdate(new Date().toLocaleTimeString())
+          return updated
+        })
+      }
+    }
+
+    const interval = setInterval(flush, 300)
 
     return () => {
       clearInterval(interval)
       client.end(true)
     }
-  }, []) // Nur einmal ausführen
+  }, [])
 
-  // Optimistisches UI für Buttons
   const toggleBoolean = (publishTopic: string, current: string) => {
     const next = current?.toUpperCase() === 'ON' ? 'OFF' : 'ON'
-    // Optimistisches Update im State
     setValues(prev => ({
       ...prev,
       [publishTopic.replace('cmnd/', 'stat/').replace('/POWER', '/POWER')]: next
@@ -217,22 +216,22 @@ function App() {
         </div>
 
         <div className="rounded-xl p-4 border border-gray-600 bg-gray-800">
-  <h2 className="text-md font-bold mb-3">🔋 Erzeugung</h2>
-  <p>Gesamt: {(() => {
-    const key = 'tele/Balkonkraftwerk/SENSOR.ENERGY.EnergyPTotal.0'
-    const raw = values[key]
-    const num = parseFloat(raw)
-    return !isNaN(num) ? (num + 178.779).toFixed(3) : '...'
-  })()} kWh</p>
-  <p>
-    Erzeugung Aktuell: {(() => {
-      const key = 'tele/Balkonkraftwerk/SENSOR.ENERGY.Power.0'
-      const raw = values[key]
-      const num = parseFloat(raw)
-      return !isNaN(num) ? `${num} W` : '...'
-    })()}
-  </p>
-</div>
+          <h2 className="text-md font-bold mb-3">🔋 Erzeugung</h2>
+          <p>Gesamt: {(() => {
+            const key = 'tele/Balkonkraftwerk/SENSOR.ENERGY.EnergyPTotal.0'
+            const raw = values[key]
+            const num = parseFloat(raw)
+            return !isNaN(num) ? (num + 178.779).toFixed(3) : '...'
+          })()} kWh</p>
+          <p>
+            Erzeugung Aktuell: {(() => {
+              const key = 'tele/Balkonkraftwerk/SENSOR.ENERGY.Power.0'
+              const raw = values[key]
+              const num = parseFloat(raw)
+              return !isNaN(num) ? `${num} W` : '...'
+            })()}
+          </p>
+        </div>
 
         <div className="rounded-xl p-4 border border-gray-600 bg-gray-800">
           <h2 className="text-md font-bold mb-2">🔌 Steckdosen</h2>
