@@ -1,4 +1,5 @@
 // src/config.ts
+
 export const mqttConfig = {
   host: 'wss://cyberdyne.chickenkiller.com:8884',
   username: 'christopher',
@@ -56,31 +57,18 @@ export const topics = [
     statusTopic: 'stat/Poolpumpe/POWER',
     publishTopic: 'cmnd/Poolpumpe/POWER',
   },
-  {
-    label: 'Verbrauch aktuell',
-    type: 'number',
-    unit: 'W',
-    statusTopic: 'tele/Stromzähler/SENSOR.grid.Verbrauch_aktuell',
-    favorite: true,
-  },
-  {
-    label: 'Verbrauch gesamt',
-    type: 'number',
-    unit: 'kWh',
-    statusTopic: 'tele/Stromzähler/SENSOR.grid.Verbrauch_gesamt',
-  },
   //{
-    //label: 'Eingespeist gesamt',
+    //label: 'Balkonkraftwerk Erzeugung:',
     //type: 'number',
-   // unit: 'kWh',
-    //statusTopic: 'tele/Stromzähler/SENSOR.grid.Eingespeist_gesamt',
- // },
-  //{
-    //label: 'Balkonkraftwerk Erzeugung',
-   // type: 'number',
     //unit: 'W',
    // statusTopic: 'tele/Balkonkraftwerk/SENSOR.ENERGY.Power.0',
- // },
+  //},
+  //{
+    //label: 'Verbrauch aktuell:',
+    //type: 'number',
+  //  unit: 'W',
+//    statusTopic: 'tele/Stromzähler/SENSOR.grid.Verbrauch_aktuell',
+//  },
   {
     label: 'Leistung L1–L3',
     type: 'group',
