@@ -71,7 +71,7 @@ const flush = () => {
     client.on('connect', () => {
       client.publish('dashboard/minmax/request', '')
       const allTopics = topics.map(t => t.statusTopic || t.topic).filter(Boolean)
-      client.subscribe([...allTopics, '#', MINMAX_TOPIC])
+      client.subscribe([...allTopics, MINMAX_TOPIC])
       topics.forEach(({ publishTopic }) => {
         if (publishTopic?.includes('/POWER')) client.publish(publishTopic, '')
         if (publishTopic) {
