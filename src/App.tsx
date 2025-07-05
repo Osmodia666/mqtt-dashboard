@@ -68,7 +68,7 @@ function App() {
             const allTopics = topics
               .flatMap(t => [t.statusTopic, t.topic])
               .filter(Boolean)
-            client.subscribe([...new Set([...allTopics, 'Pool_temp/temperatur', 'Gaszaehler/stand', MINMAX_TOPIC)])
+            client.subscribe([...new Set([...allTopics, 'Pool_temp/temperatur', 'Gaszaehler/stand', MINMAX_TOPIC])])
 
             topics.forEach(({ publishTopic }) => {
                 if (publishTopic?.includes('/POWER')) client.publish(publishTopic, '')
