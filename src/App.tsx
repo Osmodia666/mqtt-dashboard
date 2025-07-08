@@ -215,23 +215,38 @@ function App() {
           </div>
         </div>
 
-        <div className="rounded-xl p-4 border border-gray-600 bg-gray-800">
-          <h2 className="text-md font-bold mb-3">🔋 Erzeugung</h2>
-          <p>Gesamt: {(() => {
-            const key = 'tele/Balkonkraftwerk/SENSOR.ENERGY.EnergyPTotal.0'
-            const raw = values[key]
-            const num = parseFloat(raw)
-            return !isNaN(num) ? (num + 178.779).toFixed(3) : '...'
-          })()} kWh</p>
-          <p>
-            Erzeugung Aktuell: {(() => {
-              const key = 'tele/Balkonkraftwerk/SENSOR.ENERGY.Power.0'
-              const raw = values[key]
-              const num = parseFloat(raw)
-              return !isNaN(num) ? `${num} W` : '...'
-            })()}
-          </p>
-        </div>
+        // ...existing code...
+
+<div className="rounded-xl p-4 border border-gray-600 bg-gray-800">
+  <h2 className="text-md font-bold mb-3">🔋 Erzeugung</h2>
+  <p>Gesamt: {(() => {
+    const key = 'tele/Balkonkraftwerk/SENSOR.ENERGY.EnergyPTotal.0'
+    const raw = values[key]
+    const num = parseFloat(raw)
+    return !isNaN(num) ? (num + 178.779).toFixed(3) : '...'
+  })()} kWh</p>
+  {(() => {
+    const key = 'tele/Balkonkraftwerk/SENSOR.ENERGY.Power.0'
+    const raw = values[key]
+    const num = raw !== undefined ? parseFloat(raw) : NaN
+    const range = minMax[key] ?? { min: num, max: num }
+    // Farbverlauf: <250W rot, 250-500W gelb, >500W grün
+    let color = 'bg-red-600'
+    if (num >= 500) color = 'bg-green-500'
+    else if (num >= 250) color = 'bg-yellow-400'
+    return (
+      <>
+        <p className="mt-3">Erzeugung Aktuell: {isNaN(num) ? '...' : `${num} W`}</p>
+        {progressBar(num, range.max > 0 ? range.max : 1000, color)}
+        <p className="text-xs text-gray-400">
+          Min: {range.min?.toFixed(1)} W | Max: {range.max?.toFixed(1)} W
+        </p>
+      </>
+    )
+  })()}
+</div>
+
+
 
         <div className="rounded-xl p-4 border border-gray-600 bg-gray-800">
           <h2 className="text-md font-bold mb-2">🔌 Steckdosen</h2>
