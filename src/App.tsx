@@ -215,8 +215,6 @@ function App() {
           </div>
         </div>
 
-        // ...existing code...
-
 <div className="rounded-xl p-4 border border-gray-600 bg-gray-800">
   <h2 className="text-md font-bold mb-3">🔋 Erzeugung</h2>
   <p>Gesamt: {(() => {
