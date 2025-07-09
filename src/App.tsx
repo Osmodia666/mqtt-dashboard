@@ -4,27 +4,17 @@ import mqtt from 'mqtt'
 import { mqttConfig, topics } from './config'
 
 type MinMax = Record<string, { min: number; max: number }>
-const STORAGE_KEY = 'global_minmax_store'
-const LAST_RESET_KEY = 'global_minmax_store_reset'
 const MINMAX_TOPIC = 'dashboard/minmax/update'
+const REQUEST_TOPIC = 'dashboard/minmax/request'
 
 function App() {
   const [values, setValues] = useState<Record<string, string>>({})
   const [lastUpdate, setLastUpdate] = useState('')
   const [minMax, setMinMax] = useState<MinMax>({})
   const messageQueue = useRef<Record<string, string>>({})
-  const minMaxInitialized = useRef(false)
   const clientRef = useRef<any>(null)
 
   useEffect(() => {
-    const now = Date.now()
-    const lastReset = parseInt(localStorage.getItem(LAST_RESET_KEY) || '0', 10)
-    if (now - lastReset > 86400000) {
-      setMinMax({})
-      localStorage.setItem(LAST_RESET_KEY, String(now))
-      localStorage.removeItem(STORAGE_KEY)
-    }
-
     const client = mqtt.connect(mqttConfig.host, {
       username: mqttConfig.username,
       password: mqttConfig.password,
@@ -32,7 +22,7 @@ function App() {
     clientRef.current = client
 
     client.on('connect', () => {
-      client.publish('dashboard/minmax/request', '')
+      client.publish(REQUEST_TOPIC, '')
       const allTopics = topics.map(t => t.statusTopic || t.topic).filter(Boolean)
       client.subscribe([...allTopics, '#', MINMAX_TOPIC])
       topics.forEach(({ publishTopic }) => {
@@ -50,19 +40,11 @@ function App() {
 
     client.on('message', (topic, message) => {
       const payload = message.toString()
-      if (topic === 'Pool_temp/temperatur' || topic === 'Gaszaehler/stand') {
-        messageQueue.current[topic] = payload
-        return
-      }
 
       if (topic === MINMAX_TOPIC) {
         try {
           const incoming = JSON.parse(payload)
-          // Nur beim ersten Mal übernehmen!
-          if (!minMaxInitialized.current) {
-            setMinMax(incoming)
-            minMaxInitialized.current = true
-          }
+          setMinMax(incoming)
         } catch (err) {
           console.error('[MQTT] Fehler beim MinMax-Update:', err)
         }
@@ -98,28 +80,6 @@ function App() {
       if (Object.keys(updates).length > 0) {
         setValues(prev => {
           const updated = { ...prev, ...updates }
-          setMinMax(prevMinMax => {
-            const nextMinMax: MinMax = { ...prevMinMax }
-            for (const [key, val] of Object.entries(updates)) {
-              const num = parseFloat(val)
-              if (!isNaN(num) && (
-                key.includes('power_L') ||
-                key.includes('Verbrauch_aktuell') ||
-                key === 'Pool_temp/temperatur' ||
-                key.includes('Balkonkraftwerk') ||
-                key.includes('Voltage') ||
-                key.includes('Strom_L')
-              )) {
-                const current = nextMinMax[key] ?? { min: num, max: num }
-                nextMinMax[key] = {
-                  min: Math.min(current.min, num),
-                  max: Math.max(current.max, num),
-                }
-              }
-            }
-            client.publish(MINMAX_TOPIC, JSON.stringify(nextMinMax))
-            return nextMinMax
-          })
           setLastUpdate(new Date().toLocaleTimeString())
           return updated
         })
@@ -127,7 +87,6 @@ function App() {
     }
 
     const interval = setInterval(flush, 300)
-
     return () => {
       clearInterval(interval)
       client.end(true)
@@ -155,6 +114,7 @@ function App() {
       <div className={`${color} h-2 transition-all duration-1000 ease-in-out`} style={{ width: `${Math.min(100, (value / max) * 100)}%` }} />
     </div>
   )
+
 
   return (
     <main className="min-h-screen p-4 sm:p-6 bg-gray-950 text-white font-sans">
