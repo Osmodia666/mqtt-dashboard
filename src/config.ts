@@ -39,18 +39,18 @@ export const topics = [
     statusTopic: 'stat/Doppelsteckdose/POWER',
     publishTopic: 'cmnd/Doppelsteckdose/POWER',
   },
-  //{
-    //label: 'Beleuchtung',
-    //type: 'boolean',
-    //statusTopic: 'stat/Beleuchtung/POWER',
-    //publishTopic: 'cmnd/Beleuchtung/POWER',
-  //},
-//  {
-  //  label: 'Teichpumpe',
-   // type: 'boolean',
-   // statusTopic: 'stat/Teichpumpe/POWER',
-   // publishTopic: 'cmnd/Teichpumpe/POWER',
-  //},
+  {
+    label: 'Beleuchtung',
+    type: 'boolean',
+    statusTopic: 'stat/Beleuchtung/POWER',
+    publishTopic: 'cmnd/Beleuchtung/POWER',
+  },
+  {
+    label: 'Teichpumpe',
+    type: 'boolean',
+    statusTopic: 'stat/Teichpumpe/POWER',
+    publishTopic: 'cmnd/Teichpumpe/POWER',
+  },
   {
     label: 'Poolpumpe',
     type: 'boolean',
