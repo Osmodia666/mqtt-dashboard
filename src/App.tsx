@@ -38,9 +38,13 @@ function App() {
       console.error('MQTT Fehler:', err)
     })
 
-    client.on('message', (topic, message) => {
+      client.on('message', (topic, message) => {
       const payload = message.toString()
-
+      if (topic === 'Pool_temp/temperatur' || topic === 'Gaszaehler/stand') {
+        messageQueue.current[topic] = payload
+        return
+      }
+        
       if (topic === MINMAX_TOPIC) {
         try {
           const incoming = JSON.parse(payload)
