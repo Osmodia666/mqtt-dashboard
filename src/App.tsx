@@ -182,7 +182,7 @@ function App() {
           <h2 className="text-md font-bold mb-2">🎰 Zähler</h2>
           <div className="flex flex-col space-y-3">
             <p>⚡ Strom: {values['tele/Stromzähler/SENSOR.grid.Verbrauch_gesamt'] ?? '...'} kWh</p>
-            <p>🔋 Gesamt: {(() => {
+            <p>🔋 BKW: {(() => {
               const key = 'tele/Balkonkraftwerk/SENSOR.ENERGY.EnergyPTotal.0'
               const raw = values[key]
               const num = parseFloat(raw)
