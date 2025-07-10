@@ -284,7 +284,7 @@ function App() {
             </div>
           )
         })}
-      </div> {
+      </div> 
 
       <div className="mt-10 grid grid-cols-1 sm:grid-cols-3 gap-4">
         {topics.filter(t => t.type === 'group').map(group => (
