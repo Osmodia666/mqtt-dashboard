@@ -236,7 +236,7 @@ function App() {
         </div>
 
         <div className="rounded-xl p-4 border border-gray-600 bg-gray-800">
-          <h2 className="text-md font-bold mb-2">🔌 Doppelsteckdosen</h2>
+          <h2 className="text-md font-bold mb-2">🔌 Steckdosen 1</h2>
           {['Steckdose 1', 'Steckdose 2'].map((label, i) => {
             const topic = topics.find(t => t.label === label)
             if (!topic) return null
@@ -251,6 +251,16 @@ function App() {
               </div>
             )
           })}
+          {/* Hardcoded Doppelsteckdose */}
+          <div className="flex justify-between items-center mt-3">
+            <span>Doppelsteckdose</span>
+            <button
+              className={`px-4 py-1 rounded text-white ${values['stat/Doppelsteckdose/POWER']?.toUpperCase() === 'ON' ? 'bg-green-500' : 'bg-red-500'}`}
+              onClick={() => toggleBoolean('cmnd/Doppelsteckdose/POWER', values['stat/Doppelsteckdose/POWER']?.toUpperCase())}
+            >
+              {values['stat/Doppelsteckdose/POWER']?.toUpperCase() === 'ON' ? 'AN' : 'AUS'}
+            </button>
+          </div>
         </div>
 
         <div className="rounded-xl p-4 border border-gray-600 bg-gray-800">
