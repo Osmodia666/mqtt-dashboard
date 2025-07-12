@@ -340,4 +340,4 @@ function App() {
   )
 }
 
-export
+export default App
