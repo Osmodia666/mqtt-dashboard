@@ -33,12 +33,12 @@ export const topics = [
     statusTopic: 'stat/Steckdose_2/POWER',
     publishTopic: 'cmnd/Steckdose_2/POWER',
   },
-  {
-    label: 'Doppelsteckdose',
-    type: 'boolean',
-    statusTopic: 'stat/Doppelsteckdose/POWER',
-    publishTopic: 'cmnd/Doppelsteckdose/POWER',
-  },
+//  {
+//    label: 'Doppelsteckdose',
+//    type: 'boolean',
+//    statusTopic: 'stat/Doppelsteckdose/POWER',
+//    publishTopic: 'cmnd/Doppelsteckdose/POWER',
+//  },
 //  {
 //    label: 'Beleuchtung',
 //    type: 'boolean',
