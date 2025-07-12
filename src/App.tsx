@@ -77,6 +77,7 @@ function App() {
       }
     })
 
+    // Min/Max Werte lokal berechnen und speichern
     const flush = () => {
       const updates = { ...messageQueue.current }
       messageQueue.current = {}
@@ -84,6 +85,20 @@ function App() {
       if (Object.keys(updates).length > 0) {
         setValues(prev => {
           const updated = { ...prev, ...updates }
+          setMinMax(prevMinMax => {
+            const nextMinMax: MinMax = { ...prevMinMax }
+            for (const [key, val] of Object.entries(updates)) {
+              const num = parseFloat(val)
+              if (!isNaN(num)) {
+                const current = nextMinMax[key] ?? { min: num, max: num }
+                nextMinMax[key] = {
+                  min: Math.min(current.min, num),
+                  max: Math.max(current.max, num),
+                }
+              }
+            }
+            return nextMinMax
+          })
           setLastUpdate(new Date().toLocaleTimeString())
           return updated
         })
@@ -236,7 +251,7 @@ function App() {
         </div>
 
         <div className="rounded-xl p-4 border border-gray-600 bg-gray-800">
-          <h2 className="text-md font-bold mb-2">🔌 Steckdosen 1</h2>
+          <h2 className="text-md font-bold mb-2">🔌 Doppelsteckdosen</h2>
           {['Steckdose 1', 'Steckdose 2'].map((label, i) => {
             const topic = topics.find(t => t.label === label)
             if (!topic) return null
@@ -337,5 +352,3 @@ function App() {
     </main>
   )
 }
-
-export default App
