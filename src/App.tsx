@@ -235,23 +235,42 @@ function App() {
           })()}
         </div>
 
-      <div className="rounded-xl p-4 border border-gray-600 bg-gray-800">
-  <h2 className="text-md font-bold mb-2">🔌 Doppelsteckdosen</h2>
-  {['Steckdose 1', 'Steckdose 2', 'Beleuchtung', 'Teichpumpe'].map((label, i) => {
-    const topic = topics.find(t => t.label === label)
-    if (!topic) return null
-    const val = values[topic.statusTopic]?.toUpperCase()
-    return (
-      <div key={label} className={`flex justify-between items-center ${i > 0 ? 'mt-3' : 'mt-1'}`}>
-        <span>{label}</span>
-        <button className={`px-4 py-1 rounded text-white ${val === 'ON' ? 'bg-green-500' : 'bg-red-500'}`}
-          onClick={() => toggleBoolean(topic.publishTopic!, val)}>
-          {val === 'ON' ? 'AN' : 'AUS'}
-        </button>
-      </div>
-    )
-  })}
-</div>
+        <div className="rounded-xl p-4 border border-gray-600 bg-gray-800">
+          <h2 className="text-md font-bold mb-2">🔌 Doppelsteckdosen</h2>
+          {['Steckdose 1', 'Steckdose 2'].map((label, i) => {
+            const topic = topics.find(t => t.label === label)
+            if (!topic) return null
+            const val = values[topic.statusTopic]?.toUpperCase()
+            return (
+              <div key={label} className={`flex justify-between items-center ${i > 0 ? 'mt-3' : 'mt-1'}`}>
+                <span>{label}</span>
+                <button className={`px-4 py-1 rounded text-white ${val === 'ON' ? 'bg-green-500' : 'bg-red-500'}`}
+                  onClick={() => toggleBoolean(topic.publishTopic!, val)}>
+                  {val === 'ON' ? 'AN' : 'AUS'}
+                </button>
+              </div>
+            )
+          })}
+        </div>
+
+        <div className="rounded-xl p-4 border border-gray-600 bg-gray-800">
+          <h2 className="text-md font-bold mb-2">🔌 Steckdosen 2</h2>
+          {[
+            { label: 'Beleuchtung', publishTopic: 'cmnd/Beleuchtung/POWER', statusTopic: 'stat/Beleuchtung/POWER' },
+            { label: 'Teichpumpe', publishTopic: 'cmnd/Teichpumpe/POWER', statusTopic: 'stat/Teichpumpe/POWER' }
+          ].map(({ label, publishTopic, statusTopic }, i) => {
+            const val = values[statusTopic]?.toUpperCase()
+            return (
+              <div key={label} className={`flex justify-between items-center ${i > 0 ? 'mt-3' : 'mt-1'}`}>
+                <span>{label}</span>
+                <button className={`px-4 py-1 rounded text-white ${val === 'ON' ? 'bg-green-500' : 'bg-red-500'}`}
+                  onClick={() => toggleBoolean(publishTopic, val)}>
+                  {val === 'ON' ? 'AN' : 'AUS'}
+                </button>
+              </div>
+            )
+          })}
+        </div>
 
         {topics.filter(t =>
           t.type !== 'group' &&
@@ -309,4 +328,4 @@ function App() {
   )
 }
 
-export default App
+export
