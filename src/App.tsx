@@ -55,21 +55,6 @@ function App() {
         return
       }
 
-      // Werte aus tele/Stromzähler/SENSOR.grid.* extrahieren
-      if (topic === 'tele/Stromzähler/SENSOR') {
-        try {
-          const json = JSON.parse(payload)
-          if (json.grid) {
-            Object.entries(json.grid).forEach(([key, val]) => {
-              messageQueue.current[`tele/Stromzähler/SENSOR.grid.${key}`] = String(val)
-            })
-          }
-        } catch (err) {
-          console.error('[MQTT] Fehler beim Parsen von grid:', err)
-        }
-        return
-      }
-
       try {
         const json = JSON.parse(payload)
         const flatten = (obj: any, prefix = ''): Record<string, string> =>
@@ -92,6 +77,7 @@ function App() {
       }
     })
 
+    // Min/Max Werte lokal berechnen und speichern
     const flush = () => {
       const updates = { ...messageQueue.current }
       messageQueue.current = {}
@@ -99,6 +85,20 @@ function App() {
       if (Object.keys(updates).length > 0) {
         setValues(prev => {
           const updated = { ...prev, ...updates }
+          setMinMax(prevMinMax => {
+            const nextMinMax: MinMax = { ...prevMinMax }
+            for (const [key, val] of Object.entries(updates)) {
+              const num = parseFloat(val)
+              if (!isNaN(num)) {
+                const current = nextMinMax[key] ?? { min: num, max: num }
+                nextMinMax[key] = {
+                  min: Math.min(current.min, num),
+                  max: Math.max(current.max, num),
+                }
+              }
+            }
+            return nextMinMax
+          })
           setLastUpdate(new Date().toLocaleTimeString())
           return updated
         })
@@ -210,38 +210,48 @@ function App() {
         <div className="rounded-xl p-4 border border-gray-600 bg-gray-800">
           <h2 className="text-md font-bold mb-3">🔋 Strom</h2>
           {(() => {
-            // Werte aus tele/Stromzähler/SENSOR.grid.*
-            const l1 = parseFloat(values['tele/Stromzähler/SENSOR.grid.power_L1'] ?? 'NaN')
-            const l2 = parseFloat(values['tele/Stromzähler/SENSOR.grid.power_L2'] ?? 'NaN')
-            const l3 = parseFloat(values['tele/Stromzähler/SENSOR.grid.power_L3'] ?? 'NaN')
-            const minL1 = minMax['tele/Stromzähler/SENSOR.grid.power_L1']?.min ?? l1
-            const maxL1 = minMax['tele/Stromzähler/SENSOR.grid.power_L1']?.max ?? l1
-            const minL2 = minMax['tele/Stromzähler/SENSOR.grid.power_L2']?.min ?? l2
-            const maxL2 = minMax['tele/Stromzähler/SENSOR.grid.power_L2']?.max ?? l2
-            const minL3 = minMax['tele/Stromzähler/SENSOR.grid.power_L3']?.min ?? l3
-            const maxL3 = minMax['tele/Stromzähler/SENSOR.grid.power_L3']?.max ?? l3
+            const key = 'tele/Stromzähler/SENSOR.grid.Verbrauch_aktuell'
+            const raw = values[key]
+            const num = raw !== undefined ? parseFloat(raw) : NaN
+            const range = minMax[key] ?? { min: num, max: num }
+
+            let color = 'bg-green-500'
+            if (num >= 1000) color = 'bg-red-600'
+            else if (num >= 300) color = 'bg-yellow-400'
 
             return (
               <>
-                <div className="mb-2">
-                  <div className="text-md font-bold">Leistung L1–L3</div>
-                  <div>L1: {isNaN(l1) ? '...' : `${l1} W`}</div>
-                  {progressBar(l1, 2000, 'bg-blue-500')}
-                  <div className="text-xs text-gray-400">Min: {minL1} | Max: {maxL1}</div>
-                  <div>L2: {isNaN(l2) ? '...' : `${l2} W`}</div>
-                  {progressBar(l2, 2000, 'bg-blue-500')}
-                  <div className="text-xs text-gray-400">Min: {minL2} | Max: {maxL2}</div>
-                  <div>L3: {isNaN(l3) ? '...' : `${l3} W`}</div>
-                  {progressBar(l3, 2000, 'bg-blue-500')}
-                  <div className="text-xs text-gray-400">Min: {minL3} | Max: {maxL3}</div>
-                </div>
+                <p className="mt-3">Verbrauch Aktuell: {isNaN(num) ? '...' : `${num} W`}</p>
+                {progressBar(num, range.max > 0 ? range.max : 2000, color)}
+                <p className="text-xs text-gray-400">
+                  Min: {range.min?.toFixed(1)} W | Max: {range.max?.toFixed(1)} W
+                </p>
+              </>
+            )
+          })()}
+          {(() => {
+            const key = 'tele/Balkonkraftwerk/SENSOR.ENERGY.Power.0'
+            const raw = values[key]
+            const num = raw !== undefined ? parseFloat(raw) : NaN
+            const range = minMax[key] ?? { min: num, max: num }
+
+            let color = 'bg-red-600'
+            if (num >= 500) color = 'bg-green-500'
+            else if (num >= 250) color = 'bg-yellow-400'
+            return (
+              <>
+                <p className="mt-3">Erzeugung Aktuell: {isNaN(num) ? '...' : `${num} W`}</p>
+                {progressBar(num, range.max > 0 ? range.max : 1000, color)}
+                <p className="text-xs text-gray-400">
+                  Min: {range.min?.toFixed(1)} W | Max: {range.max?.toFixed(1)} W
+                </p>
               </>
             )
           })()}
         </div>
 
         <div className="rounded-xl p-4 border border-gray-600 bg-gray-800">
-          <h2 className="text-md font-bold mb-2">🔌 Steckdosen 1</h2>
+          <h2 className="text-md font-bold mb-2">🔌 Doppelsteckdosen</h2>
           {['Steckdose 1', 'Steckdose 2'].map((label, i) => {
             const topic = topics.find(t => t.label === label)
             if (!topic) return null
