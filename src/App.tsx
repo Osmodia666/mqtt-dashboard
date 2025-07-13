@@ -15,22 +15,25 @@ function App() {
   const messageQueue = useRef<Record<string, string>>({})
   const clientRef = useRef<any>(null)
 
-  const updateMinMax = (key: string, val: number) => {
-      setMinMax(prev => {
-      const prevVal = prev[key] || { min: val, max: val }
-      const updated = {
-        ...prev,
-        [key]: {
-          min: Math.min(prevVal.min, val),
-          max: Math.max(prevVal.max, val),
-        },
-      }
-      clientRef.current?.publish(MINMAX_TOPIC, JSON.stringify(updated))
-      return updated
-        console.log('[MQTT SEND]', key, updated[key])
-      clientRef.current?.publish(MINMAX_TOPIC, JSON.stringify({ [key]: updated[key] }))
-    })
-  }
+const updateMinMax = (key: string, val: number) => {
+  setMinMax(prev => {
+    const prevVal = prev[key]
+    if (!prevVal) {
+      return { ...prev, [key]: { min: val, max: val } } // kein Publish beim allerersten Mal
+    }
+
+    const newMin = Math.min(prevVal.min, val)
+    const newMax = Math.max(prevVal.max, val)
+
+    if (newMin === prevVal.min && newMax === prevVal.max) return prev // keine Änderung
+
+    const delta = { [key]: { min: newMin, max: newMax } }
+    clientRef.current?.publish(MINMAX_TOPIC, JSON.stringify(delta))
+
+    return { ...prev, ...delta }
+  })
+}
+
 
   useEffect(() => {
     const client = mqtt.connect(mqttConfig.host, {
