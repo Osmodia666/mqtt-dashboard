@@ -16,8 +16,6 @@ function App() {
   const clientRef = useRef<any>(null)
 
   const updateMinMax = (key: string, val: number) => {
-      console.log('[MQTT SEND]', key, updated[key])
-      clientRef.current?.publish(MINMAX_TOPIC, JSON.stringify({ [key]: updated[key] }))
       setMinMax(prev => {
       const prevVal = prev[key] || { min: val, max: val }
       const updated = {
@@ -29,6 +27,8 @@ function App() {
       }
       clientRef.current?.publish(MINMAX_TOPIC, JSON.stringify(updated))
       return updated
+        console.log('[MQTT SEND]', key, updated[key])
+      clientRef.current?.publish(MINMAX_TOPIC, JSON.stringify({ [key]: updated[key] }))
     })
   }
 
