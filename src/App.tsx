@@ -110,11 +110,6 @@ function App() {
     }
   }, [])
 
-  const progressBar = (value: number, max = 100, color = 'bg-blue-500') => (
-    <div className="w-full bg-gray-300 rounded-full h-2 mt-2 overflow-hidden">
-      <div className={`${color} h-2 transition-all duration-1000 ease-in-out`} style={{ width: `${Math.min(100, (value / max) * 100)}%` }} />
-    </div>
-  )
 
   const toggleBoolean = (publishTopic: string, current: string) => {
     const next = current?.toUpperCase() === 'ON' ? 'OFF' : 'ON'
