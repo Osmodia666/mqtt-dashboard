@@ -15,25 +15,20 @@ function App() {
   const messageQueue = useRef<Record<string, string>>({})
   const clientRef = useRef<any>(null)
 
-const updateMinMax = (key: string, val: number) => {
-  setMinMax(prev => {
-    const prevVal = prev[key]
-    if (!prevVal) {
-      return { ...prev, [key]: { min: val, max: val } } // kein Publish beim allerersten Mal
-    }
-
-    const newMin = Math.min(prevVal.min, val)
-    const newMax = Math.max(prevVal.max, val)
-
-    if (newMin === prevVal.min && newMax === prevVal.max) return prev // keine Änderung
-
-    const delta = { [key]: { min: newMin, max: newMax } }
-    clientRef.current?.publish(MINMAX_TOPIC, JSON.stringify(delta))
-
-    return { ...prev, ...delta }
-  })
-}
-
+  const updateMinMax = (key: string, val: number) => {
+    setMinMax(prev => {
+      const prevVal = prev[key] || { min: val, max: val }
+      const updated = {
+        ...prev,
+        [key]: {
+          min: Math.min(prevVal.min, val),
+          max: Math.max(prevVal.max, val),
+        },
+      }
+      clientRef.current?.publish(MINMAX_TOPIC, JSON.stringify(updated))
+      return updated
+    })
+  }
 
   useEffect(() => {
     const client = mqtt.connect(mqttConfig.host, {
@@ -114,6 +109,12 @@ const updateMinMax = (key: string, val: number) => {
       client.end(true)
     }
   }, [])
+
+  const progressBar = (value: number, max = 100, color = 'bg-blue-500') => (
+    <div className="w-full bg-gray-300 rounded-full h-2 mt-2 overflow-hidden">
+      <div className={`${color} h-2 transition-all duration-1000 ease-in-out`} style={{ width: `${Math.min(100, (value / max) * 100)}%` }} />
+    </div>
+  )
 
   const toggleBoolean = (publishTopic: string, current: string) => {
     const next = current?.toUpperCase() === 'ON' ? 'OFF' : 'ON'
