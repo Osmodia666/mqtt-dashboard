@@ -6,6 +6,7 @@ import { mqttConfig, topics } from './config'
 type MinMax = Record<string, { min: number; max: number }>
 const MINMAX_TOPIC = 'dashboard/minmax/update'
 const REQUEST_TOPIC = 'dashboard/minmax/request'
+const INFLUX_TOPIC = 'influx/data'
 
 function App() {
   const [values, setValues] = useState<Record<string, string>>({})
@@ -44,8 +45,7 @@ function App() {
         messageQueue.current[topic] = payload
         return
       }
-        
-      // MinMax nur aus MQTT übernehmen!
+
       if (topic === MINMAX_TOPIC) {
         try {
           const incoming = JSON.parse(payload)
@@ -78,21 +78,51 @@ function App() {
       }
     })
 
-    // Flush: Nur Werte aktualisieren, MinMax kommt aus MQTT!
     const flush = () => {
       const updates = { ...messageQueue.current }
       messageQueue.current = {}
+      if (Object.keys(updates).length === 0) return
 
-      if (Object.keys(updates).length > 0) {
-        setValues(prev => {
-          const updated = { ...prev, ...updates }
-          setLastUpdate(new Date().toLocaleTimeString())
-          return updated
-        })
+      const updated = { ...values, ...updates }
+      const nextMinMax: MinMax = { ...minMax }
+      const influxPayload: Record<string, number> = {}
+
+      for (const [key, val] of Object.entries(updates)) {
+        const num = parseFloat(val)
+        if (!isNaN(num)) {
+          influxPayload[key] = num
+
+          if (
+            key.includes('power_L') ||
+            key.includes('Verbrauch_aktuell') ||
+            key === 'Pool_temp/temperatur' ||
+            key.includes('Balkonkraftwerk') ||
+            key.includes('Voltage') ||
+            key.includes('Strom_L')
+          ) {
+            const current = nextMinMax[key] ?? { min: num, max: num }
+            nextMinMax[key] = {
+              min: Math.min(current.min, num),
+              max: Math.max(current.max, num),
+            }
+          }
+        }
+      }
+
+      setValues(updated)
+      setMinMax(nextMinMax)
+      setLastUpdate(new Date().toLocaleTimeString())
+
+      if (Object.keys(influxPayload).length > 0) {
+        client.publish(INFLUX_TOPIC, JSON.stringify(influxPayload))
+      }
+
+      if (Object.keys(nextMinMax).length > 0) {
+        client.publish(MINMAX_TOPIC, JSON.stringify(nextMinMax))
       }
     }
 
-    const interval = setInterval(flush, 300)
+    const interval = setInterval(flush, 10000)
     return () => {
       clearInterval(interval)
       client.end(true)
