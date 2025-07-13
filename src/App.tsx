@@ -1,5 +1,4 @@
-// Patch: Verbesserter Balken + MQTT Min/Max Sync
-
+// src/App.tsx
 import { useEffect, useState, useRef } from 'react'
 import mqtt from 'mqtt'
 import { mqttConfig, topics } from './config'
@@ -14,21 +13,6 @@ function App() {
   const [minMax, setMinMax] = useState<MinMax>({})
   const messageQueue = useRef<Record<string, string>>({})
   const clientRef = useRef<any>(null)
-
-  const updateMinMax = (key: string, val: number) => {
-    setMinMax(prev => {
-      const prevVal = prev[key] || { min: val, max: val }
-      const updated = {
-        ...prev,
-        [key]: {
-          min: Math.min(prevVal.min, val),
-          max: Math.max(prevVal.max, val),
-        },
-      }
-      clientRef.current?.publish(MINMAX_TOPIC, JSON.stringify(updated))
-      return updated
-    })
-  }
 
   useEffect(() => {
     const client = mqtt.connect(mqttConfig.host, {
@@ -50,12 +34,18 @@ function App() {
       })
     })
 
+    client.on('error', (err) => {
+      console.error('MQTT Fehler:', err)
+    })
+
     client.on('message', (topic, message) => {
       const payload = message.toString()
       if (topic === 'Pool_temp/temperatur' || topic === 'Gaszaehler/stand') {
         messageQueue.current[topic] = payload
         return
       }
+        
+      // MinMax nur aus MQTT übernehmen!
       if (topic === MINMAX_TOPIC) {
         try {
           const incoming = JSON.parse(payload)
@@ -65,6 +55,7 @@ function App() {
         }
         return
       }
+
       try {
         const json = JSON.parse(payload)
         const flatten = (obj: any, prefix = ''): Record<string, string> =>
@@ -79,13 +70,15 @@ function App() {
           }, {})
         const flat = flatten(json)
         for (const [key, val] of Object.entries(flat)) {
-          messageQueue.current[`${topic}.${key}`] = val
+          const combinedKey = `${topic}.${key}`
+          messageQueue.current[combinedKey] = val
         }
       } catch {
         messageQueue.current[topic] = payload
       }
     })
 
+    // Flush: Nur Werte aktualisieren, MinMax kommt aus MQTT!
     const flush = () => {
       const updates = { ...messageQueue.current }
       messageQueue.current = {}
@@ -93,10 +86,6 @@ function App() {
       if (Object.keys(updates).length > 0) {
         setValues(prev => {
           const updated = { ...prev, ...updates }
-          for (const [key, val] of Object.entries(updates)) {
-            const num = parseFloat(val)
-            if (!isNaN(num)) updateMinMax(key, num)
-          }
           setLastUpdate(new Date().toLocaleTimeString())
           return updated
         })
@@ -109,7 +98,6 @@ function App() {
       client.end(true)
     }
   }, [])
-
 
   const toggleBoolean = (publishTopic: string, current: string) => {
     const next = current?.toUpperCase() === 'ON' ? 'OFF' : 'ON'
