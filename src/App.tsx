@@ -35,7 +35,7 @@ function App() {
         'Pool_temp/temperatur',
         'tele/Stromzähler/SENSOR.grid.Verbrauch_aktuell',
         'tele/Balkonkraftwerk/SENSOR.ENERGY.Power.0',
-        'tele/Stromzähler.Verbrauch_aktuell';
+        'tele/Stromzähler.Verbrauch_aktuell',
         // Hier weitere Keys ergänzen...
       ]
 
