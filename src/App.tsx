@@ -9,11 +9,54 @@ const REQUEST_TOPIC = 'dashboard/minmax/request'
 
 function App() {
   const [values, setValues] = useState<Record<string, string>>({})
-  const [lastUpdate, setLastUpdate] = useState('')
   const [minMax, setMinMax] = useState<MinMax>({})
-  const messageQueue = useRef<Record<string, string>>({})
+  const [lastUpdate, setLastUpdate] = useState('')
   const clientRef = useRef<any>(null)
+  const messageQueue = useRef<Record<string, string>>({})
 
+  // Funktion, um einen ioBroker HTTP-Adapter Endpunkt auszulesen
+  async function getPlainValue(dpId: string): Promise<number | null> {
+    try {
+      const response = await fetch(`cyberdyne.chickenkiller.com:8087/getPlainValue/${dpId}`)
+      if (!response.ok) return null
+      const text = await response.text()
+      const num = parseFloat(text)
+      return isNaN(num) ? null : num
+    } catch {
+      return null
+    }
+  }
+
+  // MinMax via HTTP beim Laden holen
+  useEffect(() => {
+    async function fetchMinMaxAll() {
+      // Liste mit Keys, die du brauchst (passe an!)
+      const keys = [
+        'Pool_temp/temperatur',
+        'tele/Stromzähler/SENSOR.grid.Verbrauch_aktuell',
+        'tele/Balkonkraftwerk/SENSOR.ENERGY.Power.0',
+        'tele/Stromzähler.Verbrauch_aktuell';
+        // Hier weitere Keys ergänzen...
+      ]
+
+      const newMinMax: MinMax = {}
+
+      for (const key of keys) {
+        // ioBroker-Datenpunktnamen mit _ statt /
+        const basePath = `0_userdata.0.MinMax.${key.replace(/\//g, '_')}`
+        const min = await getPlainValue(`${basePath}.min`)
+        const max = await getPlainValue(`${basePath}.max`)
+        if (min !== null && max !== null) {
+          newMinMax[key] = { min, max }
+        }
+      }
+      setMinMax(newMinMax)
+    }
+
+    fetchMinMaxAll()
+  }, []) // nur einmal beim Start
+
+  // MQTT-Verbindung und Message Handling
   useEffect(() => {
     const client = mqtt.connect(mqttConfig.host, {
       username: mqttConfig.username,
@@ -40,12 +83,19 @@ function App() {
 
     client.on('message', (topic, message) => {
       const payload = message.toString()
+
+      // Pool Temp und Gaszähler sofort ins UI übernehmen
       if (topic === 'Pool_temp/temperatur' || topic === 'Gaszaehler/stand') {
         messageQueue.current[topic] = payload
+        setValues(prev => {
+          const updated = { ...prev, [topic]: payload }
+          setLastUpdate(new Date().toLocaleTimeString())
+          return updated
+        })
         return
       }
-        
-      // MinMax nur aus MQTT übernehmen!
+
+      // MinMax-Update per MQTT
       if (topic === MINMAX_TOPIC) {
         try {
           const incoming = JSON.parse(payload)
@@ -56,6 +106,7 @@ function App() {
         return
       }
 
+      // Alle anderen Topics: JSON flatten & in messageQueue sammeln
       try {
         const json = JSON.parse(payload)
         const flatten = (obj: any, prefix = ''): Record<string, string> =>
@@ -78,7 +129,7 @@ function App() {
       }
     })
 
-    // Flush: Nur Werte aktualisieren, MinMax kommt aus MQTT!
+    // Flush Funktion um messageQueue in State zu übertragen
     const flush = () => {
       const updates = { ...messageQueue.current }
       messageQueue.current = {}
@@ -99,6 +150,7 @@ function App() {
     }
   }, [])
 
+  // Umschalten für Boolean Werte via MQTT
   const toggleBoolean = (publishTopic: string, current: string) => {
     const next = current?.toUpperCase() === 'ON' ? 'OFF' : 'ON'
     setValues(prev => ({
@@ -108,6 +160,7 @@ function App() {
     clientRef.current?.publish(publishTopic, next)
   }
 
+  // Farbwahl für Progress Bars
   const getBarColor = (label: string, value: number) => {
     if (label.includes('Verbrauch aktuell')) {
       if (value >= 1000) return 'bg-red-600'
@@ -123,17 +176,20 @@ function App() {
     return 'bg-blue-500'
   }
 
+  // Fortschrittsbalken UI-Komponente
   const progressBar = (value: number, max = 100, color = 'bg-blue-500') => (
     <div className="w-full bg-gray-300 rounded-full h-2 mt-2 overflow-hidden">
       <div className={`${color} h-2 transition-all duration-1000 ease-in-out`} style={{ width: `${Math.min(100, (value / max) * 100)}%` }} />
     </div>
   )
 
+  // === UI ===
   return (
     <main className="min-h-screen p-4 sm:p-6 bg-gray-950 text-white font-sans">
       <header className="mb-6 text-sm text-gray-400">Letztes Update: {lastUpdate || 'Lade...'}</header>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+        {/* 3D-Drucker */}
         <div className="rounded-xl p-4 border border-gray-600 bg-gray-800">
           <h2 className="text-md font-bold mb-2">🧱 3D-Drucker</h2>
           {['Ender 3 Pro', 'Sidewinder X1'].map((label, i) => {
@@ -152,6 +208,7 @@ function App() {
           })}
         </div>
 
+        {/* Pool */}
         <div className="rounded-xl p-4 border border-gray-600 bg-gray-800">
           <h2 className="text-md font-bold mb-2">🏊 Pool</h2>
           {(() => {
@@ -180,6 +237,7 @@ function App() {
           })()}
         </div>
 
+        {/* Zähler */}
         <div className="rounded-xl p-4 border border-gray-600 bg-gray-800">
           <h2 className="text-md font-bold mb-2">🎰 Zähler</h2>
           <div className="flex flex-col space-y-3">
@@ -194,6 +252,7 @@ function App() {
           </div>
         </div>
 
+        {/* Strom Verbrauch & Erzeugung mit MinMax */}
         <div className="rounded-xl p-4 border border-gray-600 bg-gray-800">
           <h2 className="text-md font-bold mb-3">🔋 Strom</h2>
           {(() => {
@@ -237,6 +296,7 @@ function App() {
           })()}
         </div>
 
+        {/* Steckdosen 1 */}
         <div className="rounded-xl p-4 border border-gray-600 bg-gray-800">
           <h2 className="text-md font-bold mb-2">🔌 Steckdosen 1</h2>
           {['Steckdose 1', 'Steckdose 2'].map((label, i) => {
@@ -265,6 +325,7 @@ function App() {
           </div>
         </div>
 
+        {/* Steckdosen 2 */}
         <div className="rounded-xl p-4 border border-gray-600 bg-gray-800">
           <h2 className="text-md font-bold mb-2">🔌 Steckdosen 2</h2>
           {[
@@ -284,6 +345,7 @@ function App() {
           })}
         </div>
 
+        {/* Weitere Topics außer Gruppen */}
         {topics.filter(t =>
           t.type !== 'group' &&
           !['Ender 3 Pro', 'Sidewinder X1', 'Poolpumpe', 'Steckdose 1', 'Steckdose 2'].includes(t.label)
@@ -307,34 +369,14 @@ function App() {
               {isNumber && (
                 <>
                   <p className="text-2xl">{raw ?? '...'} {unit}</p>
-                  {showMinMax && progressBar(num, range.max > 0 ? range.max : 100, barColor)}
-                  {showMinMax && <p className="text-xs text-gray-400">Min: {range.min.toFixed(1)} {unit} | Max: {range.max.toFixed(1)} {unit}</p>}
+                  {showMinMax && progressBar(num, range.max > 0 ? range.max : num * 2, barColor)}
+                  {showMinMax && <p className="text-xs text-gray-400">Min: {range.min?.toFixed(1)} | Max: {range.max?.toFixed(1)}</p>}
                 </>
               )}
-              {type === 'string' && <p className="text-lg">{raw ?? '...'}</p>}
+              {!isNumber && type !== 'boolean' && <p>{raw ?? '...'}</p>}
             </div>
           )
         })}
-      </div> 
-
-      <div className="mt-10 grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {topics.filter(t => t.type === 'group').map(group => (
-          <div key={group.label} className="rounded-xl p-4 border border-gray-600 bg-gray-800">
-            <h2 className="text-lg font-bold mb-2">{group.label}</h2>
-            {group.keys?.map(({ label, key }) => {
-              const raw = values[key]
-              const num = raw !== undefined ? parseFloat(raw) : NaN
-              const range = minMax[key] ?? { min: num, max: num }
-              return (
-                <div key={key} className="mb-2">
-                  <div className="text-sm">{label}: {isNaN(num) ? '...' : `${num} ${group.unit}`}</div>
-                  {progressBar(num, group.label.includes('Spannung') ? 250 : 1000, 'bg-blue-500')}
-                  <div className="text-xs text-gray-400">Min: {range.min?.toFixed(1)} | Max: {range.max?.toFixed(1)}</div>
-                </div>
-              )
-            })}
-          </div>
-        ))}
       </div>
     </main>
   )
