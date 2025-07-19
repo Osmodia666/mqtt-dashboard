@@ -15,6 +15,27 @@ function App() {
   const clientRef = useRef<any>(null)
 
   useEffect(() => {
+  async function fetchMinMax() {
+    const keys = Object.keys(values) // Oder bekannte Keys, z.B. Pool_temp etc.
+    const newMinMax: MinMax = {}
+
+    for (const key of keys) {
+      try {
+        const minRes = await fetch(`http://deine-ip:8087/getPlainValue/0_userdata.0.MinMax.${key}.min`)
+        const maxRes = await fetch(`http://deine-ip:8087/getPlainValue/0_userdata.0.MinMax.${key}.max`)
+        const min = parseFloat(await minRes.text())
+        const max = parseFloat(await maxRes.text())
+        if (!isNaN(min) && !isNaN(max)) newMinMax[key] = { min, max }
+      } catch(e) {
+        // Fehlerbehandlung
+      }
+    }
+    setMinMax(newMinMax)
+  }
+
+  fetchMinMax()
+}, [values]) // oder nur beim Laden, je nach Logik
+
     const client = mqtt.connect(mqttConfig.host, {
       username: mqttConfig.username,
       password: mqttConfig.password,
