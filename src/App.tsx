@@ -40,11 +40,17 @@ function App() {
 
     client.on('message', (topic, message) => {
       const payload = message.toString()
+
+      // Separat: Pool Temp & Gaszähler sofort ins UI übernehmen
       if (topic === 'Pool_temp/temperatur' || topic === 'Gaszaehler/stand') {
         messageQueue.current[topic] = payload
+        setValues(prev => {
+          const updated = { ...prev, [topic]: payload }
+          setLastUpdate(new Date().toLocaleTimeString())
+          return updated
+        })
         return
       }
-        
       // MinMax nur aus MQTT übernehmen!
       if (topic === MINMAX_TOPIC) {
         try {
@@ -98,7 +104,6 @@ function App() {
       client.end(true)
     }
   }, [])
-
   const toggleBoolean = (publishTopic: string, current: string) => {
     const next = current?.toUpperCase() === 'ON' ? 'OFF' : 'ON'
     setValues(prev => ({
@@ -128,7 +133,6 @@ function App() {
       <div className={`${color} h-2 transition-all duration-1000 ease-in-out`} style={{ width: `${Math.min(100, (value / max) * 100)}%` }} />
     </div>
   )
-
   return (
     <main className="min-h-screen p-4 sm:p-6 bg-gray-950 text-white font-sans">
       <header className="mb-6 text-sm text-gray-400">Letztes Update: {lastUpdate || 'Lade...'}</header>
@@ -194,6 +198,7 @@ function App() {
           </div>
         </div>
 
+   
         <div className="rounded-xl p-4 border border-gray-600 bg-gray-800">
           <h2 className="text-md font-bold mb-3">🔋 Strom</h2>
           {(() => {
