@@ -40,7 +40,7 @@ function App() {
 
     client.on('message', (topic, message) => {
       const payload = message.toString()
-      if (topic === 'Pool_temp.temperatur' || topic === 'Gaszaehler.stand') {
+      if (topic === 'Pool_temp/temperatur' || topic === 'Gaszaehler/stand') {
         messageQueue.current[topic] = payload
         return
       }
@@ -159,7 +159,7 @@ function App() {
           <h2 className="text-md font-bold mb-2">🏊 Pool</h2>
           {(() => {
             const pumpe = topics.find(t => t.label === 'Poolpumpe')
-            const tempKey = 'Pool_temp.temperatur'
+            const tempKey = 'Pool_temp/temperatur'
             const raw = values[tempKey]
             const val = raw !== undefined ? parseFloat(raw) : NaN
             const range = minMax[tempKey] ?? { min: val, max: val }
