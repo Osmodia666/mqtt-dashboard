@@ -50,10 +50,8 @@ function App() {
         try {
           const incoming = JSON.parse(payload)
           setMinMax(incoming)
-          console.log('[MQTT] MinMax Payload:', incoming)
         } catch (err) {
           console.error('[MQTT] Fehler beim MinMax-Update:', err)
-        
         }
         return
       }
@@ -161,8 +159,8 @@ function App() {
             const tempKey = 'Pool_temp/temperatur'
             const raw = values[tempKey]
             const val = raw !== undefined ? parseFloat(raw) : NaN
-           console.log('Checking minMax for', tempKey, '→', minMax[tempKey])
-            const range = (minMax && minMax[tempKey]) || { min: val, max: val }
+            const range = minMax[tempKey] ?? { min: val, max: val }
+
             return (
               <>
                 <div className="flex justify-between items-center">
