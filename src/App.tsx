@@ -163,6 +163,7 @@ function App() {
             const raw = values[tempKey]
             const val = raw !== undefined ? parseFloat(raw) : NaN
             console.log('Key in minMax?', tempKey, tempKey in minMax)
+            console.log('Erhaltenes minMax:', minMax)
             const range = minMax[tempKey] ?? { min: val, max: val }
 
             return (
