@@ -50,8 +50,10 @@ function App() {
         try {
           const incoming = JSON.parse(payload)
           setMinMax(incoming)
+          console.log('[MQTT] MinMax Payload:', incoming)
         } catch (err) {
           console.error('[MQTT] Fehler beim MinMax-Update:', err)
+        
         }
         return
       }
