@@ -46,15 +46,18 @@ function App() {
       }
         
       // MinMax nur aus MQTT übernehmen!
-      if (topic === MINMAX_TOPIC) {
-        try {
-          const incoming = JSON.parse(payload)
-          setMinMax(incoming)
-        } catch (err) {
-          console.error('[MQTT] Fehler beim MinMax-Update:', err)
-        }
-        return
-      }
+  if (topic === MINMAX_TOPIC) {
+  try {
+    const incoming = JSON.parse(payload)
+    const safeData = (typeof incoming === 'object' && incoming !== null) ? incoming : {}
+    console.log('[MQTT] MinMax Payload (sicher):', safeData)
+    setMinMax(safeData)
+  } catch (err) {
+    console.error('[MQTT] Fehler beim MinMax-Update:', err)
+  }
+  return
+}
+
 
       try {
         const json = JSON.parse(payload)
