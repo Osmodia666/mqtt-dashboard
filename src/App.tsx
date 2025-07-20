@@ -162,6 +162,7 @@ function App() {
             const tempKey = 'Pool_temp/temperatur'
             const raw = values[tempKey]
             const val = raw !== undefined ? parseFloat(raw) : NaN
+            console.log('Key in minMax?', tempKey, tempKey in minMax)
             const range = minMax[tempKey] ?? { min: val, max: val }
 
             return (
