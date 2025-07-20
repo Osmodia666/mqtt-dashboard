@@ -159,8 +159,8 @@ function App() {
             const tempKey = 'Pool_temp/temperatur'
             const raw = values[tempKey]
             const val = raw !== undefined ? parseFloat(raw) : NaN
-            const range = minMax[tempKey] ?? { min: val, max: val }
-
+           console.log('Checking minMax for', tempKey, '→', minMax[tempKey])
+            const range = minMax[tempKey] || { min: val, max: val }
             return (
               <>
                 <div className="flex justify-between items-center">
