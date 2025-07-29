@@ -40,24 +40,18 @@ function App() {
 
     client.on('message', (topic, message) => {
       const payload = message.toString()
-      if (topic === 'Pool_temp/temperatur' || topic === 'Gaszaehler/stand') {
-        messageQueue.current[topic] = payload
+
+      if (topic === MINMAX_TOPIC) {
+        try {
+          const incoming = JSON.parse(payload)
+          const safeData = (typeof incoming === 'object' && incoming !== null) ? incoming : {}
+          console.log('[MQTT] MinMax Payload (sicher):', safeData)
+          setMinMax(safeData)
+        } catch (err) {
+          console.error('[MQTT] Fehler beim MinMax-Update:', err)
+        }
         return
       }
-        
-      // MinMax nur aus MQTT übernehmen!
-  if (topic === MINMAX_TOPIC) {
-  try {
-    const incoming = JSON.parse(payload)
-    const safeData = (typeof incoming === 'object' && incoming !== null) ? incoming : {}
-    console.log('[MQTT] MinMax Payload (sicher):', safeData)
-    setMinMax(safeData)
-  } catch (err) {
-    console.error('[MQTT] Fehler beim MinMax-Update:', err)
-  }
-  return
-}
-
 
       try {
         const json = JSON.parse(payload)
@@ -81,7 +75,6 @@ function App() {
       }
     })
 
-    // Flush: Nur Werte aktualisieren, MinMax kommt aus MQTT!
     const flush = () => {
       const updates = { ...messageQueue.current }
       messageQueue.current = {}
