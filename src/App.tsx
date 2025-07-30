@@ -36,7 +36,13 @@ useEffect(() => {
         client.publish(`cmnd/${base}/state`, '')
       }
     })
-  })
+  }) // 👈 Das fehlte!
+
+  return () => {
+    if (clientRef.current) clientRef.current.end(true)
+  }
+}, [])
+
 
   return () => {
     if (clientRef.current) clientRef.current.end()
