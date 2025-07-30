@@ -37,7 +37,12 @@ useEffect(() => {
       }
     })
   })
-  })
+
+  return () => {
+    if (clientRef.current) clientRef.current.end()
+  }
+}, [])
+
 
   return () => {
     if (clientRef.current) clientRef.current.end()
