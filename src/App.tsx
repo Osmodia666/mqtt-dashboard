@@ -41,9 +41,7 @@ useEffect(() => {
   return () => {
     if (clientRef.current) clientRef.current.end()
   }
-}, [])
-
-
+}
     client.on('error', (err) => {
       console.error('MQTT Fehler:', err)
     })
