@@ -14,25 +14,35 @@ function App() {
   const messageQueue = useRef<Record<string, string>>({})
   const clientRef = useRef<any>(null)
 
-  useEffect(() => {
-    const client = mqtt.connect(mqttConfig.host, {
-      username: mqttConfig.username,
-      password: mqttConfig.password,
-    })
-    clientRef.current = client
+useEffect(() => {
+  const client = mqtt.connect(mqttConfig.host, {
+    username: mqttConfig.username,
+    password: mqttConfig.password,
+  })
+  clientRef.current = client
 
-    client.on('connect', () => {
-      client.publish(REQUEST_TOPIC, '')
-      const allTopics = topics.map(t => t.statusTopic || t.topic).filter(Boolean)
-      client.subscribe([...allTopics, '#', MINMAX_TOPIC])
-      topics.forEach(({ publishTopic }) => {
-        if (publishTopic?.includes('/POWER')) client.publish(publishTopic, '')
-        if (publishTopic) {
-          const base = publishTopic.split('/')[1]
-          client.publish(`cmnd/${base}/state`, '')
-        }
-      })
+  client.on('connect', () => {
+    // Min/Max-Request mit sich änderndem Payload (z. B. Timestamp)
+    client.publish(REQUEST_TOPIC, String(Date.now()), { qos: 0, retain: false })
+    console.log('[MQTT] MinMax request published')
+
+    const allTopics = topics.map(t => t.statusTopic || t.topic).filter(Boolean)
+    client.subscribe([...allTopics, '#', MINMAX_TOPIC])
+
+    topics.forEach(({ publishTopic }) => {
+      if (publishTopic?.includes('/POWER')) client.publish(publishTopic, '')
+      if (publishTopic) {
+        const base = publishTopic.split('/')[1]
+        client.publish(`cmnd/${base}/state`, '')
+      }
     })
+  })
+
+  return () => {
+    if (clientRef.current) clientRef.current.end()
+  }
+}, [])
+
 
     client.on('error', (err) => {
       console.error('MQTT Fehler:', err)
