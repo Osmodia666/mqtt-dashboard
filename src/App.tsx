@@ -22,7 +22,7 @@ useEffect(() => {
   clientRef.current = client
 
   client.on('connect', () => {
-    // Min/Max-Request mit sich änderndem Payload (z. B. Timestamp)
+    // Min/Max-Request mit eindeutiger Payload (Timestamp)
     client.publish(REQUEST_TOPIC, String(Date.now()), { qos: 0, retain: false })
     console.log('[MQTT] MinMax request published')
 
@@ -36,13 +36,12 @@ useEffect(() => {
         client.publish(`cmnd/${base}/state`, '')
       }
     })
-  }) // 👈 Das fehlte!
+  })
 
   return () => {
-    if (clientRef.current) clientRef.current.end(true)
+    if (clientRef.current) clientRef.current.end()
   }
 }, [])
-
 
   return () => {
     if (clientRef.current) clientRef.current.end()
