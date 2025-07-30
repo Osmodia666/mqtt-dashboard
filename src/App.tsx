@@ -41,17 +41,29 @@ function App() {
     client.on('message', (topic, message) => {
       const payload = message.toString()
 
-      if (topic === MINMAX_TOPIC) {
-        try {
-          const incoming = JSON.parse(payload)
-          const safeData = (typeof incoming === 'object' && incoming !== null) ? incoming : {}
-          console.log('[MQTT] MinMax Payload (sicher):', safeData)
-          setMinMax(safeData)
-        } catch (err) {
-          console.error('[MQTT] Fehler beim MinMax-Update:', err)
+      // NEU: in client.on('message', ...)
+if (topic === MINMAX_TOPIC) {
+  try {
+    const incoming = JSON.parse(payload)
+    const flatten = (obj: any, prefix = ''): Record<string, { min: number; max: number }> =>
+      Object.entries(obj).reduce((acc, [key, val]) => {
+        const newKey = prefix ? `${prefix}.${key}` : key
+        if (typeof val === 'object' && val !== null && 'min' in val && 'max' in val) {
+          acc[newKey] = val
+        } else if (typeof val === 'object' && val !== null) {
+          Object.assign(acc, flatten(val, newKey))
         }
-        return
-      }
+        return acc
+      }, {})
+    const flat = flatten(incoming)
+    console.log('[MQTT] MinMax flatten:', flat)
+    setMinMax(flat)
+  } catch (err) {
+    console.error('[MQTT] Fehler beim MinMax-Update:', err)
+  }
+  return
+}
+
 
       try {
         const json = JSON.parse(payload)
