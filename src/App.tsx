@@ -22,7 +22,6 @@ useEffect(() => {
   clientRef.current = client
 
   client.on('connect', () => {
-    // Min/Max-Request mit eindeutiger Payload (Timestamp)
     client.publish(REQUEST_TOPIC, String(Date.now()), { qos: 0, retain: false })
     console.log('[MQTT] MinMax request published')
 
@@ -38,20 +37,37 @@ useEffect(() => {
     })
   })
 
+  client.on('error', (err) => {
+    console.error('MQTT Fehler:', err)
+  })
+
+  client.on('message', (topic, message) => {
+    const payload = message.toString()
+    if (topic === 'Pool_temp/temperatur' || topic === 'Gaszaehler/stand') {
+      messageQueue.current[topic] = payload
+      return
+    }
+
+    if (topic === MINMAX_TOPIC) {
+      try {
+        const json = JSON.parse(payload)
+        setMinMax(json)
+        console.log('[MQTT] MinMax Payload (sicher):', json)
+      } catch (err) {
+        console.warn('[MQTT] Fehlerhaftes MinMax-JSON:', payload)
+      }
+      return
+    }
+
+    setValues(prev => ({ ...prev, [topic]: payload }))
+    setLastUpdate(new Date().toLocaleString())
+  })
+
   return () => {
     if (clientRef.current) clientRef.current.end()
   }
-}
-    client.on('error', (err) => {
-      console.error('MQTT Fehler:', err)
-    })
+}, [])
 
-    client.on('message', (topic, message) => {
-      const payload = message.toString()
-      if (topic === 'Pool_temp/temperatur' || topic === 'Gaszaehler/stand') {
-        messageQueue.current[topic] = payload
-        return
-      }
         
       // MinMax nur aus MQTT übernehmen!
   // NEU: in client.on('message', ...)
