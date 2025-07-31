@@ -14,109 +14,83 @@ function App() {
   const messageQueue = useRef<Record<string, string>>({})
   const clientRef = useRef<any>(null)
 
-useEffect(() => {
-  const client = mqtt.connect(mqttConfig.host, {
-    username: mqttConfig.username,
-    password: mqttConfig.password,
-  })
-
-  clientRef.current = client
-
-  client.on('connect', () => {
-    console.log('[MQTT] Verbunden')
-    client.publish(REQUEST_TOPIC, String(Date.now()), { qos: 0, retain: false })
-    console.log('[MQTT] MinMax request published')
-
-    const allTopics = topics.map(t => t.statusTopic || t.topic).filter(Boolean)
-    client.subscribe([...allTopics, MINMAX_TOPIC])
-
-    topics.forEach(({ publishTopic }) => {
-      if (publishTopic?.includes('/POWER')) client.publish(publishTopic, '')
-      if (publishTopic) {
-        const base = publishTopic.split('/')[1]
-        client.publish(`cmnd/${base}/state`, '')
-      }
+  useEffect(() => {
+    const client = mqtt.connect(mqttConfig.host, {
+      username: mqttConfig.username,
+      password: mqttConfig.password,
     })
-  })
 
-  client.on('error', (err) => {
-    console.error('MQTT Fehler:', err)
-  })
+    clientRef.current = client
 
+    client.on('connect', () => {
+      console.log('[MQTT] Verbunden')
+      client.publish(REQUEST_TOPIC, String(Date.now()), { qos: 0, retain: false })
+      console.log('[MQTT] MinMax request published')
 
-  client.on('message', (topic, message) => {
-    const payload = message.toString()
-    if (topic === 'Pool_temp/temperatur' || topic === 'Gaszaehler/stand') {
-      messageQueue.current[topic] = payload
-      return
-    }
+      const allTopics = topics.map(t => t.statusTopic || t.topic).filter(Boolean)
+      client.subscribe([...allTopics, MINMAX_TOPIC])
 
-    if (topic === MINMAX_TOPIC) {
+      topics.forEach(({ publishTopic }) => {
+        if (publishTopic?.includes('/POWER')) client.publish(publishTopic, '')
+        if (publishTopic) {
+          const base = publishTopic.split('/')[1]
+          client.publish(`cmnd/${base}/state`, '')
+        }
+      })
+    })
+
+    client.on('error', (err) => {
+      console.error('MQTT Fehler:', err)
+    })
+
+    client.on('message', (topic, message) => {
+      const payload = message.toString()
+
+      if (topic === MINMAX_TOPIC) {
+        try {
+          const incoming = JSON.parse(payload)
+          const flatten = (obj: any, prefix = ''): Record<string, { min: number; max: number }> =>
+            Object.entries(obj).reduce((acc, [key, val]) => {
+              const newKey = prefix ? `${prefix}.${key}` : key
+              if (typeof val === 'object' && val !== null && 'min' in val && 'max' in val) {
+                acc[newKey] = val
+              } else if (typeof val === 'object' && val !== null) {
+                Object.assign(acc, flatten(val, newKey))
+              }
+              return acc
+            }, {})
+          const flat = flatten(incoming)
+          console.log('[MQTT] MinMax flatten:', flat)
+          setMinMax(flat)
+        } catch (err) {
+          console.error('[MQTT] Fehler beim MinMax-Update:', err)
+        }
+        return
+      }
+
       try {
         const json = JSON.parse(payload)
-        setMinMax(json)
-        console.log('[MQTT] MinMax Payload (sicher):', json)
-      } catch (err) {
-        console.warn('[MQTT] Fehlerhaftes MinMax-JSON:', payload)
-      }
-      return
-    }
-
-    setValues(prev => ({ ...prev, [topic]: payload }))
-    setLastUpdate(new Date().toLocaleString())
-  })
-
-  return () => {
-    if (clientRef.current) clientRef.current.end()
-  }
-}, [])
-
-if (topic === MINMAX_TOPIC) {
-      try {
-        const incoming = JSON.parse(payload)
-        const flatten = (obj: any, prefix = ''): Record<string, { min: number; max: number }> =>
+        const flatten = (obj: any, prefix = ''): Record<string, string> =>
           Object.entries(obj).reduce((acc, [key, val]) => {
             const newKey = prefix ? `${prefix}.${key}` : key
-            if (typeof val === 'object' && val !== null && 'min' in val && 'max' in val) {
-              acc[newKey] = val
-            } else if (typeof val === 'object' && val !== null) {
+            if (typeof val === 'object' && val !== null) {
               Object.assign(acc, flatten(val, newKey))
+            } else {
+              acc[newKey] = String(val)
             }
             return acc
           }, {})
-        const flat = flatten(incoming)
-        console.log('[MQTT] MinMax flatten:', flat)
-        setMinMax(flat)
-      } catch (err) {
-        console.error('[MQTT] Fehler beim MinMax-Update:', err)
+        const flat = flatten(json)
+        for (const [key, val] of Object.entries(flat)) {
+          const combinedKey = `${topic}.${key}`
+          messageQueue.current[combinedKey] = val
+        }
+      } catch {
+        messageQueue.current[topic] = payload
       }
-      return
-    }
+    })
 
-    try {
-      const json = JSON.parse(payload)
-      const flatten = (obj: any, prefix = ''): Record<string, string> =>
-        Object.entries(obj).reduce((acc, [key, val]) => {
-          const newKey = prefix ? `${prefix}.${key}` : key
-          if (typeof val === 'object' && val !== null) {
-            Object.assign(acc, flatten(val, newKey))
-          } else {
-            acc[newKey] = String(val)
-          }
-          return acc
-        }, {})
-      const flat = flatten(json)
-      for (const [key, val] of Object.entries(flat)) {
-        const combinedKey = `${topic}.${key}`
-        messageQueue.current[combinedKey] = val
-      }
-    } catch {
-      messageQueue.current[topic] = payload
-    }
-  })
-
-    // Flush: Nur Werte aktualisieren, MinMax kommt aus MQTT!
-    const flush = () => {
+    const interval = setInterval(() => {
       const updates = { ...messageQueue.current }
       messageQueue.current = {}
 
@@ -127,25 +101,14 @@ if (topic === MINMAX_TOPIC) {
           return updated
         })
       }
-    }
+    }, 300)
 
-const interval = setInterval(() => {
-    const updates = { ...messageQueue.current }
-    messageQueue.current = {}
-
-    if (Object.keys(updates).length > 0) {
-      setValues(prev => {
-        const updated = { ...prev, ...updates }
-        setLastUpdate(new Date().toLocaleTimeString())
-        return updated
-      })
+    return () => {
+      clearInterval(interval)
+      if (clientRef.current) clientRef.current.end(true)
     }
-  }, 300)
-return () => {
-    clearInterval(interval)
-    if (clientRef.current) clientRef.current.end(true)
-  }
-}, [])
+  }, [])
+
 
   const toggleBoolean = (publishTopic: string, current: string) => {
     const next = current?.toUpperCase() === 'ON' ? 'OFF' : 'ON'
