@@ -6,6 +6,7 @@ export const mqttConfig = {
   password: 'v6Vrhy6u4reJsng',
 }
 
+
 export const topics = [
   {
     label: 'Ender 3 Pro',
