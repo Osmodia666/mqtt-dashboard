@@ -18,12 +18,29 @@ function App() {
     const client = mqtt.connect(mqttConfig.host, {
       username: mqttConfig.username,
       password: mqttConfig.password,
-    })
+      reconnectPeriod: 5000,
+      connectTimeout: 10000,
+      clean: true
+  })
 
     clientRef.current = client
 
     client.on('connect', () => {
-      console.log('[MQTT] Verbunden')
+  console.log('[MQTT] ✅ Verbunden')
+    })
+
+client.on('error', (err) => {
+  console.error('[MQTT] ❌ Fehler:', err)
+})
+
+client.on('close', () => {
+  console.warn('[MQTT] ❌ Verbindung geschlossen')
+})
+
+client.on('offline', () => {
+  console.warn('[MQTT] ⚠️ Offline')
+})
+
       client.publish(REQUEST_TOPIC, String(Date.now()), { qos: 0, retain: false })
       console.log('[MQTT] MinMax request published')
 
