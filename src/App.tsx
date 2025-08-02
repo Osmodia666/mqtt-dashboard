@@ -26,6 +26,8 @@ useEffect(() => {
   clientRef.current = client
 
   client.on('connect', () => {
+    console.log('[MQTT] Verwende Benutzer:', mqttConfig.username)
+
     console.log('[MQTT] ✅ Verbunden')
     client.publish(REQUEST_TOPIC, String(Date.now()), { qos: 0, retain: false })
     console.log('[MQTT] MinMax request published')
