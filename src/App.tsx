@@ -15,14 +15,12 @@ function App() {
   const clientRef = useRef<any>(null)
 
   useEffect(() => {
-    client = mqtt.connect("wss://cyberdyne.chickenkiller.com:8443/mqtt", {
-  username: "christopher",
-  password: "v6Vrhy6u4reJsng",
-  protocolId: "MQTT",
-  protocolVersion: 4,
-});
-
-
+    const client = mqtt.connect(mqttConfig.host, {
+      username: mqttConfig.username,
+      password: mqttConfig.password,
+      protocolId: "MQTT",
+      protocolVersion: 4,
+    })
 
     clientRef.current = client
 
