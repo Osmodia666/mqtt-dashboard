@@ -18,13 +18,10 @@ function App() {
     client = mqtt.connect("wss://cyberdyne.chickenkiller.com:8443/mqtt", {
   username: "christopher",
   password: "v6Vrhy6u4reJsng",
-  reconnectPeriod: 3000,
   protocolId: "MQTT",
   protocolVersion: 4,
-  clean: true,
-  connectTimeout: 4000,
-  keepalive: 60,
-})
+});
+
 
 
     clientRef.current = client
