@@ -18,8 +18,12 @@ function App() {
     const client = mqtt.connect(mqttConfig.host, {
       username: mqttConfig.username,
       password: mqttConfig.password,
+      reconnectPeriod: 3000,
       protocolId: "MQTT",
       protocolVersion: 4,
+      clean: true,
+      connectTimeout: 4000,
+      keepalive: 60,
     })
 
     clientRef.current = client
