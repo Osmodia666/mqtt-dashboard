@@ -18,24 +18,13 @@ function App() {
     const client = mqtt.connect(mqttConfig.host, {
       username: mqttConfig.username,
       password: mqttConfig.password,
-      reconnectPeriod: 3000,
-      protocolId: "MQTT",
-      protocolVersion: 4,
-      clean: true,
-      connectTimeout: 4000,
-      keepalive: 60,
     })
-
     clientRef.current = client
 
     client.on('connect', () => {
-      console.log('[MQTT] Verbunden')
-      client.publish(REQUEST_TOPIC, String(Date.now()), { qos: 0, retain: false })
-      console.log('[MQTT] MinMax request published')
-
+      client.publish(REQUEST_TOPIC, '')
       const allTopics = topics.map(t => t.statusTopic || t.topic).filter(Boolean)
-      client.subscribe([...allTopics, MINMAX_TOPIC])
-
+      client.subscribe([...allTopics, '#', MINMAX_TOPIC])
       topics.forEach(({ publishTopic }) => {
         if (publishTopic?.includes('/POWER')) client.publish(publishTopic, '')
         if (publishTopic) {
@@ -50,27 +39,17 @@ function App() {
     })
 
     client.on('message', (topic, message) => {
-  const payload = message.toString()
+      const payload = message.toString()
       if (topic === 'Pool_temp/temperatur' || topic === 'Gaszaehler/stand') {
         messageQueue.current[topic] = payload
         return
       }
+        
+      // MinMax nur aus MQTT übernehmen!
       if (topic === MINMAX_TOPIC) {
         try {
           const incoming = JSON.parse(payload)
-          const flatten = (obj: any, prefix = ''): Record<string, { min: number; max: number }> =>
-            Object.entries(obj).reduce((acc, [key, val]) => {
-              const newKey = prefix ? `${prefix}.${key}` : key
-              if (typeof val === 'object' && val !== null && 'min' in val && 'max' in val) {
-                acc[newKey] = val
-              } else if (typeof val === 'object' && val !== null) {
-                Object.assign(acc, flatten(val, newKey))
-              }
-              return acc
-            }, {})
-          const flat = flatten(incoming)
-          console.log('[MQTT] MinMax flatten:', flat)
-          setMinMax(flat)
+          setMinMax(incoming)
         } catch (err) {
           console.error('[MQTT] Fehler beim MinMax-Update:', err)
         }
@@ -90,16 +69,17 @@ function App() {
             return acc
           }, {})
         const flat = flatten(json)
-       for (const [key, val] of Object.entries(flat)) {
-  messageQueue.current[key] = val
-}
-
+        for (const [key, val] of Object.entries(flat)) {
+          const combinedKey = `${topic}.${key}`
+          messageQueue.current[combinedKey] = val
+        }
       } catch {
         messageQueue.current[topic] = payload
       }
     })
 
-    const interval = setInterval(() => {
+    // Flush: Nur Werte aktualisieren, MinMax kommt aus MQTT!
+    const flush = () => {
       const updates = { ...messageQueue.current }
       messageQueue.current = {}
 
@@ -110,14 +90,14 @@ function App() {
           return updated
         })
       }
-    }, 300)
+    }
 
+    const interval = setInterval(flush, 300)
     return () => {
       clearInterval(interval)
-      if (clientRef.current) clientRef.current.end(true)
+      client.end(true)
     }
   }, [])
-
 
   const toggleBoolean = (publishTopic: string, current: string) => {
     const next = current?.toUpperCase() === 'ON' ? 'OFF' : 'ON'
@@ -179,8 +159,6 @@ function App() {
             const tempKey = 'Pool_temp/temperatur'
             const raw = values[tempKey]
             const val = raw !== undefined ? parseFloat(raw) : NaN
-            console.log('Key in minMax?', tempKey, tempKey in minMax)
-            console.log('Erhaltenes minMax:', minMax)
             const range = minMax[tempKey] ?? { min: val, max: val }
 
             return (
