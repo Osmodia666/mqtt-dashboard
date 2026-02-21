@@ -136,7 +136,7 @@ function App() {
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
         <div className="rounded-xl p-4 border border-gray-600 bg-gray-800">
           <h2 className="text-md font-bold mb-2">🧱 3D-Drucker</h2>
-          {['Ender 3 Pro', 'Sidewinder X1'].map((label, i) => {
+          {['Sidewinder X1'].map((label, i) => {
             const topic = topics.find(t => t.label === label)
             if (!topic) return null
             const val = values[topic.statusTopic]?.toUpperCase()
@@ -286,7 +286,7 @@ function App() {
 
         {topics.filter(t =>
           t.type !== 'group' &&
-          !['Ender 3 Pro', 'Sidewinder X1', 'Poolpumpe', 'Steckdose 1', 'Steckdose 2'].includes(t.label)
+          !['Sidewinder X1', 'Poolpumpe', 'Steckdose 1', 'Steckdose 2'].includes(t.label)
         ).map(({ label, type, unit, favorite, statusTopic, publishTopic, topic }) => {
           const key = statusTopic ?? topic
           let raw = values[key]
