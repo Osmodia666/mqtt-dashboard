@@ -22,6 +22,9 @@ function App() {
     clientRef.current = client
 
     client.on('connect', () => {
+      client.publish("dashboard/minmax/request", "test", { qos: 0 });
+      console.log("MinMax request sent");
+      
       client.publish(REQUEST_TOPIC, '')
       const allTopics = topics.map(t => t.statusTopic || t.topic).filter(Boolean)
       client.subscribe([...allTopics, '#', MINMAX_TOPIC])
