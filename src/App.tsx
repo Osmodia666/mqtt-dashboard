@@ -23,13 +23,18 @@ function App() {
     clientRef.current = client
 
     client.on('connect', () => {
+      // Request auslösen
       client.publish(REQUEST_TOPIC, '')
-
+      
+      // Subscribe auf alle normalen Topics plus MinMax Update
       const allTopics = topics.map(t => t.statusTopic || t.topic).filter(Boolean) as string[]
-      client.subscribe([...allTopics, '#', MINMAX_TOPIC])
+      client.subscribe([...allTopics, MINMAX_TOPIC])
 
+      // Falls publishTopics vorhanden sind
       topics.forEach(({ publishTopic }) => {
-        if (publishTopic?.includes('/POWER')) client.publish(publishTopic, '')
+        if (publishTopic?.includes('/POWER')) {
+          client.publish(publishTopic, '')
+        }
         if (publishTopic) {
           const base = publishTopic.split('/')[1]
           client.publish(`cmnd/${base}/state`, '')
@@ -44,27 +49,24 @@ function App() {
     client.on('message', (topic, message) => {
       const payload = message.toString()
 
-      // ===========================
-      // ⚡ Min/Max nur für dieses Topic
-      // ===========================
+      // Min/Max Update empfangen
       if (topic === MINMAX_TOPIC) {
         try {
-          const parsed = JSON.parse(payload)
-          setMinMax(parsed)
-          console.log('[MQTT] MinMax aktualisiert:', parsed)
+          const incoming = JSON.parse(payload)
+          setMinMax(incoming)
+          console.log('📊 Min/Max aktualisiert:', incoming)
         } catch (err) {
           console.error('[MQTT] Fehler beim MinMax-Update:', err)
         }
         return
       }
 
-      // ===========================
-      // Normale MQTT Werte
-      // ===========================
+      // Normale Werte
       if (topic === 'Pool_temp/temperatur' || topic === 'Gaszaehler/stand') {
         messageQueue.current[topic] = payload
         return
       }
+
       try {
         const json = JSON.parse(payload)
         const flatten = (obj: any, prefix = ''): Record<string, string> =>
