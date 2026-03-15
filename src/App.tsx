@@ -23,7 +23,6 @@ function App() {
 
     client.on('connect', () => {
       client.publish(REQUEST_TOPIC, JSON.stringify({ ts: Date.now() }))
-      client.publish(REQUEST_TOPIC, '')
       const allTopics = topics.map(t => t.statusTopic || t.topic).filter(Boolean)
       client.subscribe([...allTopics, '#', MINMAX_TOPIC])
       topics.forEach(({ publishTopic }) => {
