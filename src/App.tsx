@@ -3,8 +3,7 @@ import { useEffect, useState, useRef } from 'react'
 import mqtt from 'mqtt'
 import { mqttConfig, topics } from './config'
 
-type MinMax = Record<string, { min: number | null, max: number | null }>
-
+type MinMax = Record<string, { min: number; max: number }>
 const MINMAX_TOPIC = 'dashboard/minmax/update'
 const REQUEST_TOPIC = 'dashboard/minmax/request'
 
@@ -23,18 +22,11 @@ function App() {
     clientRef.current = client
 
     client.on('connect', () => {
-      // Request auslösen
       client.publish(REQUEST_TOPIC, '')
-      
-      // Subscribe auf alle normalen Topics plus MinMax Update
-      const allTopics = topics.map(t => t.statusTopic || t.topic).filter(Boolean) as string[]
-      client.subscribe([...allTopics, MINMAX_TOPIC])
-
-      // Falls publishTopics vorhanden sind
+      const allTopics = topics.map(t => t.statusTopic || t.topic).filter(Boolean)
+      client.subscribe([...allTopics, '#', MINMAX_TOPIC])
       topics.forEach(({ publishTopic }) => {
-        if (publishTopic?.includes('/POWER')) {
-          client.publish(publishTopic, '')
-        }
+        if (publishTopic?.includes('/POWER')) client.publish(publishTopic, '')
         if (publishTopic) {
           const base = publishTopic.split('/')[1]
           client.publish(`cmnd/${base}/state`, '')
@@ -48,22 +40,19 @@ function App() {
 
     client.on('message', (topic, message) => {
       const payload = message.toString()
-
-      // Min/Max Update empfangen
+      if (topic === 'Pool_temp/temperatur' || topic === 'Gaszaehler/stand') {
+        messageQueue.current[topic] = payload
+        return
+      }
+        
+      // MinMax nur aus MQTT übernehmen!
       if (topic === MINMAX_TOPIC) {
         try {
           const incoming = JSON.parse(payload)
           setMinMax(incoming)
-          console.log('📊 Min/Max aktualisiert:', incoming)
         } catch (err) {
           console.error('[MQTT] Fehler beim MinMax-Update:', err)
         }
-        return
-      }
-
-      // Normale Werte
-      if (topic === 'Pool_temp/temperatur' || topic === 'Gaszaehler/stand') {
-        messageQueue.current[topic] = payload
         return
       }
 
@@ -78,7 +67,7 @@ function App() {
               acc[newKey] = String(val)
             }
             return acc
-          }, {} as Record<string, string>)
+          }, {})
         const flat = flatten(json)
         for (const [key, val] of Object.entries(flat)) {
           const combinedKey = `${topic}.${key}`
@@ -89,9 +78,11 @@ function App() {
       }
     })
 
+    // Flush: Nur Werte aktualisieren, MinMax kommt aus MQTT!
     const flush = () => {
       const updates = { ...messageQueue.current }
       messageQueue.current = {}
+
       if (Object.keys(updates).length > 0) {
         setValues(prev => {
           const updated = { ...prev, ...updates }
@@ -100,8 +91,8 @@ function App() {
         })
       }
     }
-    const interval = setInterval(flush, 300)
 
+    const interval = setInterval(flush, 300)
     return () => {
       clearInterval(interval)
       client.end(true)
@@ -112,7 +103,7 @@ function App() {
     const next = current?.toUpperCase() === 'ON' ? 'OFF' : 'ON'
     setValues(prev => ({
       ...prev,
-      [publishTopic.replace('cmnd/', 'stat/').replace('/POWER', '/POWER')]: next,
+      [publishTopic.replace('cmnd/', 'stat/').replace('/POWER', '/POWER')]: next
     }))
     clientRef.current?.publish(publishTopic, next)
   }
@@ -128,21 +119,17 @@ function App() {
       if (value >= 250) return 'bg-yellow-400'
       return 'bg-red-600'
     }
-    if (label.includes('Pool Temperatur'))
-      return value > 23 ? 'bg-green-500' : value > 17 ? 'bg-yellow-400' : 'bg-blue-500'
+    if (label.includes('Pool Temperatur')) return value > 23 ? 'bg-green-500' : value > 17 ? 'bg-yellow-400' : 'bg-blue-500'
     return 'bg-blue-500'
   }
 
   const progressBar = (value: number, max = 100, color = 'bg-blue-500') => (
-    <div className="w-full bg-gray-200 rounded">
-      <div
-        className={`h-4 ${color} rounded`}
-        style={{ width: `${Math.min((value / max) * 100, 100)}%` }}
-      ></div>
+    <div className="w-full bg-gray-300 rounded-full h-2 mt-2 overflow-hidden">
+      <div className={`${color} h-2 transition-all duration-1000 ease-in-out`} style={{ width: `${Math.min(100, (value / max) * 100)}%` }} />
     </div>
   )
 
-   return (
+  return (
     <main className="min-h-screen p-4 sm:p-6 bg-gray-950 text-white font-sans">
       <header className="mb-6 text-sm text-gray-400">Letztes Update: {lastUpdate || 'Lade...'}</header>
 
