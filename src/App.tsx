@@ -4,7 +4,8 @@ import mqtt from 'mqtt'
 import { mqttConfig, topics } from './config'
 
 type MinMax = Record<string, { min: number; max: number }>
-const MINMAX_TOPIC = 'dashboard/minmax/update'
+#const MINMAX_TOPIC = 'dashboard/minmax/update'
+const MINMAX_TOPIC = '0_userdata/0/dashboard/minmax/update'
 const REQUEST_TOPIC = 'dashboard/minmax/request'
 
 function App() {
