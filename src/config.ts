@@ -6,7 +6,6 @@ export const mqttConfig = {
   password: 'v6Vrhy6u4reJsng',
 }
 
-
 export const topics = [
   {
     label: 'Sidewinder X1',
@@ -27,50 +26,20 @@ export const topics = [
     statusTopic: 'stat/Steckdose_2/POWER',
     publishTopic: 'cmnd/Steckdose_2/POWER',
   },
-//  {
-//    label: 'Doppelsteckdose',
-//    type: 'boolean',
-//    statusTopic: 'stat/Doppelsteckdose/POWER',
-//    publishTopic: 'cmnd/Doppelsteckdose/POWER',
-//  },
-//  {
-//    label: 'Beleuchtung',
-//    type: 'boolean',
-//    statusTopic: 'stat/Beleuchtung/POWER',
-//    publishTopic: 'cmnd/Beleuchtung/POWER',
-//  },
-//  {
-//    label: 'Teichpumpe',
-//    type: 'boolean',
-//    statusTopic: 'stat/Teichpumpe/POWER',
-//    publishTopic: 'cmnd/Teichpumpe/POWER',
-//  },
   {
     label: 'Poolpumpe',
     type: 'boolean',
     statusTopic: 'stat/Poolpumpe/POWER',
     publishTopic: 'cmnd/Poolpumpe/POWER',
   },
-  //{
-    //label: 'Balkonkraftwerk Erzeugung:',
-    //type: 'number',
-    //unit: 'W',
-   // statusTopic: 'tele/Balkonkraftwerk/SENSOR.ENERGY.Power.0',
-  //},
-  //{
-    //label: 'Verbrauch aktuell:',
-    //type: 'number',
-  //  unit: 'W',
-//    statusTopic: 'tele/Stromzähler/SENSOR.grid.Verbrauch_aktuell',
-//  },
   {
     label: 'Leistung L1–L3',
     type: 'group',
     unit: 'W',
     keys: [
-      { label: 'L1', key: 'tele/Stromzähler/SENSOR.grid.power_L1' },
-      { label: 'L2', key: 'tele/Stromzähler/SENSOR.grid.power_L2' },
-      { label: 'L3', key: 'tele/Stromzähler/SENSOR.grid.power_L3' },
+      { label: 'L1', key: 'tele/Stromzähler/SENSOR.grid.sml_L1_W' },
+      { label: 'L2', key: 'tele/Stromzähler/SENSOR.grid.sml_L2_W' },
+      { label: 'L3', key: 'tele/Stromzähler/SENSOR.grid.sml_L3_W' },
     ],
   },
   {
@@ -78,9 +47,9 @@ export const topics = [
     type: 'group',
     unit: 'V',
     keys: [
-      { label: 'L1', key: 'tele/Stromzähler/SENSOR.grid.Spannung_L1' },
-      { label: 'L2', key: 'tele/Stromzähler/SENSOR.grid.Spannung_L2' },
-      { label: 'L3', key: 'tele/Stromzähler/SENSOR.grid.Spannung_L3' },
+      { label: 'L1', key: 'tele/Stromzähler/SENSOR.grid.sml_L1_V' },
+      { label: 'L2', key: 'tele/Stromzähler/SENSOR.grid.sml_L2_V' },
+      { label: 'L3', key: 'tele/Stromzähler/SENSOR.grid.sml_L3_V' },
     ],
   },
   {
@@ -88,9 +57,9 @@ export const topics = [
     type: 'group',
     unit: 'A',
     keys: [
-      { label: 'L1', key: 'tele/Stromzähler/SENSOR.grid.Strom_L1' },
-      { label: 'L2', key: 'tele/Stromzähler/SENSOR.grid.Strom_L2' },
-      { label: 'L3', key: 'tele/Stromzähler/SENSOR.grid.Strom_L3' },
+      { label: 'L1', key: 'tele/Stromzähler/SENSOR.grid.sml_L1_A' },
+      { label: 'L2', key: 'tele/Stromzähler/SENSOR.grid.sml_L2_A' },
+      { label: 'L3', key: 'tele/Stromzähler/SENSOR.grid.sml_L3_A' },
     ],
   },
 ]
