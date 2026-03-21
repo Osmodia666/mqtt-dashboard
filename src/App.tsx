@@ -329,7 +329,7 @@ function App() {
                 <div key={key} className="mb-2">
                   <div className="text-sm">{label}: {isNaN(num) ? '...' : `${num} ${group.unit}`}</div>
                   {progressBar(num, group.label.includes('Spannung') ? 250 : 1000, 'bg-blue-500')}
-                  <div className="text-xs text-gray-400">Min: {range.min?.toFixed(1)} | Max: {range.max?.toFixed(1)}</div>
+                  <div className="text-xs text-gray-400">Min: {range.min?.toFixed(1)} {group.unit} | Max: {range.max?.toFixed(1)} {group.unit}</div>
                 </div>
               )
             })}
