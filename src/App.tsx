@@ -50,7 +50,6 @@ function App() {
         try {
           const incoming = JSON.parse(payload)
           setMinMax(incoming)
-          console.log('📊 MinMax empfangen:', JSON.stringify(incoming))
         } catch (err) {
           console.error('[MQTT] Fehler beim MinMax-Update:', err)
         }
@@ -79,11 +78,9 @@ function App() {
       }
     })
 
-    // Flush: Nur Werte aktualisieren, MinMax kommt aus MQTT!
     const flush = () => {
       const updates = { ...messageQueue.current }
       messageQueue.current = {}
-
       if (Object.keys(updates).length > 0) {
         setValues(prev => {
           const updated = { ...prev, ...updates }
@@ -184,7 +181,8 @@ function App() {
         <div className="rounded-xl p-4 border border-gray-600 bg-gray-800">
           <h2 className="text-md font-bold mb-2">🎰 Zähler</h2>
           <div className="flex flex-col space-y-3">
-            <p>⚡ Strom: {values['tele/Stromzähler/SENSOR.grid.Verbrauch_gesamt'] ?? '...'} kWh</p>
+            {/* sml_v = Verbrauch gesamt */}
+            <p>⚡ Strom: {values['tele/Stromzähler/SENSOR.grid.sml_v'] ?? '...'} kWh</p>
             <p>🔋 BKW: {(() => {
               const key = 'tele/Balkonkraftwerk/SENSOR.ENERGY.EnergyPTotal.0'
               const raw = values[key]
@@ -198,7 +196,8 @@ function App() {
         <div className="rounded-xl p-4 border border-gray-600 bg-gray-800">
           <h2 className="text-md font-bold mb-3">🔋 Strom</h2>
           {(() => {
-            const key = 'tele/Stromzähler/SENSOR.grid.Verbrauch_aktuell'
+            // sml_m = Verbrauch aktuell
+            const key = 'tele/Stromzähler/SENSOR.grid.sml_m'
             const raw = values[key]
             const num = raw !== undefined ? parseFloat(raw) : NaN
             const range = minMax[key] ?? { min: num, max: num }
@@ -294,7 +293,7 @@ function App() {
           const value = raw?.toUpperCase()
           const num = parseFloat(raw)
           const isNumber = type === 'number' && !isNaN(num)
-          const showMinMax = !label.includes('gesamt') && (key.includes('power_L') || key.includes('Verbrauch_aktuell') || key.includes('Balkonkraftwerk'))
+          const showMinMax = !label.includes('gesamt') && (key.includes('sml_L') || key.includes('sml_m') || key.includes('Balkonkraftwerk'))
           const range = minMax[key] ?? { min: num, max: num }
           const barColor = getBarColor(label, num)
           return (
@@ -316,7 +315,7 @@ function App() {
             </div>
           )
         })}
-      </div> 
+      </div>
 
       <div className="mt-10 grid grid-cols-1 sm:grid-cols-3 gap-4">
         {topics.filter(t => t.type === 'group').map(group => (
