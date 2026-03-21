@@ -329,7 +329,6 @@ function App() {
                 <div className="text-sm">{label}: {isNaN(num) ? '...' : `${group.label.includes('Spannung') ? num.toFixed(0) : num} ${group.unit}`}</div>
                 {progressBar(num, group.label.includes('Spannung') ? 250 : 1000, 'bg-blue-500')}
                 <div className="text-xs text-gray-400">Min: {range.min?.toFixed(group.label.includes('Spannung') ? 0 : 1)} {group.unit} | Max: {range.max?.toFixed(group.label.includes('Spannung') ? 0 : 1)} {group.unit}</div>
-                </div>
               )
             })}
           </div>
