@@ -266,10 +266,12 @@ function App() {
         </div>
 
         <div className="rounded-xl p-4 border border-gray-600 bg-gray-800">
-          <h2 className="text-md font-bold mb-2">🔌 Steckdosen 2</h2>
+          <h2 className="text-md font-bold mb-2">🔌 Steckdosen + Beleuchtung</h2>
           {[
             { label: 'Beleuchtung', publishTopic: 'cmnd/Beleuchtung/POWER', statusTopic: 'stat/Beleuchtung/POWER' },
             { label: 'Teichpumpe', publishTopic: 'cmnd/Teichpumpe/POWER', statusTopic: 'stat/Teichpumpe/POWER' }
+            { label: 'Carport-Licht', publishTopic: 'cmnd/Carport-Licht/POWER', statusTopic: 'stat/Carport-Licht/POWER' },
+
           ].map(({ label, publishTopic, statusTopic }, i) => {
             const val = values[statusTopic]?.toUpperCase()
             return (
