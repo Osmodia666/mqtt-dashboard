@@ -1,5 +1,5 @@
 // src/App.tsx
-import { useEffect, useState, useRef, useCallback } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import mqtt from 'mqtt'
 import { mqttConfig, topics } from './config'
 
@@ -8,64 +8,50 @@ const MINMAX_TOPIC = 'dashboard/minmax/update'
 const REQUEST_TOPIC = 'dashboard/minmax/request'
 const HISTORY_LENGTH = 60
 
-// --- Sparkline Component ---
+// Nur explizite Topics abonnieren — kein '#' Wildcard
+const EXPLICIT_SUBSCRIBES = [
+  'tele/Stromzähler/SENSOR',
+  'tele/Balkonkraftwerk/SENSOR',
+  'Pool_temp/temperatur',
+  'Gaszaehler/stand',
+  'stat/+/POWER',
+  'stat/+/POWER1',
+  MINMAX_TOPIC,
+]
+
+// --- Sparkline ---
 function Sparkline({ data, color = '#60a5fa', height = 28 }: { data: number[]; color?: string; height?: number }) {
   if (data.length < 2) return <div style={{ height }} />
   const min = Math.min(...data)
   const max = Math.max(...data)
   const range = max - min || 1
-  const w = 200
-  const h = height
-  const pad = 2
+  const w = 200, h = height, pad = 2
   const points = data.map((v, i) => {
     const x = pad + (i / (data.length - 1)) * (w - pad * 2)
     const y = h - pad - ((v - min) / range) * (h - pad * 2)
     return `${x},${y}`
   }).join(' ')
+  const gradId = `sg${color.replace('#', '')}`
   return (
     <svg viewBox={`0 0 ${w} ${h}`} className="w-full" style={{ height, display: 'block' }} preserveAspectRatio="none">
       <defs>
-        <linearGradient id={`sg-${color.replace('#', '')}`} x1="0" y1="0" x2="0" y2="1">
+        <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor={color} stopOpacity="0.18" />
           <stop offset="100%" stopColor={color} stopOpacity="0.01" />
         </linearGradient>
       </defs>
-      <polyline
-        points={`${pad},${h - pad} ${points} ${w - pad},${h - pad}`}
-        fill={`url(#sg-${color.replace('#', '')})`}
-        stroke="none"
-      />
-      <polyline
-        points={points}
-        fill="none"
-        stroke={color}
-        strokeWidth="1.5"
-        strokeLinejoin="round"
-        strokeLinecap="round"
-      />
+      <polyline points={`${pad},${h - pad} ${points} ${w - pad},${h - pad}`} fill={`url(#${gradId})`} stroke="none" />
+      <polyline points={points} fill="none" stroke={color} strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
     </svg>
   )
 }
 
-// --- Sparkline color helpers ---
 function sparkColor(label: string, value: number): string {
-  if (label.includes('Verbrauch')) {
-    if (value >= 1000) return '#dc2626'
-    if (value >= 300) return '#facc15'
-    return '#22c55e'
-  }
-  if (label.includes('Balkon') || label.includes('Erzeugung')) {
-    if (value >= 500) return '#22c55e'
-    if (value >= 250) return '#facc15'
-    return '#ef4444'
-  }
-  if (label.includes('Pool') || label.includes('Temperatur')) {
-    if (value > 23) return '#22c55e'
-    if (value > 17) return '#facc15'
-    return '#60a5fa'
-  }
+  if (label.includes('Verbrauch')) return value >= 1000 ? '#dc2626' : value >= 300 ? '#facc15' : '#22c55e'
+  if (label.includes('Balkon') || label.includes('Erzeugung')) return value >= 500 ? '#22c55e' : value >= 250 ? '#facc15' : '#ef4444'
+  if (label.includes('Pool') || label.includes('Temperatur')) return value > 23 ? '#22c55e' : value > 17 ? '#facc15' : '#60a5fa'
   if (label.includes('Spannung')) return '#a78bfa'
-  if (label.includes('Strom') || label.includes('Strom L')) return '#fb923c'
+  if (label.includes('Strom')) return '#fb923c'
   if (label.includes('Leistung')) return '#38bdf8'
   return '#60a5fa'
 }
@@ -74,138 +60,112 @@ function App() {
   const [values, setValues] = useState<Record<string, string>>({})
   const [lastUpdate, setLastUpdate] = useState('')
   const [minMax, setMinMax] = useState<MinMax>({})
-  const [history, setHistory] = useState<Record<string, number[]>>({})
+  // History als Ref (kein eigener State) — wird beim values-Update mitgelesen
+  const histRef = useRef<Record<string, number[]>>({})
   const messageQueue = useRef<Record<string, string>>({})
   const clientRef = useRef<any>(null)
-
-  const pushHistory = useCallback((key: string, num: number) => {
-    setHistory(prev => {
-      const arr = prev[key] ?? []
-      const next = arr.length >= HISTORY_LENGTH ? [...arr.slice(1), num] : [...arr, num]
-      return { ...prev, [key]: next }
-    })
-  }, [])
 
   useEffect(() => {
     const client = mqtt.connect(mqttConfig.host, {
       username: mqttConfig.username,
       password: mqttConfig.password,
+      reconnectPeriod: 2000,
+      connectTimeout: 8000,
     })
     clientRef.current = client
 
     client.on('connect', () => {
+      // MinMax sofort anfordern
       client.publish(REQUEST_TOPIC, JSON.stringify({ ts: Date.now() }))
-      const allTopics = topics.map(t => t.statusTopic || t.topic).filter(Boolean)
-      client.subscribe([...allTopics, '#', MINMAX_TOPIC])
+      // Nur explizite Topics abonnieren
+      client.subscribe(EXPLICIT_SUBSCRIBES, { qos: 0 })
+      // Schalter-Status abfragen
       topics.forEach(({ publishTopic }) => {
         if (publishTopic?.includes('/POWER')) client.publish(publishTopic, '')
-        if (publishTopic) {
-          const base = publishTopic.split('/')[1]
-          client.publish(`cmnd/${base}/state`, '')
-        }
       })
     })
 
-    client.on('error', (err) => {
-      console.error('MQTT Fehler:', err)
-    })
+    client.on('error', (err) => console.error('MQTT Fehler:', err))
 
     client.on('message', (topic, message) => {
       const payload = message.toString()
+
       if (topic === 'Pool_temp/temperatur' || topic === 'Gaszaehler/stand') {
         messageQueue.current[topic] = payload
         return
       }
-
       if (topic === MINMAX_TOPIC) {
-        try {
-          const incoming = JSON.parse(payload)
-          setMinMax(incoming)
-        } catch (err) {
-          console.error('[MQTT] Fehler beim MinMax-Update:', err)
-        }
+        try { setMinMax(JSON.parse(payload)) } catch {}
         return
       }
-
       try {
         const json = JSON.parse(payload)
         const flatten = (obj: any, prefix = ''): Record<string, string> =>
-          Object.entries(obj).reduce((acc, [key, val]) => {
-            const newKey = prefix ? `${prefix}.${key}` : key
-            if (typeof val === 'object' && val !== null) {
-              Object.assign(acc, flatten(val, newKey))
-            } else {
-              acc[newKey] = String(val)
-            }
+          Object.entries(obj).reduce((acc: Record<string, string>, [key, val]) => {
+            const k = prefix ? `${prefix}.${key}` : key
+            if (typeof val === 'object' && val !== null) Object.assign(acc, flatten(val, k))
+            else acc[k] = String(val)
             return acc
           }, {})
         const flat = flatten(json)
-        for (const [key, val] of Object.entries(flat)) {
-          const combinedKey = `${topic}.${key}`
-          messageQueue.current[combinedKey] = val
-        }
+        for (const [k, v] of Object.entries(flat)) messageQueue.current[`${topic}.${k}`] = v
       } catch {
         messageQueue.current[topic] = payload
       }
     })
 
     const flush = () => {
-      const updates = { ...messageQueue.current }
+      const updates = messageQueue.current
+      if (Object.keys(updates).length === 0) return
       messageQueue.current = {}
-      if (Object.keys(updates).length > 0) {
-        setValues(prev => {
-          const updated = { ...prev, ...updates }
-          setLastUpdate(new Date().toLocaleTimeString())
-          // Push numeric values into history
-          for (const [key, val] of Object.entries(updates)) {
-            const n = parseFloat(val)
-            if (!isNaN(n)) pushHistory(key, n)
-          }
-          return updated
-        })
+
+      // History-Batch: alle numerischen Werte in einem Durchgang, in-place
+      const h = histRef.current
+      for (const [key, val] of Object.entries(updates)) {
+        const n = parseFloat(val)
+        if (isNaN(n)) continue
+        if (!h[key]) {
+          h[key] = [n]
+        } else if (h[key].length >= HISTORY_LENGTH) {
+          h[key] = [...h[key].slice(1), n]
+        } else {
+          h[key].push(n)
+        }
       }
+
+      // Ein einziger State-Update → ein Re-render
+      setValues(prev => ({ ...prev, ...updates }))
+      setLastUpdate(new Date().toLocaleTimeString())
     }
 
-    const interval = setInterval(flush, 300)
-    return () => {
-      clearInterval(interval)
-      client.end(true)
-    }
-  }, [pushHistory])
+    const interval = setInterval(flush, 150)
+    return () => { clearInterval(interval); client.end(true) }
+  }, [])
 
   const toggleBoolean = (publishTopic: string, current: string) => {
     const next = current?.toUpperCase() === 'ON' ? 'OFF' : 'ON'
-    setValues(prev => ({
-      ...prev,
-      [publishTopic.replace('cmnd/', 'stat/').replace('/POWER', '/POWER')]: next
-    }))
+    setValues(prev => ({ ...prev, [publishTopic.replace('cmnd/', 'stat/')]: next }))
     clientRef.current?.publish(publishTopic, next)
   }
 
   const getBarColor = (label: string, value: number) => {
-    if (label.includes('Verbrauch aktuell')) {
-      if (value >= 1000) return 'bg-red-600'
-      if (value >= 300) return 'bg-yellow-400'
-      return 'bg-green-500'
-    }
-    if (label.includes('Balkonkraftwerk')) {
-      if (value >= 500) return 'bg-green-500'
-      if (value >= 250) return 'bg-yellow-400'
-      return 'bg-red-600'
-    }
+    if (label.includes('Verbrauch aktuell')) return value >= 1000 ? 'bg-red-600' : value >= 300 ? 'bg-yellow-400' : 'bg-green-500'
+    if (label.includes('Balkonkraftwerk')) return value >= 500 ? 'bg-green-500' : value >= 250 ? 'bg-yellow-400' : 'bg-red-600'
     if (label.includes('Pool Temperatur')) return value > 23 ? 'bg-green-500' : value > 17 ? 'bg-yellow-400' : 'bg-blue-500'
     return 'bg-blue-500'
   }
 
   const progressBar = (value: number, max = 100, color = 'bg-blue-500') => (
     <div className="w-full bg-gray-300 rounded-full h-2 mt-2 overflow-hidden">
-      <div className={`${color} h-2 transition-all duration-1000 ease-in-out`} style={{ width: `${Math.min(100, (value / max) * 100)}%` }} />
+      <div className={`${color} h-2 transition-all duration-500 ease-in-out`} style={{ width: `${Math.min(100, (value / max) * 100)}%` }} />
     </div>
   )
 
+  const hist = histRef.current
+
   return (
     <main className="min-h-screen p-4 sm:p-6 bg-gray-950 text-white font-sans">
-      <header className="mb-6 text-sm text-gray-400">Letztes Update: {lastUpdate || 'Lade...'}</header>
+      <header className="mb-6 text-sm text-gray-400">Letztes Update: {lastUpdate || 'Verbinde...'}</header>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
 
@@ -237,8 +197,7 @@ function App() {
             const raw = values[tempKey]
             const val = raw !== undefined ? parseFloat(raw) : NaN
             const range = minMax[tempKey] ?? { min: val, max: val }
-            const hist = history[tempKey] ?? []
-
+            const h = hist[tempKey] ?? []
             return (
               <>
                 <div className="flex justify-between items-center">
@@ -253,11 +212,7 @@ function App() {
                 <p className="mt-3">🌡️ Temperatur: {isNaN(val) ? '...' : `${val} °C`}</p>
                 {progressBar(val, 40, getBarColor('Pool Temperatur', val))}
                 <p className="text-xs text-gray-400">Min: {range.min?.toFixed(1)} °C | Max: {range.max?.toFixed(1)} °C</p>
-                {hist.length >= 2 && (
-                  <div className="mt-1 opacity-70">
-                    <Sparkline data={hist} color={sparkColor('Temperatur', val)} height={28} />
-                  </div>
-                )}
+                {h.length >= 2 && <div className="mt-1 opacity-70"><Sparkline data={h} color={sparkColor('Temperatur', val)} height={28} /></div>}
               </>
             )
           })()}
@@ -278,7 +233,7 @@ function App() {
           </div>
         </div>
 
-        {/* Strom (Verbrauch + Erzeugung) */}
+        {/* Strom */}
         <div className="rounded-xl p-4 border border-gray-600 bg-gray-800">
           <h2 className="text-md font-bold mb-3">🔋 Strom</h2>
           {(() => {
@@ -286,20 +241,14 @@ function App() {
             const raw = values[key]
             const num = raw !== undefined ? parseFloat(raw) : NaN
             const range = minMax[key] ?? { min: num, max: num }
-            const hist = history[key] ?? []
-            let color = 'bg-green-500'
-            if (num >= 1000) color = 'bg-red-600'
-            else if (num >= 300) color = 'bg-yellow-400'
+            const h = hist[key] ?? []
+            const color = num >= 1000 ? 'bg-red-600' : num >= 300 ? 'bg-yellow-400' : 'bg-green-500'
             return (
               <>
                 <p className="mt-1">Verbrauch Aktuell: {isNaN(num) ? '...' : `${num} W`}</p>
                 {progressBar(num, range.max > 0 ? range.max : 2000, color)}
                 <p className="text-xs text-gray-400">Min: {range.min?.toFixed(1)} W | Max: {range.max?.toFixed(1)} W</p>
-                {hist.length >= 2 && (
-                  <div className="mt-1 opacity-70">
-                    <Sparkline data={hist} color={sparkColor('Verbrauch', num)} height={28} />
-                  </div>
-                )}
+                {h.length >= 2 && <div className="mt-1 opacity-70"><Sparkline data={h} color={sparkColor('Verbrauch', num)} height={28} /></div>}
               </>
             )
           })()}
@@ -308,20 +257,14 @@ function App() {
             const raw = values[key]
             const num = raw !== undefined ? parseFloat(raw) : NaN
             const range = minMax[key] ?? { min: num, max: num }
-            const hist = history[key] ?? []
-            let color = 'bg-red-600'
-            if (num >= 500) color = 'bg-green-500'
-            else if (num >= 250) color = 'bg-yellow-400'
+            const h = hist[key] ?? []
+            const color = num >= 500 ? 'bg-green-500' : num >= 250 ? 'bg-yellow-400' : 'bg-red-600'
             return (
               <>
                 <p className="mt-3">Erzeugung Aktuell: {isNaN(num) ? '...' : `${num} W`}</p>
                 {progressBar(num, range.max > 0 ? range.max : 1000, color)}
                 <p className="text-xs text-gray-400">Min: {range.min?.toFixed(1)} W | Max: {range.max?.toFixed(1)} W</p>
-                {hist.length >= 2 && (
-                  <div className="mt-1 opacity-70">
-                    <Sparkline data={hist} color={sparkColor('Erzeugung', num)} height={28} />
-                  </div>
-                )}
+                {h.length >= 2 && <div className="mt-1 opacity-70"><Sparkline data={h} color={sparkColor('Erzeugung', num)} height={28} /></div>}
               </>
             )
           })()}
@@ -376,20 +319,19 @@ function App() {
           })}
         </div>
 
-        {/* Dynamische Topics (type !== 'group', nicht hardcoded) */}
+        {/* Dynamische Topics */}
         {topics.filter(t =>
           t.type !== 'group' &&
           !['Sidewinder X1', 'Poolpumpe', 'Steckdose 1', 'Steckdose 2'].includes(t.label)
         ).map(({ label, type, unit, favorite, statusTopic, publishTopic, topic }) => {
           const key = statusTopic ?? topic
-          let raw = values[key]
+          const raw = values[key]
           const value = raw?.toUpperCase()
           const num = parseFloat(raw)
           const isNumber = type === 'number' && !isNaN(num)
           const showMinMax = !label.includes('gesamt') && (key.includes('sml_L') || key.includes('sml_m') || key.includes('Balkonkraftwerk'))
           const range = minMax[key] ?? { min: num, max: num }
-          const barColor = getBarColor(label, num)
-          const hist = history[key] ?? []
+          const h = hist[key] ?? []
           return (
             <div key={key} className={`rounded-xl p-4 border ${favorite ? 'border-yellow-400' : 'border-gray-600'} bg-gray-800`}>
               <h2 className="text-md font-bold mb-2">{label}</h2>
@@ -402,13 +344,9 @@ function App() {
               {isNumber && (
                 <>
                   <p className="text-2xl">{raw ?? '...'} {unit}</p>
-                  {showMinMax && progressBar(num, range.max > 0 ? range.max : 100, barColor)}
+                  {showMinMax && progressBar(num, range.max > 0 ? range.max : 100, getBarColor(label, num))}
                   {showMinMax && <p className="text-xs text-gray-400">Min: {range.min.toFixed(1)} {unit} | Max: {range.max.toFixed(1)} {unit}</p>}
-                  {hist.length >= 2 && (
-                    <div className="mt-2 opacity-70">
-                      <Sparkline data={hist} color={sparkColor(label, num)} height={28} />
-                    </div>
-                  )}
+                  {h.length >= 2 && <div className="mt-2 opacity-70"><Sparkline data={h} color={sparkColor(label, num)} height={28} /></div>}
                 </>
               )}
               {type === 'string' && <p className="text-lg">{raw ?? '...'}</p>}
@@ -417,7 +355,7 @@ function App() {
         })}
       </div>
 
-      {/* Gruppen (Leistung, Spannung, Strom L1–L3) */}
+      {/* Gruppen */}
       <div className="mt-10 grid grid-cols-1 sm:grid-cols-3 gap-4">
         {topics.filter(t => t.type === 'group').map(group => (
           <div key={group.label} className="rounded-xl p-4 border border-gray-600 bg-gray-800">
@@ -426,7 +364,7 @@ function App() {
               const raw = values[key]
               const num = raw !== undefined ? parseFloat(raw) : NaN
               const range = minMax[key] ?? { min: num, max: num }
-              const hist = history[key] ?? []
+              const h = hist[key] ?? []
               const isSpannung = group.label.includes('Spannung')
               return (
                 <div key={key} className="mb-3">
@@ -435,11 +373,7 @@ function App() {
                   <div className="text-xs text-gray-400">
                     Min: {range.min?.toFixed(isSpannung ? 0 : 1)} {group.unit} | Max: {range.max?.toFixed(isSpannung ? 0 : 1)} {group.unit}
                   </div>
-                  {hist.length >= 2 && (
-                    <div className="mt-1 opacity-60">
-                      <Sparkline data={hist} color={sparkColor(group.label, num)} height={24} />
-                    </div>
-                  )}
+                  {h.length >= 2 && <div className="mt-1 opacity-60"><Sparkline data={h} color={sparkColor(group.label, num)} height={24} /></div>}
                 </div>
               )
             })}
