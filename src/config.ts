@@ -8,6 +8,12 @@ export const mqttConfig = {
 
 export const topics = [
   {
+  label: 'Carport-Licht',
+  type: 'boolean',
+  statusTopic: 'stat/Carport-Licht/POWER',
+  publishTopic: 'cmnd/Carport-Licht/POWER',
+  },
+  {
     label: 'Sidewinder X1',
     type: 'boolean',
     statusTopic: 'stat/Sidewinder_X1/POWER1',
