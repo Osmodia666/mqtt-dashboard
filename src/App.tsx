@@ -7,8 +7,8 @@ type MinMax = Record<string, { min: number; max: number }>
 const MINMAX_TOPIC = 'dashboard/minmax/update'
 const REQUEST_TOPIC = 'dashboard/minmax/request'
 const HISTORY_LENGTH = 60
+const MINMAX_CACHE_KEY = 'mqtt_minmax_cache'
 
-// Nur explizite Topics abonnieren — kein '#' Wildcard
 const EXPLICIT_SUBSCRIBES = [
   'tele/Stromzähler/SENSOR',
   'tele/Balkonkraftwerk/SENSOR',
@@ -56,11 +56,22 @@ function sparkColor(label: string, value: number): string {
   return '#60a5fa'
 }
 
+// localStorage-Helfer (kann im SSR-Kontext fehlen)
+function loadCachedMinMax(): MinMax {
+  try {
+    const raw = localStorage.getItem(MINMAX_CACHE_KEY)
+    return raw ? JSON.parse(raw) : {}
+  } catch { return {} }
+}
+function saveCachedMinMax(data: MinMax) {
+  try { localStorage.setItem(MINMAX_CACHE_KEY, JSON.stringify(data)) } catch {}
+}
+
 function App() {
   const [values, setValues] = useState<Record<string, string>>({})
   const [lastUpdate, setLastUpdate] = useState('')
-  const [minMax, setMinMax] = useState<MinMax>({})
-  // History als Ref (kein eigener State) — wird beim values-Update mitgelesen
+  // MinMax direkt mit gecachten Werten initialisieren → sofort angezeigt
+  const [minMax, setMinMax] = useState<MinMax>(loadCachedMinMax)
   const histRef = useRef<Record<string, number[]>>({})
   const messageQueue = useRef<Record<string, string>>({})
   const clientRef = useRef<any>(null)
@@ -75,10 +86,12 @@ function App() {
     clientRef.current = client
 
     client.on('connect', () => {
-      // MinMax sofort anfordern
-      client.publish(REQUEST_TOPIC, JSON.stringify({ ts: Date.now() }))
-      // Nur explizite Topics abonnieren
-      client.subscribe(EXPLICIT_SUBSCRIBES, { qos: 0 })
+      // 1. Erst subscriben — damit retained messages (minmax/update, Pool_temp, etc.)
+      //    sofort geliefert werden, BEVOR wir den Request absenden
+      client.subscribe(EXPLICIT_SUBSCRIBES, { qos: 0 }, () => {
+        // 2. Erst nach erfolgtem Subscribe den MinMax-Request senden
+        client.publish(REQUEST_TOPIC, JSON.stringify({ ts: Date.now() }))
+      })
       // Schalter-Status abfragen
       topics.forEach(({ publishTopic }) => {
         if (publishTopic?.includes('/POWER')) client.publish(publishTopic, '')
@@ -90,14 +103,22 @@ function App() {
     client.on('message', (topic, message) => {
       const payload = message.toString()
 
+      if (topic === MINMAX_TOPIC) {
+        try {
+          const incoming = JSON.parse(payload)
+          setMinMax(incoming)
+          saveCachedMinMax(incoming) // im Browser cachen
+        } catch {}
+        return
+      }
+
+      // Einfache Plaintext-Topics
       if (topic === 'Pool_temp/temperatur' || topic === 'Gaszaehler/stand') {
         messageQueue.current[topic] = payload
         return
       }
-      if (topic === MINMAX_TOPIC) {
-        try { setMinMax(JSON.parse(payload)) } catch {}
-        return
-      }
+
+      // JSON-Topics flatten
       try {
         const json = JSON.parse(payload)
         const flatten = (obj: any, prefix = ''): Record<string, string> =>
@@ -119,21 +140,15 @@ function App() {
       if (Object.keys(updates).length === 0) return
       messageQueue.current = {}
 
-      // History-Batch: alle numerischen Werte in einem Durchgang, in-place
       const h = histRef.current
       for (const [key, val] of Object.entries(updates)) {
         const n = parseFloat(val)
         if (isNaN(n)) continue
-        if (!h[key]) {
-          h[key] = [n]
-        } else if (h[key].length >= HISTORY_LENGTH) {
-          h[key] = [...h[key].slice(1), n]
-        } else {
-          h[key].push(n)
-        }
+        if (!h[key]) { h[key] = [n] }
+        else if (h[key].length >= HISTORY_LENGTH) { h[key] = [...h[key].slice(1), n] }
+        else { h[key].push(n) }
       }
 
-      // Ein einziger State-Update → ein Re-render
       setValues(prev => ({ ...prev, ...updates }))
       setLastUpdate(new Date().toLocaleTimeString())
     }
