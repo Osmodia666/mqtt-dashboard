@@ -50,7 +50,6 @@ function App() {
         try {
           const incoming = JSON.parse(payload)
           setMinMax(incoming)
-            console.log('BKW Power MinMax:', incoming['0_userdata.0.Balkonkraftwerk.Power'])
         } catch (err) {
           console.error('[MQTT] Fehler beim MinMax-Update:', err)
         }
