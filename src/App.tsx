@@ -19,8 +19,35 @@ const EXPLICIT_SUBSCRIBES = [
   MINMAX_TOPIC,
 ]
 
-// --- Sparkline ---
-function Sparkline({ data, color = '#60a5fa', height = 28 }: { data: number[]; color?: string; height?: number }) {
+// ── Slate Night design tokens ──────────────────────────────────────────────
+const T = {
+  bg:       '#1a1f2e',
+  surf:     '#242938',
+  surf2:    '#2d3347',
+  border:   'rgba(255,255,255,0.07)',
+  borderHi: 'rgba(255,255,255,0.13)',
+  text:     '#e8edf8',
+  muted:    'rgba(255,255,255,0.35)',
+  accent:   '#7c8cf8',
+  accentDim:'rgba(124,140,248,0.15)',
+  ok:       '#34d399',
+  okDim:    'rgba(52,211,153,0.15)',
+  warn:     '#fbbf24',
+  warnDim:  'rgba(251,191,36,0.15)',
+  err:      '#f87171',
+  errDim:   'rgba(248,113,113,0.15)',
+  spark: {
+    power:   '#7c8cf8',
+    energy:  '#34d399',
+    warn:    '#fbbf24',
+    purple:  '#a78bfa',
+    orange:  '#fb923c',
+    cyan:    '#38bdf8',
+  },
+} as const
+
+// ── Sparkline ──────────────────────────────────────────────────────────────
+function Sparkline({ data, color = T.spark.power, height = 28 }: { data: number[]; color?: string; height?: number }) {
   if (data.length < 2) return <div style={{ height }} />
   const min = Math.min(...data)
   const max = Math.max(...data)
@@ -31,50 +58,111 @@ function Sparkline({ data, color = '#60a5fa', height = 28 }: { data: number[]; c
     const y = h - pad - ((v - min) / range) * (h - pad * 2)
     return `${x},${y}`
   }).join(' ')
-  const gradId = `sg${color.replace('#', '')}`
   return (
-    <svg viewBox={`0 0 ${w} ${h}`} className="w-full" style={{ height, display: 'block' }} preserveAspectRatio="none">
-      <defs>
-        <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity="0.18" />
-          <stop offset="100%" stopColor={color} stopOpacity="0.01" />
-        </linearGradient>
-      </defs>
-      <polyline points={`${pad},${h - pad} ${points} ${w - pad},${h - pad}`} fill={`url(#${gradId})`} stroke="none" />
+    <svg viewBox={`0 0 ${w} ${h}`} style={{ width: '100%', height, display: 'block' }} preserveAspectRatio="none">
       <polyline points={points} fill="none" stroke={color} strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
     </svg>
   )
 }
 
 function sparkColor(label: string, value: number): string {
-  if (label.includes('Verbrauch')) return value >= 1000 ? '#dc2626' : value >= 300 ? '#facc15' : '#22c55e'
-  if (label.includes('Balkon') || label.includes('Erzeugung')) return value >= 500 ? '#22c55e' : value >= 250 ? '#facc15' : '#ef4444'
-  if (label.includes('Pool') || label.includes('Temperatur')) return value > 23 ? '#22c55e' : value > 17 ? '#facc15' : '#60a5fa'
-  if (label.includes('Spannung')) return '#a78bfa'
-  if (label.includes('Strom')) return '#fb923c'
-  if (label.includes('Leistung')) return '#38bdf8'
-  return '#60a5fa'
+  if (label.includes('Verbrauch'))  return value >= 1000 ? T.err  : value >= 300 ? T.warn  : T.ok
+  if (label.includes('Balkon') || label.includes('Erzeugung')) return value >= 500 ? T.ok : value >= 250 ? T.warn : T.err
+  if (label.includes('Pool') || label.includes('Temperatur')) return value > 23 ? T.ok : value > 17 ? T.warn : T.spark.cyan
+  if (label.includes('Spannung')) return T.spark.purple
+  if (label.includes('Strom'))    return T.spark.orange
+  if (label.includes('Leistung')) return T.spark.power
+  return T.spark.power
 }
 
-// localStorage-Helfer (kann im SSR-Kontext fehlen)
+// ── LocalStorage helpers ───────────────────────────────────────────────────
 function loadCachedMinMax(): MinMax {
-  try {
-    const raw = localStorage.getItem(MINMAX_CACHE_KEY)
-    return raw ? JSON.parse(raw) : {}
-  } catch { return {} }
+  try { const r = localStorage.getItem(MINMAX_CACHE_KEY); return r ? JSON.parse(r) : {} } catch { return {} }
 }
 function saveCachedMinMax(data: MinMax) {
   try { localStorage.setItem(MINMAX_CACHE_KEY, JSON.stringify(data)) } catch {}
 }
 
+// ── Shared card shell ──────────────────────────────────────────────────────
+function Card({ children, highlight = false }: { children: React.ReactNode; highlight?: boolean }) {
+  return (
+    <div style={{
+      background: T.surf,
+      border: `1px solid ${highlight ? T.borderHi : T.border}`,
+      borderRadius: 10,
+      padding: '12px 14px',
+    }}>
+      {children}
+    </div>
+  )
+}
+
+function CardLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{
+      fontSize: 10,
+      fontWeight: 700,
+      letterSpacing: '0.08em',
+      textTransform: 'uppercase',
+      color: T.muted,
+      marginBottom: 8,
+    }}>
+      {children}
+    </div>
+  )
+}
+
+// ── Progress bar ───────────────────────────────────────────────────────────
+function Bar({ value, max, color }: { value: number; max: number; color: string }) {
+  const pct = Math.min(100, max > 0 ? (value / max) * 100 : 0)
+  return (
+    <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 3, height: 4, marginTop: 6, overflow: 'hidden' }}>
+      <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: 3, transition: 'width 0.4s ease' }} />
+    </div>
+  )
+}
+
+// ── Toggle button ──────────────────────────────────────────────────────────
+function ToggleBtn({ on, onClick }: { on: boolean; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        padding: '3px 12px',
+        borderRadius: 5,
+        fontSize: 11,
+        fontWeight: 700,
+        cursor: 'pointer',
+        border: `1px solid ${on ? T.ok + '55' : T.err + '55'}`,
+        background: on ? T.okDim : T.errDim,
+        color: on ? T.ok : T.err,
+        letterSpacing: '0.04em',
+        transition: 'all 0.15s',
+        whiteSpace: 'nowrap',
+      }}
+    >
+      {on ? 'AN' : 'AUS'}
+    </button>
+  )
+}
+
+// ── MinMax label ───────────────────────────────────────────────────────────
+function MinMaxRow({ min, max, unit }: { min: number; max: number; unit?: string }) {
+  return (
+    <div style={{ fontSize: 10, color: T.muted, marginTop: 3 }}>
+      Min: {min?.toFixed(1)}{unit} | Max: {max?.toFixed(1)}{unit}
+    </div>
+  )
+}
+
+// ── App ────────────────────────────────────────────────────────────────────
 function App() {
-  const [values, setValues] = useState<Record<string, string>>({})
+  const [values, setValues]     = useState<Record<string, string>>({})
   const [lastUpdate, setLastUpdate] = useState('')
-  // MinMax direkt mit gecachten Werten initialisieren → sofort angezeigt
-  const [minMax, setMinMax] = useState<MinMax>(loadCachedMinMax)
-  const histRef = useRef<Record<string, number[]>>({})
-  const messageQueue = useRef<Record<string, string>>({})
-  const clientRef = useRef<any>(null)
+  const [minMax, setMinMax]     = useState<MinMax>(loadCachedMinMax)
+  const histRef                 = useRef<Record<string, number[]>>({})
+  const messageQueue            = useRef<Record<string, string>>({})
+  const clientRef               = useRef<any>(null)
 
   useEffect(() => {
     const client = mqtt.connect(mqttConfig.host, {
@@ -86,39 +174,25 @@ function App() {
     clientRef.current = client
 
     client.on('connect', () => {
-      // 1. Erst subscriben — damit retained messages (minmax/update, Pool_temp, etc.)
-      //    sofort geliefert werden, BEVOR wir den Request absenden
       client.subscribe(EXPLICIT_SUBSCRIBES, { qos: 0 }, () => {
-        // 2. Erst nach erfolgtem Subscribe den MinMax-Request senden
         client.publish(REQUEST_TOPIC, JSON.stringify({ ts: Date.now() }))
       })
-      // Schalter-Status abfragen
       topics.forEach(({ publishTopic }) => {
         if (publishTopic?.includes('/POWER')) client.publish(publishTopic, '')
       })
     })
 
-    client.on('error', (err) => console.error('MQTT Fehler:', err))
+    client.on('error', (err) => console.error('MQTT:', err))
 
     client.on('message', (topic, message) => {
       const payload = message.toString()
-
       if (topic === MINMAX_TOPIC) {
-        try {
-          const incoming = JSON.parse(payload)
-          setMinMax(incoming)
-          saveCachedMinMax(incoming) // im Browser cachen
-        } catch {}
+        try { const d = JSON.parse(payload); setMinMax(d); saveCachedMinMax(d) } catch {}
         return
       }
-
-      // Einfache Plaintext-Topics
       if (topic === 'Pool_temp/temperatur' || topic === 'Gaszaehler/stand') {
-        messageQueue.current[topic] = payload
-        return
+        messageQueue.current[topic] = payload; return
       }
-
-      // JSON-Topics flatten
       try {
         const json = JSON.parse(payload)
         const flatten = (obj: any, prefix = ''): Record<string, string> =>
@@ -139,16 +213,14 @@ function App() {
       const updates = messageQueue.current
       if (Object.keys(updates).length === 0) return
       messageQueue.current = {}
-
       const h = histRef.current
       for (const [key, val] of Object.entries(updates)) {
         const n = parseFloat(val)
         if (isNaN(n)) continue
-        if (!h[key]) { h[key] = [n] }
-        else if (h[key].length >= HISTORY_LENGTH) { h[key] = [...h[key].slice(1), n] }
-        else { h[key].push(n) }
+        if (!h[key])                     h[key] = [n]
+        else if (h[key].length >= HISTORY_LENGTH) h[key] = [...h[key].slice(1), n]
+        else                             h[key].push(n)
       }
-
       setValues(prev => ({ ...prev, ...updates }))
       setLastUpdate(new Date().toLocaleTimeString())
     }
@@ -157,245 +229,255 @@ function App() {
     return () => { clearInterval(interval); client.end(true) }
   }, [])
 
-  const toggleBoolean = (publishTopic: string, current: string) => {
+  const toggle = (publishTopic: string, current: string) => {
     const next = current?.toUpperCase() === 'ON' ? 'OFF' : 'ON'
     setValues(prev => ({ ...prev, [publishTopic.replace('cmnd/', 'stat/')]: next }))
     clientRef.current?.publish(publishTopic, next)
   }
 
-  const getBarColor = (label: string, value: number) => {
-    if (label.includes('Verbrauch aktuell')) return value >= 1000 ? 'bg-red-600' : value >= 300 ? 'bg-yellow-400' : 'bg-green-500'
-    if (label.includes('Balkonkraftwerk')) return value >= 500 ? 'bg-green-500' : value >= 250 ? 'bg-yellow-400' : 'bg-red-600'
-    if (label.includes('Pool Temperatur')) return value > 23 ? 'bg-green-500' : value > 17 ? 'bg-yellow-400' : 'bg-blue-500'
-    return 'bg-blue-500'
-  }
-
-  const progressBar = (value: number, max = 100, color = 'bg-blue-500') => (
-    <div className="w-full bg-gray-300 rounded-full h-2 mt-2 overflow-hidden">
-      <div className={`${color} h-2 transition-all duration-500 ease-in-out`} style={{ width: `${Math.min(100, (value / max) * 100)}%` }} />
-    </div>
-  )
-
+  const isOn = (val: string) => val?.toUpperCase() === 'ON'
   const hist = histRef.current
 
+  // ── helpers ──────────────────────────────────────────────────────────────
+  const powerColor = (w: number) => w >= 1000 ? T.err : w >= 300 ? T.warn : T.ok
+
   return (
-    <main className="min-h-screen p-4 sm:p-6 bg-gray-950 text-white font-sans">
-      <header className="mb-6 text-sm text-gray-400">Letztes Update: {lastUpdate || 'Verbinde...'}</header>
+    <div style={{ minHeight: '100vh', background: T.bg, color: T.text, fontFamily: "'Inter', system-ui, sans-serif" }}>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-
-        {/* 3D-Drucker */}
-        <div className="rounded-xl p-4 border border-gray-600 bg-gray-800">
-          <h2 className="text-md font-bold mb-2">🧱 3D-Drucker</h2>
-          {['Sidewinder X1'].map((label, i) => {
-            const topic = topics.find(t => t.label === label)
-            if (!topic) return null
-            const val = values[topic.statusTopic]?.toUpperCase()
-            return (
-              <div key={label} className={`flex justify-between items-center ${i > 0 ? 'mt-3' : 'mt-1'}`}>
-                <span>{label}</span>
-                <button className={`px-4 py-1 rounded text-white ${val === 'ON' ? 'bg-green-500' : 'bg-red-500'}`}
-                  onClick={() => toggleBoolean(topic.publishTopic!, val)}>
-                  {val === 'ON' ? 'AN' : 'AUS'}
-                </button>
-              </div>
-            )
-          })}
+      {/* ── Header ── */}
+      <header style={{
+        background: T.surf,
+        borderBottom: `1px solid ${T.border}`,
+        padding: '10px 20px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        position: 'sticky',
+        top: 0,
+        zIndex: 10,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: T.text, opacity: 0.7 }}>
+            MQTT Dashboard
+          </span>
+          <span style={{ width: 6, height: 6, borderRadius: '50%', background: lastUpdate ? T.ok : T.warn, display: 'inline-block' }} />
+          <span style={{ fontSize: 11, color: lastUpdate ? T.ok : T.warn }}>
+            {lastUpdate ? 'verbunden' : 'verbinde…'}
+          </span>
         </div>
+        <span style={{ fontSize: 11, color: T.muted, fontVariantNumeric: 'tabular-nums' }}>
+          {lastUpdate ? `Letztes Update: ${lastUpdate}` : ''}
+        </span>
+      </header>
 
-        {/* Pool */}
-        <div className="rounded-xl p-4 border border-gray-600 bg-gray-800">
-          <h2 className="text-md font-bold mb-2">🏊 Pool</h2>
-          {(() => {
-            const pumpe = topics.find(t => t.label === 'Poolpumpe')
-            const tempKey = 'Pool_temp/temperatur'
-            const raw = values[tempKey]
-            const val = raw !== undefined ? parseFloat(raw) : NaN
-            const range = minMax[tempKey] ?? { min: val, max: val }
-            const h = hist[tempKey] ?? []
-            return (
-              <>
-                <div className="flex justify-between items-center">
-                  <span>Pumpe</span>
-                  {pumpe && (
-                    <button className={`px-4 py-1 rounded text-white ${values[pumpe.statusTopic]?.toUpperCase() === 'ON' ? 'bg-green-500' : 'bg-red-500'}`}
-                      onClick={() => toggleBoolean(pumpe.publishTopic!, values[pumpe.statusTopic])}>
-                      {values[pumpe.statusTopic]?.toUpperCase() === 'ON' ? 'AN' : 'AUS'}
-                    </button>
-                  )}
-                </div>
-                <p className="mt-3">🌡️ Temperatur: {isNaN(val) ? '...' : `${val} °C`}</p>
-                {progressBar(val, 40, getBarColor('Pool Temperatur', val))}
-                <p className="text-xs text-gray-400">Min: {range.min?.toFixed(1)} °C | Max: {range.max?.toFixed(1)} °C</p>
-                {h.length >= 2 && <div className="mt-1 opacity-70"><Sparkline data={h} color={sparkColor('Temperatur', val)} height={28} /></div>}
-              </>
-            )
-          })()}
-        </div>
+      <main style={{ padding: '14px 16px 24px' }}>
 
-        {/* Zähler */}
-        <div className="rounded-xl p-4 border border-gray-600 bg-gray-800">
-          <h2 className="text-md font-bold mb-2">🎰 Zähler</h2>
-          <div className="flex flex-col space-y-2">
-            <p>⚡ Strom: {values['tele/Stromzähler/SENSOR.grid.sml_v'] ?? '...'} kWh</p>
-            <p>🔋 BKW: {(() => {
-              const key = 'tele/Balkonkraftwerk/SENSOR.ENERGY.EnergyPTotal.0'
-              const raw = values[key]
-              const num = parseFloat(raw)
-              return !isNaN(num) ? (num + 178.779).toFixed(3) : '...'
-            })()} kWh</p>
-            <p>🔥 Gas: {values['Gaszaehler/stand'] ?? '...'} m³</p>
-          </div>
-        </div>
+        {/* ── Top cards grid ── */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 10, marginBottom: 10 }}>
 
-        {/* Strom */}
-        <div className="rounded-xl p-4 border border-gray-600 bg-gray-800">
-          <h2 className="text-md font-bold mb-3">🔋 Strom</h2>
-          {(() => {
-            const key = 'tele/Stromzähler/SENSOR.grid.sml_m'
-            const raw = values[key]
-            const num = raw !== undefined ? parseFloat(raw) : NaN
-            const range = minMax[key] ?? { min: num, max: num }
-            const h = hist[key] ?? []
-            const color = num >= 1000 ? 'bg-red-600' : num >= 300 ? 'bg-yellow-400' : 'bg-green-500'
-            return (
-              <>
-                <p className="mt-1">Verbrauch Aktuell: {isNaN(num) ? '...' : `${num} W`}</p>
-                {progressBar(num, range.max > 0 ? range.max : 2000, color)}
-                <p className="text-xs text-gray-400">Min: {range.min?.toFixed(1)} W | Max: {range.max?.toFixed(1)} W</p>
-                {h.length >= 2 && <div className="mt-1 opacity-70"><Sparkline data={h} color={sparkColor('Verbrauch', num)} height={28} /></div>}
-              </>
-            )
-          })()}
-          {(() => {
-            const key = 'tele/Balkonkraftwerk/SENSOR.ENERGY.Power.0'
-            const raw = values[key]
-            const num = raw !== undefined ? parseFloat(raw) : NaN
-            const range = minMax[key] ?? { min: num, max: num }
-            const h = hist[key] ?? []
-            const color = num >= 500 ? 'bg-green-500' : num >= 250 ? 'bg-yellow-400' : 'bg-red-600'
-            return (
-              <>
-                <p className="mt-3">Erzeugung Aktuell: {isNaN(num) ? '...' : `${num} W`}</p>
-                {progressBar(num, range.max > 0 ? range.max : 1000, color)}
-                <p className="text-xs text-gray-400">Min: {range.min?.toFixed(1)} W | Max: {range.max?.toFixed(1)} W</p>
-                {h.length >= 2 && <div className="mt-1 opacity-70"><Sparkline data={h} color={sparkColor('Erzeugung', num)} height={28} /></div>}
-              </>
-            )
-          })()}
-        </div>
-
-        {/* Steckdosen 1 */}
-        <div className="rounded-xl p-4 border border-gray-600 bg-gray-800">
-          <h2 className="text-md font-bold mb-2">🔌 Steckdosen 1</h2>
-          {['Steckdose 1', 'Steckdose 2'].map((label, i) => {
-            const topic = topics.find(t => t.label === label)
-            if (!topic) return null
-            const val = values[topic.statusTopic]?.toUpperCase()
-            return (
-              <div key={label} className={`flex justify-between items-center ${i > 0 ? 'mt-3' : 'mt-1'}`}>
-                <span>{label}</span>
-                <button className={`px-4 py-1 rounded text-white ${val === 'ON' ? 'bg-green-500' : 'bg-red-500'}`}
-                  onClick={() => toggleBoolean(topic.publishTopic!, val)}>
-                  {val === 'ON' ? 'AN' : 'AUS'}
-                </button>
-              </div>
-            )
-          })}
-          <div className="flex justify-between items-center mt-3">
-            <span>Doppelsteckdose</span>
-            <button
-              className={`px-4 py-1 rounded text-white ${values['stat/Doppelsteckdose/POWER']?.toUpperCase() === 'ON' ? 'bg-green-500' : 'bg-red-500'}`}
-              onClick={() => toggleBoolean('cmnd/Doppelsteckdose/POWER', values['stat/Doppelsteckdose/POWER']?.toUpperCase())}
-            >
-              {values['stat/Doppelsteckdose/POWER']?.toUpperCase() === 'ON' ? 'AN' : 'AUS'}
-            </button>
-          </div>
-        </div>
-
-        {/* Steckdosen + Beleuchtung */}
-        <div className="rounded-xl p-4 border border-gray-600 bg-gray-800">
-          <h2 className="text-md font-bold mb-2">🔌 Steckdosen + Beleuchtung</h2>
-          {[
-            { label: 'Teichpumpe', publishTopic: 'cmnd/Teichpumpe/POWER', statusTopic: 'stat/Teichpumpe/POWER' },
-            { label: 'Beleuchtung', publishTopic: 'cmnd/Beleuchtung/POWER', statusTopic: 'stat/Beleuchtung/POWER' },
-            { label: 'Carport-Licht', publishTopic: 'cmnd/Carport-Licht/POWER', statusTopic: 'stat/Carport-Licht/POWER' }
-          ].map(({ label, publishTopic, statusTopic }, i) => {
-            const val = values[statusTopic]?.toUpperCase()
-            return (
-              <div key={label} className={`flex justify-between items-center ${i > 0 ? 'mt-3' : 'mt-1'}`}>
-                <span>{label}</span>
-                <button className={`px-4 py-1 rounded text-white ${val === 'ON' ? 'bg-green-500' : 'bg-red-500'}`}
-                  onClick={() => toggleBoolean(publishTopic, val)}>
-                  {val === 'ON' ? 'AN' : 'AUS'}
-                </button>
-              </div>
-            )
-          })}
-        </div>
-
-        {/* Dynamische Topics */}
-        {topics.filter(t =>
-          t.type !== 'group' &&
-          !['Sidewinder X1', 'Poolpumpe', 'Steckdose 1', 'Steckdose 2'].includes(t.label)
-        ).map(({ label, type, unit, favorite, statusTopic, publishTopic, topic }) => {
-          const key = statusTopic ?? topic
-          const raw = values[key]
-          const value = raw?.toUpperCase()
-          const num = parseFloat(raw)
-          const isNumber = type === 'number' && !isNaN(num)
-          const showMinMax = !label.includes('gesamt') && (key.includes('sml_L') || key.includes('sml_m') || key.includes('Balkonkraftwerk'))
-          const range = minMax[key] ?? { min: num, max: num }
-          const h = hist[key] ?? []
-          return (
-            <div key={key} className={`rounded-xl p-4 border ${favorite ? 'border-yellow-400' : 'border-gray-600'} bg-gray-800`}>
-              <h2 className="text-md font-bold mb-2">{label}</h2>
-              {type === 'boolean' && (
-                <button className={`px-4 py-1 rounded text-white ${value === 'ON' ? 'bg-green-500' : 'bg-red-500'}`}
-                  onClick={() => toggleBoolean(publishTopic ?? key, value)}>
-                  {value === 'ON' ? 'AN' : 'AUS'}
-                </button>
-              )}
-              {isNumber && (
-                <>
-                  <p className="text-2xl">{raw ?? '...'} {unit}</p>
-                  {showMinMax && progressBar(num, range.max > 0 ? range.max : 100, getBarColor(label, num))}
-                  {showMinMax && <p className="text-xs text-gray-400">Min: {range.min.toFixed(1)} {unit} | Max: {range.max.toFixed(1)} {unit}</p>}
-                  {h.length >= 2 && <div className="mt-2 opacity-70"><Sparkline data={h} color={sparkColor(label, num)} height={28} /></div>}
-                </>
-              )}
-              {type === 'string' && <p className="text-lg">{raw ?? '...'}</p>}
-            </div>
-          )
-        })}
-      </div>
-
-      {/* Gruppen */}
-      <div className="mt-10 grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {topics.filter(t => t.type === 'group').map(group => (
-          <div key={group.label} className="rounded-xl p-4 border border-gray-600 bg-gray-800">
-            <h2 className="text-lg font-bold mb-2">{group.label}</h2>
-            {group.keys?.map(({ label, key }) => {
-              const raw = values[key]
-              const num = raw !== undefined ? parseFloat(raw) : NaN
-              const range = minMax[key] ?? { min: num, max: num }
-              const h = hist[key] ?? []
-              const isSpannung = group.label.includes('Spannung')
+          {/* 3D-Drucker */}
+          <Card>
+            <CardLabel>🧱 3D-Drucker</CardLabel>
+            {['Sidewinder X1'].map(label => {
+              const t = topics.find(x => x.label === label)
+              if (!t) return null
+              const val = values[t.statusTopic]
               return (
-                <div key={key} className="mb-3">
-                  <div className="text-sm">{label}: {isNaN(num) ? '...' : `${isSpannung ? num.toFixed(0) : num} ${group.unit}`}</div>
-                  {progressBar(num, isSpannung ? 250 : 1000, 'bg-blue-500')}
-                  <div className="text-xs text-gray-400">
-                    Min: {range.min?.toFixed(isSpannung ? 0 : 1)} {group.unit} | Max: {range.max?.toFixed(isSpannung ? 0 : 1)} {group.unit}
-                  </div>
-                  {h.length >= 2 && <div className="mt-1 opacity-60"><Sparkline data={h} color={sparkColor(group.label, num)} height={24} /></div>}
+                <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: 13 }}>{label}</span>
+                  <ToggleBtn on={isOn(val)} onClick={() => toggle(t.publishTopic!, val)} />
                 </div>
               )
             })}
-          </div>
-        ))}
-      </div>
-    </main>
+          </Card>
+
+          {/* Pool */}
+          <Card>
+            <CardLabel>🏊 Pool</CardLabel>
+            {(() => {
+              const pumpe   = topics.find(t => t.label === 'Poolpumpe')
+              const tempKey = 'Pool_temp/temperatur'
+              const raw     = values[tempKey]
+              const val     = raw !== undefined ? parseFloat(raw) : NaN
+              const range   = minMax[tempKey] ?? { min: val, max: val }
+              const h       = hist[tempKey] ?? []
+              const col     = val > 23 ? T.ok : val > 17 ? T.warn : T.spark.cyan
+              return (
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <span style={{ fontSize: 13 }}>Pumpe</span>
+                    {pumpe && <ToggleBtn on={isOn(values[pumpe.statusTopic])} onClick={() => toggle(pumpe.publishTopic!, values[pumpe.statusTopic])} />}
+                  </div>
+                  <div style={{ fontSize: 13, marginBottom: 2 }}>🌡️ {isNaN(val) ? '…' : `${val} °C`}</div>
+                  <Bar value={val} max={40} color={col} />
+                  <MinMaxRow min={range.min} max={range.max} unit=" °C" />
+                  {h.length >= 2 && <div style={{ marginTop: 4 }}><Sparkline data={h} color={col} height={26} /></div>}
+                </>
+              )
+            })()}
+          </Card>
+
+          {/* Zähler */}
+          <Card>
+            <CardLabel>🎰 Zähler</CardLabel>
+            <div style={{ fontSize: 13, lineHeight: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <span><span style={{ color: T.muted }}>⚡</span> {values['tele/Stromzähler/SENSOR.grid.sml_v'] ?? '…'} kWh</span>
+              <span><span style={{ color: T.muted }}>🔋</span> {(() => {
+                const raw = values['tele/Balkonkraftwerk/SENSOR.ENERGY.EnergyPTotal.0']
+                const n   = parseFloat(raw)
+                return !isNaN(n) ? (n + 178.779).toFixed(3) : '…'
+              })()} kWh</span>
+              <span><span style={{ color: T.muted }}>🔥</span> {values['Gaszaehler/stand'] ?? '…'} m³</span>
+            </div>
+          </Card>
+
+          {/* Strom */}
+          <Card>
+            <CardLabel>🔋 Strom</CardLabel>
+            {(() => {
+              const key   = 'tele/Stromzähler/SENSOR.grid.sml_m'
+              const num   = parseFloat(values[key])
+              const range = minMax[key] ?? { min: num, max: num }
+              const h     = hist[key] ?? []
+              const col   = powerColor(num)
+              return (
+                <>
+                  <div style={{ fontSize: 13, marginBottom: 2 }}>Verbrauch: <strong style={{ color: T.text }}>{isNaN(num) ? '…' : `${num} W`}</strong></div>
+                  <Bar value={num} max={range.max > 0 ? range.max : 2000} color={col} />
+                  <MinMaxRow min={range.min} max={range.max} unit=" W" />
+                  {h.length >= 2 && <div style={{ marginTop: 4 }}><Sparkline data={h} color={col} height={26} /></div>}
+                </>
+              )
+            })()}
+            {(() => {
+              const key   = 'tele/Balkonkraftwerk/SENSOR.ENERGY.Power.0'
+              const num   = parseFloat(values[key])
+              const range = minMax[key] ?? { min: num, max: num }
+              const h     = hist[key] ?? []
+              const col   = num >= 500 ? T.ok : num >= 250 ? T.warn : T.err
+              return (
+                <>
+                  <div style={{ fontSize: 13, marginTop: 10, marginBottom: 2 }}>Erzeugung: <strong style={{ color: T.text }}>{isNaN(num) ? '…' : `${num} W`}</strong></div>
+                  <Bar value={num} max={range.max > 0 ? range.max : 1000} color={col} />
+                  <MinMaxRow min={range.min} max={range.max} unit=" W" />
+                  {h.length >= 2 && <div style={{ marginTop: 4 }}><Sparkline data={h} color={col} height={26} /></div>}
+                </>
+              )
+            })()}
+          </Card>
+
+          {/* Steckdosen 1 */}
+          <Card>
+            <CardLabel>🔌 Steckdosen 1</CardLabel>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {['Steckdose 1', 'Steckdose 2'].map(label => {
+                const t = topics.find(x => x.label === label)
+                if (!t) return null
+                const val = values[t.statusTopic]
+                return (
+                  <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: 13 }}>{label}</span>
+                    <ToggleBtn on={isOn(val)} onClick={() => toggle(t.publishTopic!, val)} />
+                  </div>
+                )
+              })}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: 13 }}>Doppelsteckdose</span>
+                <ToggleBtn
+                  on={isOn(values['stat/Doppelsteckdose/POWER'])}
+                  onClick={() => toggle('cmnd/Doppelsteckdose/POWER', values['stat/Doppelsteckdose/POWER'])}
+                />
+              </div>
+            </div>
+          </Card>
+
+          {/* Steckdosen + Beleuchtung */}
+          <Card>
+            <CardLabel>🔌 Steckdosen + Beleuchtung</CardLabel>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {[
+                { label: 'Teichpumpe',   pub: 'cmnd/Teichpumpe/POWER',   stat: 'stat/Teichpumpe/POWER' },
+                { label: 'Beleuchtung',  pub: 'cmnd/Beleuchtung/POWER',  stat: 'stat/Beleuchtung/POWER' },
+                { label: 'Carport-Licht',pub: 'cmnd/Carport-Licht/POWER',stat: 'stat/Carport-Licht/POWER' },
+              ].map(({ label, pub, stat }) => (
+                <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: 13 }}>{label}</span>
+                  <ToggleBtn on={isOn(values[stat])} onClick={() => toggle(pub, values[stat])} />
+                </div>
+              ))}
+            </div>
+          </Card>
+
+          {/* Dynamische Topics */}
+          {topics.filter(t =>
+            t.type !== 'group' &&
+            !['Sidewinder X1', 'Poolpumpe', 'Steckdose 1', 'Steckdose 2'].includes(t.label)
+          ).map(({ label, type, unit, favorite, statusTopic, publishTopic, topic }) => {
+            const key    = statusTopic ?? topic
+            const raw    = values[key]
+            const num    = parseFloat(raw)
+            const isNum  = type === 'number' && !isNaN(num)
+            const showMM = !label.includes('gesamt') && (key.includes('sml_L') || key.includes('sml_m') || key.includes('Balkonkraftwerk'))
+            const range  = minMax[key] ?? { min: num, max: num }
+            const h      = hist[key] ?? []
+            return (
+              <Card key={key} highlight={favorite}>
+                <CardLabel>{label}</CardLabel>
+                {type === 'boolean' && (
+                  <ToggleBtn on={isOn(raw)} onClick={() => toggle(publishTopic ?? key, raw)} />
+                )}
+                {isNum && (
+                  <>
+                    <div style={{ fontSize: 22, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+                      {raw} <span style={{ fontSize: 13, fontWeight: 400, color: T.muted }}>{unit}</span>
+                    </div>
+                    {showMM && <Bar value={num} max={range.max > 0 ? range.max : 100} color={powerColor(num)} />}
+                    {showMM && <MinMaxRow min={range.min} max={range.max} unit={unit ? ` ${unit}` : ''} />}
+                    {h.length >= 2 && <div style={{ marginTop: 6 }}><Sparkline data={h} color={sparkColor(label, num)} height={26} /></div>}
+                  </>
+                )}
+                {type === 'string' && <div style={{ fontSize: 15 }}>{raw ?? '…'}</div>}
+              </Card>
+            )
+          })}
+        </div>
+
+        {/* ── Group cards (L1–L3) ── */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 10 }}>
+          {topics.filter(t => t.type === 'group').map(group => (
+            <Card key={group.label}>
+              <CardLabel>{group.label}</CardLabel>
+              {group.keys?.map(({ label, key }) => {
+                const raw      = values[key]
+                const num      = raw !== undefined ? parseFloat(raw) : NaN
+                const range    = minMax[key] ?? { min: num, max: num }
+                const h        = hist[key] ?? []
+                const isSpan   = group.label.includes('Spannung')
+                const isStrom  = group.label.includes('Strom L')
+                const barColor = isSpan ? T.spark.purple : isStrom ? T.spark.orange : T.spark.power
+                const barMax   = isSpan ? 250 : isStrom ? 20 : 1000
+                const dp       = isSpan ? 0 : 1
+                return (
+                  <div key={key} style={{ marginBottom: 10 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', fontSize: 13 }}>
+                      <span style={{ color: T.muted }}>{label}</span>
+                      <strong style={{ fontVariantNumeric: 'tabular-nums' }}>{isNaN(num) ? '…' : `${num.toFixed(dp)} ${group.unit}`}</strong>
+                    </div>
+                    <Bar value={num} max={barMax} color={barColor} />
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: T.muted, marginTop: 2 }}>
+                      <span>Min: {range.min?.toFixed(dp)} {group.unit}</span>
+                      <span>Max: {range.max?.toFixed(dp)} {group.unit}</span>
+                    </div>
+                    {h.length >= 2 && <div style={{ marginTop: 3, opacity: 0.65 }}><Sparkline data={h} color={barColor} height={24} /></div>}
+                  </div>
+                )
+              })}
+            </Card>
+          ))}
+        </div>
+
+      </main>
+    </div>
   )
 }
 
