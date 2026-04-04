@@ -2,7 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ── Google Fonts: alle 4 Themes auf einmal laden ── */
 @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow:wght@400;600;700&family=Outfit:wght@400;600;700&display=swap');
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -13,13 +12,51 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Scrollbar */
+/* ── Scrollbar ── */
 ::-webkit-scrollbar        { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track  { background: transparent; }
 ::-webkit-scrollbar-thumb  { background: rgba(255,255,255,0.12); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.25); }
 
-/* ── Top grid: 6 Spalten → responsiv ── */
+/* ── Header ── */
+.dash-header {
+  padding: 11px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+}
+
+/* Mobil: zweizeilig, Update unter dem Titel */
+@media (max-width: 600px) {
+  .dash-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    padding: 10px 14px;
+    font-size: 12px;
+  }
+}
+
+/* ── Card-Label-Schrift: auf Desktop größer ── */
+.card-label-text {
+  /* Basisgröße kommt aus theme.ts via inline style */
+}
+
+@media (min-width: 900px) {
+  .card-label-text {
+    font-size: 13px !important;
+  }
+}
+
+@media (min-width: 1400px) {
+  .card-label-text {
+    font-size: 14px !important;
+  }
+}
+
+/* ── Top grid: 6 → 3 → 2 Spalten ── */
 .grid-top {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
@@ -30,11 +67,12 @@ body {
 @media (max-width: 1300px) {
   .grid-top { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
+
 @media (max-width: 700px) {
   .grid-top { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
-/* ── Group grid: 3 Spalten → responsiv ── */
+/* ── Group grid: 3 → 2 → 1 Spalten ── */
 .grid-groups {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -44,6 +82,7 @@ body {
 @media (max-width: 1000px) {
   .grid-groups { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
 @media (max-width: 600px) {
   .grid-groups { grid-template-columns: 1fr; }
 }
