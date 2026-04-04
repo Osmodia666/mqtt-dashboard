@@ -19,29 +19,29 @@ const EXPLICIT_SUBSCRIBES = [
   MINMAX_TOPIC,
 ]
 
-// ── Slate Night design tokens ──────────────────────────────────────────────
+// ── Carbon design tokens ───────────────────────────────────────────────────
 const T = {
-  bg:       '#1a1f2e',
-  surf:     '#242938',
-  surf2:    '#2d3347',
+  bg:       '#141414',
+  surf:     '#1f1f1f',
+  surf2:    '#2a2a2a',
   border:   'rgba(255,255,255,0.07)',
-  borderHi: 'rgba(255,255,255,0.13)',
-  text:     '#e8edf8',
-  muted:    'rgba(255,255,255,0.35)',
-  accent:   '#7c8cf8',
-  accentDim:'rgba(124,140,248,0.15)',
-  ok:       '#34d399',
-  okDim:    'rgba(52,211,153,0.15)',
-  warn:     '#fbbf24',
-  warnDim:  'rgba(251,191,36,0.15)',
+  borderHi: 'rgba(255,107,53,0.35)',
+  text:     '#e0e0e0',
+  muted:    'rgba(255,255,255,0.32)',
+  accent:   '#ff6b35',
+  accentDim:'rgba(255,107,53,0.15)',
+  ok:       '#4ade80',
+  okDim:    'rgba(74,222,128,0.15)',
+  warn:     '#facc15',
+  warnDim:  'rgba(250,204,21,0.15)',
   err:      '#f87171',
   errDim:   'rgba(248,113,113,0.15)',
   spark: {
-    power:   '#7c8cf8',
-    energy:  '#34d399',
-    warn:    '#fbbf24',
-    purple:  '#a78bfa',
-    orange:  '#fb923c',
+    power:   '#60a5fa',
+    energy:  '#4ade80',
+    warn:    '#facc15',
+    purple:  '#c084fc',
+    orange:  '#ff6b35',
     cyan:    '#38bdf8',
   },
 } as const
@@ -247,7 +247,7 @@ function App() {
       {/* ── Header ── */}
       <header style={{
         background: T.surf,
-        borderBottom: `1px solid ${T.border}`,
+        borderBottom: `2px solid ${T.accent}`,
         padding: '10px 20px',
         display: 'flex',
         alignItems: 'center',
@@ -270,10 +270,10 @@ function App() {
         </span>
       </header>
 
-      <main style={{ padding: '14px 16px 24px' }}>
+      <main style={{ padding: '14px 20px 32px' }}>
 
         {/* ── Top cards grid ── */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 10, marginBottom: 10 }}>
+        <div className="grid-top">
 
           {/* 3D-Drucker */}
           <Card>
@@ -443,7 +443,7 @@ function App() {
         </div>
 
         {/* ── Group cards (L1–L3) ── */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 10 }}>
+        <div className="grid-groups">
           {topics.filter(t => t.type === 'group').map(group => (
             <Card key={group.label}>
               <CardLabel>{group.label}</CardLabel>
