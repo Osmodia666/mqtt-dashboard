@@ -81,7 +81,7 @@ function CardLabel({ icon, children, color }: { icon: string; children: React.Re
       <span style={{ fontSize: 15, lineHeight: 1, fontStyle: 'normal', textTransform: 'none', letterSpacing: 0 }}>
         {icon}
       </span>
-      <span style={{
+      <span className="card-label-text" style={{
         fontFamily: T.fontLabel,
         fontSize: T.labelSize,
         fontWeight: 700,
@@ -140,9 +140,11 @@ function ToggleBtn({ on, onClick }: { on: boolean; onClick: () => void }) {
 // ── Switch Row ────────────────────────────────────────────────────────────
 function SwitchRow({ label, on, onClick }: { label: string; on: boolean; onClick: () => void }) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-      <span style={{ fontSize: 14, fontFamily: T.fontBody, color: T.text }}>{label}</span>
-      <ToggleBtn on={on} onClick={onClick} />
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
+      <span style={{ fontSize: 14, fontFamily: T.fontBody, color: T.text, minWidth: 0, wordBreak: 'break-word' }}>{label}</span>
+      <div style={{ flexShrink: 0 }}>
+        <ToggleBtn on={on} onClick={onClick} />
+      </div>
     </div>
   )
 }
@@ -245,27 +247,23 @@ function App() {
     <div style={{ minHeight: '100vh', background: T.bg, color: T.text, fontFamily: T.fontBody }}>
 
       {/* ── Header ── */}
-      <header style={{
+      <header className="dash-header" style={{
         background: T.surf,
         borderBottom: `2px solid ${T.accent}`,
-        padding: '11px 20px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
         position: 'sticky',
         top: 0,
         zIndex: 10,
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <span style={{ fontFamily: T.fontLabel, fontSize: 12, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: T.text, opacity: 0.75 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ fontFamily: T.fontLabel, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: T.text, opacity: 0.75 }}>
             MQTT Dashboard
           </span>
-          <span style={{ width: 7, height: 7, borderRadius: '50%', background: lastUpdate ? T.ok : T.warn, display: 'inline-block' }} />
-          <span style={{ fontFamily: T.fontLabel, fontSize: 12, color: lastUpdate ? T.ok : T.warn }}>
+          <span style={{ width: 7, height: 7, borderRadius: '50%', background: lastUpdate ? T.ok : T.warn, display: 'inline-block', flexShrink: 0 }} />
+          <span style={{ fontFamily: T.fontLabel, color: lastUpdate ? T.ok : T.warn, whiteSpace: 'nowrap' }}>
             {lastUpdate ? 'verbunden' : 'verbinde…'}
           </span>
         </div>
-        <span style={{ fontFamily: T.fontMono, fontSize: 12, color: T.muted, fontVariantNumeric: 'tabular-nums' }}>
+        <span style={{ fontFamily: T.fontMono, color: T.muted, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
           {lastUpdate ? `Letztes Update: ${lastUpdate}` : ''}
         </span>
       </header>
