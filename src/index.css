@@ -15,18 +15,39 @@ body {
   padding: 0;
 }
 
-/* Scrollbar styling for dark theme */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+/* ── Scrollbar ── */
+::-webkit-scrollbar        { width: 6px; height: 6px; }
+::-webkit-scrollbar-track  { background: #141414; }
+::-webkit-scrollbar-thumb  { background: rgba(255,255,255,0.13); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,107,53,0.4); }
+
+/* ── Responsive grid: top cards (6 → 3 → 2 cols) ── */
+.grid-top {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
 }
-::-webkit-scrollbar-track {
-  background: #1a1f2e;
+
+@media (max-width: 1200px) {
+  .grid-top { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
-::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
-  border-radius: 3px;
+
+@media (max-width: 700px) {
+  .grid-top { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.25);
+
+/* ── Responsive grid: group cards (3 → 2 → 1 col) ── */
+.grid-groups {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+@media (max-width: 1000px) {
+  .grid-groups { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 600px) {
+  .grid-groups { grid-template-columns: 1fr; }
 }
