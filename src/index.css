@@ -2,52 +2,48 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+/* ── Google Fonts: alle 4 Themes auf einmal laden ── */
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow:wght@400;600;700&family=Outfit:wght@400;600;700&display=swap');
 
-*, *::before, *::after {
-  box-sizing: border-box;
-}
+*, *::before, *::after { box-sizing: border-box; }
 
 body {
-  font-family: 'Inter', system-ui, sans-serif;
-  -webkit-font-smoothing: antialiased;
   margin: 0;
   padding: 0;
+  -webkit-font-smoothing: antialiased;
 }
 
-/* ── Scrollbar ── */
+/* Scrollbar */
 ::-webkit-scrollbar        { width: 6px; height: 6px; }
-::-webkit-scrollbar-track  { background: #141414; }
-::-webkit-scrollbar-thumb  { background: rgba(255,255,255,0.13); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(255,107,53,0.4); }
+::-webkit-scrollbar-track  { background: transparent; }
+::-webkit-scrollbar-thumb  { background: rgba(255,255,255,0.12); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.25); }
 
-/* ── Responsive grid: top cards (6 → 3 → 2 cols) ── */
+/* ── Top grid: 6 Spalten → responsiv ── */
 .grid-top {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 12px;
-  margin-bottom: 12px;
+  gap: 10px;
+  margin-bottom: 10px;
 }
 
-@media (max-width: 1200px) {
+@media (max-width: 1300px) {
   .grid-top { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
-
 @media (max-width: 700px) {
   .grid-top { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
-/* ── Responsive grid: group cards (3 → 2 → 1 col) ── */
+/* ── Group grid: 3 Spalten → responsiv ── */
 .grid-groups {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
+  gap: 10px;
 }
 
 @media (max-width: 1000px) {
   .grid-groups { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
-
 @media (max-width: 600px) {
   .grid-groups { grid-template-columns: 1fr; }
 }
