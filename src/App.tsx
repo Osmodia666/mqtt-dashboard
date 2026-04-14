@@ -392,20 +392,20 @@ function App() {
     })
     clientRef.current = client
 
-    client.on('connect', () => {
-      client.subscribe(EXPLICIT_SUBSCRIBES, { qos: 0 }, () => {
-        client.publish(REQUEST_TOPIC, JSON.stringify({ ts: Date.now() }))
-        // Venus OS keepalive: alle 30s senden damit N/-Topics aktiv bleiben
-        const keepalive = setInterval(() => {
-          client.publish(`R/${VICTRON_PORTAL_ID}/system/0/Serial`, '')
-        }, 30_000)
-        // Cleanup beim Unmount
-        ;(client as any)._keepalive = keepalive
-      })
-      topics.forEach(({ publishTopic }) => {
-        if (publishTopic?.includes('/POWER')) client.publish(publishTopic, '')
-      })
-    })
+  client.on('connect', () => {
+  client.subscribe(EXPLICIT_SUBSCRIBES, { qos: 0 })
+
+  // WICHTIG: retained Messages erst ankommen lassen
+  setTimeout(() => {
+    client.publish(REQUEST_TOPIC, JSON.stringify({ ts: Date.now() }))
+  }, 300)
+
+  const keepalive = setInterval(() => {
+    client.publish(`R/${VICTRON_PORTAL_ID}/system/0/Serial`, '')
+  }, 30_000)
+
+  ;(client as any)._keepalive = keepalive
+})
 
     client.on('error', err => console.error('MQTT:', err))
 
