@@ -433,9 +433,9 @@ function App() {
 
       try {
         const json = JSON.parse(payload)
-        const flatten = (obj: any, prefix = ''): Record<string, string> =>
+        const flatten = (obj: any, prefix = topic): Record<string, string> =>
           Object.entries(obj).reduce((acc: Record<string, string>, [k, v]) => {
-            const key = prefix ? `${prefix}.${k}` : k
+            const key = `${prefix}.${k}`
             if (typeof v === 'object' && v !== null) Object.assign(acc, flatten(v, key))
             else acc[key] = String(v)
             return acc
