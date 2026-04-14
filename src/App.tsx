@@ -411,6 +411,7 @@ function App() {
 
     client.on('message', (topic: string, message: Buffer) => {
       const payload = message.toString()
+      console.log("MQTT:", topic, payload)
 
       if (topic === MINMAX_TOPIC) {
         try { const d = JSON.parse(payload); setMinMax(d); saveCachedMinMax(d) } catch {}
@@ -433,9 +434,9 @@ function App() {
 
       try {
         const json = JSON.parse(payload)
-        const flatten = (obj: any, prefix = topic): Record<string, string> =>
+        const flatten = (obj: any, prefix = ''): Record<string, string> =>
           Object.entries(obj).reduce((acc: Record<string, string>, [k, v]) => {
-            const key = `${prefix}.${k}`
+            const key = prefix ? `${prefix}.${k}` : k
             if (typeof v === 'object' && v !== null) Object.assign(acc, flatten(v, key))
             else acc[key] = String(v)
             return acc
