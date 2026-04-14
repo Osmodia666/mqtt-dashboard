@@ -6,6 +6,25 @@ export const mqttConfig = {
   password: 'v6Vrhy6u4reJsng',
 }
 
+// Venus OS Portal-ID – anpassen!
+export const VICTRON_PORTAL_ID = 'b827eb75907a'
+
+// ESS-Modi (Settings/CGwacs/BatteryLife/State)
+export const ESS_MODES = [
+  { value: 1, label: 'Optimiert',        sub: 'mit BatteryLife' },
+  { value: 2, label: 'Optimiert',        sub: 'ohne BatteryLife' },
+  { value: 3, label: 'Batterie laden',   sub: 'Keep charged' },
+  { value: 9, label: 'Extern',           sub: 'ESS External Control' },
+] as const
+
+// Wechselrichter-Modi (vebus/.../Mode)
+export const INVERTER_MODES = [
+  { value: 3, label: 'An',               sub: 'Normal' },
+  { value: 1, label: 'Nur Laden',        sub: 'Charger only' },
+  { value: 2, label: 'Nur Inverter',     sub: 'Inverter only' },
+  { value: 4, label: 'Aus',              sub: 'Off' },
+] as const
+
 export const topics = [
   {
     label: 'Sidewinder X1',
