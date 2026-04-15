@@ -17,26 +17,26 @@ const V = (path: string) => `N/${VICTRON_PORTAL_ID}/${path}`
 const VW = (path: string) => `W/${VICTRON_PORTAL_ID}/${path}`
 
 const VICTRON_TOPICS = {
-  // Batterie (Pylontech via VE.Can / BMS)
-  soc:         V('battery/0/Soc'),
-  batVoltage:  V('battery/0/Voltage'),
-  batCurrent:  V('battery/0/Current'),
-  batPower:    V('battery/0/Power'),
-  batTemp:     V('battery/0/Temperature'),
-  batState:    V('battery/0/State'),          // 0=idle 1=charging 2=discharging
+  // Batterie (Pylontech, Device-ID 512)
+  soc:         V('system/0/Dc/Battery/Soc'),         // system-Aggregat – zuverlässiger als battery/512
+  batVoltage:  V('system/0/Dc/Battery/Voltage'),
+  batCurrent:  V('system/0/Dc/Battery/Current'),
+  batPower:    V('system/0/Dc/Battery/Power'),
+  batTemp:     V('system/0/Dc/Battery/Temperature'),
+  batState:    V('system/0/Dc/Battery/State'),         // 0=idle 1=charging 2=discharging
 
-  // MPPT Solarladeregler
-  pvPower:     V('solarcharger/0/Yield/Power'),
-  pvVoltage:   V('solarcharger/0/Pv/V'),
-  pvCurrent:   V('solarcharger/0/Pv/I'),
-  mpptState:   V('solarcharger/0/State'),     // 0=Off 3=Bulk 4=Absorption 5=Float
+  // MPPT Solarladeregler (SmartSolar, Device-ID 288)
+  pvPower:     V('solarcharger/288/Yield/Power'),
+  pvVoltage:   V('solarcharger/288/Pv/V'),
+  pvCurrent:   V('solarcharger/288/Pv/I'),
+  mpptState:   V('solarcharger/288/State'),           // 0=Off 3=Bulk 4=Absorption 5=Float
 
-  // Wechselrichter/Charger (MultiPlus / Quattro)
-  acOutPower:  V('vebus/276/Ac/Out/P'),
-  acOutVoltage:V('vebus/276/Ac/Out/L1/V'),
-  acOutFreq:   V('vebus/276/Ac/Out/L1/F'),
-  vebusState:  V('vebus/276/VebusStatus'),    // 2=Fault 3=Bulk 4=Absorption 5=Float 9=Inverting
-  vebusMode:   V('vebus/276/Mode'),           // 1=Charger 2=Inverter 3=On 4=Off
+  // Wechselrichter/Charger (MultiPlus-II, Device-ID 288)
+  acOutPower:  V('vebus/288/Ac/Out/P'),
+  acOutVoltage:V('vebus/288/Ac/Out/L1/V'),
+  acOutFreq:   V('vebus/288/Ac/Out/L1/F'),
+  vebusState:  V('vebus/288/VebusStatus'),            // 2=Fault 3=Bulk 4=Absorption 5=Float 9=Inverting
+  vebusMode:   V('vebus/288/Mode'),                   // 1=Charger 2=Inverter 3=On 4=Off
 
   // ESS
   essMode:     V('settings/0/Settings/CGwacs/BatteryLife/State'),
@@ -508,7 +508,7 @@ function App() {
     victronWrite('settings/0/Settings/CGwacs/BatteryLife/State', v)
   }
   const setInverterMode = (v: number) => {
-    victronWrite('vebus/276/Mode', v)
+    victronWrite('vebus/288/Mode', v)
   }
 
   const isOn       = (v: string) => v?.toUpperCase() === 'ON'
