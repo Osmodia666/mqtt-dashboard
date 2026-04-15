@@ -56,9 +56,9 @@ export const topics = [
     type: 'group',
     unit: 'W',
     keys: [
-      { label: 'L1', key: 'tele/Stromzähler/SENSOR.grid.sml_L1_W' },
-      { label: 'L2', key: 'tele/Stromzähler/SENSOR.grid.sml_L2_W' },
-      { label: 'L3', key: 'tele/Stromzähler/SENSOR.grid.sml_L3_W' },
+      { label: 'L1', key: 'Stromzähler/Wirkleistung_L1' },
+      { label: 'L2', key: 'Stromzähler/Wirkleistung_L2' },
+      { label: 'L3', key: 'Stromzähler/Wirkleistung_L3' },
     ],
   },
   {
@@ -66,9 +66,9 @@ export const topics = [
     type: 'group',
     unit: 'V',
     keys: [
-      { label: 'L1', key: 'tele/Stromzähler/SENSOR.grid.sml_L1_V' },
-      { label: 'L2', key: 'tele/Stromzähler/SENSOR.grid.sml_L2_V' },
-      { label: 'L3', key: 'tele/Stromzähler/SENSOR.grid.sml_L3_V' },
+      { label: 'L1', key: 'Stromzähler/Spannung_L1' },
+      { label: 'L2', key: 'Stromzähler/Spannung_L2' },
+      { label: 'L3', key: 'Stromzähler/Spannung_L3' },
     ],
   },
   {
@@ -76,9 +76,9 @@ export const topics = [
     type: 'group',
     unit: 'A',
     keys: [
-      { label: 'L1', key: 'tele/Stromzähler/SENSOR.grid.sml_L1_A' },
-      { label: 'L2', key: 'tele/Stromzähler/SENSOR.grid.sml_L2_A' },
-      { label: 'L3', key: 'tele/Stromzähler/SENSOR.grid.sml_L3_A' },
+      { label: 'L1', key: 'Stromzähler/Strom_L1' },
+      { label: 'L2', key: 'Stromzähler/Strom_L2' },
+      { label: 'L3', key: 'Stromzähler/Strom_L3' },
     ],
   },
 ]

@@ -74,6 +74,8 @@ const EXPLICIT_SUBSCRIBES = [
   'stat/+/POWER',
   'stat/+/POWER1',
   MINMAX_TOPIC,
+  // Einzelne Stromzähler-Topics (retained, von Tasmota publish2)
+  'Stromzähler/#',
   // Victron: alle N/<portal-id>/# abonnieren
   `N/${VICTRON_PORTAL_ID}/#`,
 ]
@@ -395,15 +397,19 @@ function App() {
   client.on('connect', () => {
   client.subscribe(EXPLICIT_SUBSCRIBES, { qos: 0 })
 
-  // WICHTIG: retained Messages erst ankommen lassen
+  // Victron keepalive sofort senden damit Venus OS retained Messages pushed,
+  // dann nochmal alle 30s wiederholen
+  const sendKeepalive = () => {
+    client.publish(`R/${VICTRON_PORTAL_ID}/system/0/Serial`, '')
+  }
+  sendKeepalive()
+
+  // MinMax-Request nach kurzer Pause (retained Messages kommen zuerst)
   setTimeout(() => {
     client.publish(REQUEST_TOPIC, JSON.stringify({ ts: Date.now() }))
-  }, 300)
+  }, 500)
 
-  const keepalive = setInterval(() => {
-    client.publish(`R/${VICTRON_PORTAL_ID}/system/0/Serial`, '')
-  }, 30_000)
-
+  const keepalive = setInterval(sendKeepalive, 30_000)
   ;(client as any)._keepalive = keepalive
 })
 
@@ -456,9 +462,14 @@ function App() {
       for (const [key, val] of Object.entries(updates)) {
         const n = parseFloat(val)
         if (isNaN(n)) continue
-        if (!h[key])                              h[key] = [n]
-        else if (h[key].length >= HISTORY_LENGTH) h[key] = [...h[key].slice(1), n]
-        else                                      h[key].push(n)
+        if (!h[key]) {
+          // Ersten Wert als Mini-History vorbelegen damit Sparkline sofort rendert
+          h[key] = Array(Math.min(HISTORY_LENGTH, 10)).fill(n)
+        } else if (h[key].length >= HISTORY_LENGTH) {
+          h[key] = [...h[key].slice(1), n]
+        } else {
+          h[key].push(n)
+        }
       }
       setValues(prev => ({ ...prev, ...updates }))
       setLastUpdate(new Date().toLocaleTimeString())
@@ -523,7 +534,7 @@ function App() {
   const totalGen = (!isNaN(BKW_W) ? BKW_W : 0) + (!isNaN(V_PV_W) ? V_PV_W : 0)
 
   // Verbrauch
-  const verbrauch = parseFloat(values['tele/Stromzähler/SENSOR.grid.sml_m'] ?? 'NaN')
+  const verbrauch = parseFloat(values['Stromzähler/Verbrauch_aktuell'] ?? 'NaN')
 
   // Überschuss (positiv = Einspeisung / Überschuss)
   const ueberschuss = totalGen - verbrauch
@@ -607,7 +618,7 @@ function App() {
             <CardLabel icon="📊" color={T.spark.cyan}>Zähler</CardLabel>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
               {[
-                { icon: '⚡', val: values['tele/Stromzähler/SENSOR.grid.sml_v'], unit: 'kWh' },
+                { icon: '⚡', val: values['Stromzähler/Verbrauch_gesamt'], unit: 'kWh' },
                 { icon: '🔋', val: (() => { const n = parseFloat(values['tele/Balkonkraftwerk/SENSOR.ENERGY.EnergyPTotal.0']); return !isNaN(n) ? (n + 178.779).toFixed(3) : '…' })(), unit: 'kWh' },
                 { icon: '🔥', val: values['Gaszaehler/stand'], unit: 'm³' },
               ].map(({ icon, val, unit }, i) => (
@@ -624,7 +635,7 @@ function App() {
             <CardLabel icon="⚡" color={T.err}>Strom</CardLabel>
             {/* Verbrauch */}
             {(() => {
-              const key   = 'tele/Stromzähler/SENSOR.grid.sml_m'
+              const key   = 'Stromzähler/Verbrauch_aktuell'
               const num   = parseFloat(values[key])
               const range = minMax[key] ?? { min: num, max: num }
               const h     = hist[key] ?? []
