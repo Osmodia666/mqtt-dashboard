@@ -76,7 +76,7 @@ const EXPLICIT_SUBSCRIBES = [
   MINMAX_TOPIC,
   // Einzelne Stromzähler-Topics (retained, von Tasmota publish2)
   'Stromzähler/#',
-  // Victron: alle N/<portal-id>/# abonnieren
+  // Victron: alle N/<portal-id>/# abonnieren (inkl. system/0/Ac/Consumption)
   `N/${VICTRON_PORTAL_ID}/#`,
 ]
 
@@ -539,11 +539,20 @@ function App() {
   // Kombinierte Gesamterzeugung = Balkon + Victron-PV
   const totalGen = (!isNaN(BKW_W) ? BKW_W : 0) + (!isNaN(V_PV_W) ? V_PV_W : 0)
 
-  // Verbrauch
-  const verbrauch = parseFloat(values['Stromzähler/Verbrauch_aktuell'] ?? 'NaN')
+  // Netz-Austausch (positiv = Bezug, negativ = Einspeisung)
+  const netzAustausch = parseFloat(values['Stromzähler/Verbrauch_aktuell'] ?? 'NaN')
 
-  // Überschuss (positiv = Einspeisung / Überschuss)
-  const ueberschuss = totalGen - verbrauch
+  // Hausverbrauch aus Venus OS (immer positiv, unabhängig von Einspeisung)
+  const consL1 = parseFloat(values[V('system/0/Ac/Consumption/L1/Power')] ?? '0')
+  const consL2 = parseFloat(values[V('system/0/Ac/Consumption/L2/Power')] ?? '0')
+  const consL3 = parseFloat(values[V('system/0/Ac/Consumption/L3/Power')] ?? '0')
+  const hausverbrauch = (!isNaN(consL1) ? consL1 : 0) + (!isNaN(consL2) ? consL2 : 0) + (!isNaN(consL3) ? consL3 : 0)
+
+  // Für Strom-Card: Netz-Austausch (wie bisher)
+  const verbrauch = netzAustausch
+
+  // Überschuss = Erzeugung − Hausverbrauch (positiv = mehr erzeugt als verbraucht)
+  const ueberschuss = totalGen - hausverbrauch
 
   // Farben
   const socColor       = V_SOC >= 60 ? T.ok : V_SOC >= 30 ? T.warn : T.err
@@ -792,25 +801,30 @@ function App() {
 
                 <div className="flow-arrow">→</div>
 
-                {/* Verbrauch */}
+                {/* Hausverbrauch (aus Venus OS) */}
                 <div className="flow-node">
                   <span style={{ fontSize: 11, color: T.muted, fontFamily: T.fontMono, marginBottom: 3 }}>Verbrauch</span>
-                  <span style={{ fontSize: 18, fontWeight: 700, fontFamily: T.fontMono, color: powerColor(verbrauch) }}>
-                    {isNaN(verbrauch) ? '…' : `${Math.round(verbrauch)} W`}
+                  <span style={{ fontSize: 18, fontWeight: 700, fontFamily: T.fontMono, color: powerColor(hausverbrauch) }}>
+                    {hausverbrauch === 0 && isNaN(consL1) ? '…' : `${Math.round(hausverbrauch)} W`}
                   </span>
                 </div>
 
                 <div className="flow-arrow">→</div>
 
-                {/* Überschuss / Defizit */}
-                <div className="flow-node" style={{ border: `1px solid ${uebColor}44`, borderRadius: 6 }}>
-                  <span style={{ fontSize: 11, color: T.muted, fontFamily: T.fontMono, marginBottom: 3 }}>
-                    {ueberschuss >= 0 ? 'Überschuss' : 'Defizit'}
-                  </span>
-                  <span style={{ fontSize: 18, fontWeight: 700, fontFamily: T.fontMono, color: uebColor }}>
-                    {isNaN(verbrauch) || isNaN(totalGen) ? '…' : `${ueberschuss >= 0 ? '+' : ''}${Math.round(ueberschuss)} W`}
-                  </span>
-                </div>
+                {/* Netz: positiv = Bezug, negativ = Einspeisung */}
+                {(() => {
+                  const netzColor = isNaN(netzAustausch) ? T.muted : netzAustausch > 0 ? T.err : T.ok
+                  return (
+                    <div className="flow-node" style={{ border: `1px solid ${netzColor}44`, borderRadius: 6 }}>
+                      <span style={{ fontSize: 11, color: T.muted, fontFamily: T.fontMono, marginBottom: 3 }}>
+                        {isNaN(netzAustausch) ? 'Netz' : netzAustausch > 0 ? 'Netzbezug' : 'Einspeisung'}
+                      </span>
+                      <span style={{ fontSize: 18, fontWeight: 700, fontFamily: T.fontMono, color: netzColor }}>
+                        {isNaN(netzAustausch) ? '…' : `${netzAustausch > 0 ? '+' : ''}${Math.round(netzAustausch)} W`}
+                      </span>
+                    </div>
+                  )
+                })()}
               </div>
             </Card>
           </div>
