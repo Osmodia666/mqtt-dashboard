@@ -416,7 +416,7 @@ function App() {
     client.on('error', err => console.error('MQTT:', err))
 
     client.on('message', (topic: string, message: Buffer) => {
-      const payload = message.toString()
+      const payload = message.toString().trim()
       console.log("MQTT:", topic, payload)
 
       if (topic === MINMAX_TOPIC) {
@@ -425,6 +425,12 @@ function App() {
       }
       if (topic === 'Pool_temp/temperatur' || topic === 'Gaszaehler/stand') {
         messageQueue.current[topic] = payload; return
+      }
+
+      // Einzelne Stromzaehler-Topics: Plain-Number-Payload direkt speichern
+      if (topic.startsWith('Stromzähler/')) {
+        messageQueue.current[topic] = payload
+        return
       }
 
       // Venus OS liefert JSON: {"value": x}
