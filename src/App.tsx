@@ -43,7 +43,7 @@ const mpptStateLabel = (s: number) => {
     case 11:  return 'Laden'
     case 245: return 'Starten'
     case 247: return 'Laden'
-    case 252: return 'Ext. Steuerung'  // ESS steuert den MPPT
+    case 252: return 'Ext. Steuerung'
     default:  return `Status ${s}`
   }
 }
@@ -90,36 +90,22 @@ function Sparkline({ data, color, height = 28 }: { data: number[]; color: string
   )
 }
 
-function sparkColor(label: string, value: number): string {
-  if (label.includes('Verbrauch'))  return value >= 1000 ? T.err : value >= 300 ? T.warn : T.ok
-  if (label.includes('Balkon') || label.includes('Erzeugung')) return value >= 500 ? T.ok : value >= 250 ? T.warn : T.err
-  if (label.includes('Pool') || label.includes('Temperatur'))  return value > 23 ? T.ok : value > 17 ? T.warn : T.spark.cyan
-  if (label.includes('Spannung')) return T.spark.purple
-  if (label.includes('Strom'))    return T.spark.orange
-  if (label.includes('Leistung')) return T.spark.power
-  return T.spark.power
-}
-
-// ── Card (Option B: farbige Border, kein Top-Bar) ────────────────────────
+// ── Card ─────────────────────────────────────────────────────────────────
 function Card({ children, accentColor, style }: {
   children: React.ReactNode; accentColor?: string; style?: React.CSSProperties
 }) {
   const color = accentColor ?? T.accent
   return (
     <div style={{
-      background: T.surf,
-      border: `1px solid ${color}28`,
-      borderRadius: T.radius,
-      padding: '11px 13px',
-      height: '100%',
-      ...style,
+      background: T.surf, border: `1px solid ${color}28`,
+      borderRadius: T.radius, padding: '11px 13px', height: '100%', ...style,
     }}>
       {children}
     </div>
   )
 }
 
-// ── Pill Label (Option B) ────────────────────────────────────────────────
+// ── Pill Label ───────────────────────────────────────────────────────────
 function CardLabel({ icon, children, color }: { icon: string; children: React.ReactNode; color?: string }) {
   const c = color ?? T.accent
   return (
@@ -153,18 +139,12 @@ function MinMaxRow({ min, max, unit }: { min: number; max: number; unit?: string
 function ToggleBtn({ on, onClick }: { on: boolean; onClick: () => void }) {
   return (
     <button onClick={onClick} style={{
-      padding: '3px 11px',
-      borderRadius: T.btnRadius,
-      fontSize: 11,
-      fontWeight: 700,
-      fontFamily: T.fontLabel,
-      cursor: 'pointer',
+      padding: '3px 11px', borderRadius: T.btnRadius, fontSize: 11, fontWeight: 700,
+      fontFamily: T.fontLabel, cursor: 'pointer',
       border: `1px solid ${on ? T.ok + '55' : T.err + '55'}`,
       background: on ? T.ok + '20' : T.err + '20',
       color: on ? T.ok : T.err,
-      letterSpacing: '0.05em',
-      transition: 'all 0.15s',
-      whiteSpace: 'nowrap',
+      letterSpacing: '0.05em', transition: 'all 0.15s', whiteSpace: 'nowrap',
     }}>
       {on ? 'AN' : 'AUS'}
     </button>
@@ -181,7 +161,7 @@ function SwitchRow({ label, on, onClick }: { label: string; on: boolean; onClick
   )
 }
 
-// ── Value Display ────────────────────────────────────────────────────────
+// ── BigVal ───────────────────────────────────────────────────────────────
 function BigVal({ value, unit, size = 20, color }: { value: string; unit?: string; size?: number; color?: string }) {
   return (
     <div style={{ fontFamily: T.fontMono, fontSize: size, fontWeight: 700, fontVariantNumeric: 'tabular-nums', lineHeight: 1.15, color: color ?? T.text }}>
@@ -225,9 +205,7 @@ function SocRing({ soc, size = 52 }: { soc: number; size?: number }) {
   )
 }
 
-function Div() {
-  return <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '8px 0' }} />
-}
+function Div() { return <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '8px 0' }} /> }
 function Sub({ children }: { children: React.ReactNode }) {
   return <div style={{ fontSize: 10, color: T.muted, marginBottom: 2, fontFamily: T.fontMono }}>{children}</div>
 }
@@ -240,23 +218,56 @@ function StatRow({ label, value }: { label: string; value: string }) {
   )
 }
 
-// ── Leistungsfarbe: negativ = Einspeisung = grün ─────────────────────────
-// positiv = Verbrauch: grün/gelb/rot je nach Höhe
-// negativ = Einspeisung ins Netz oder Rückspeisung = immer grün
-// Für Verbrauch-Card (Nettobezug): negativ=Einspeisung=grün, positiv=Verbrauch=grün/gelb/rot
+// ── Farben ───────────────────────────────────────────────────────────────
 function leistungColor(w: number): string {
   if (w < 0) return T.ok
   return w >= 1000 ? T.err : w >= 300 ? T.warn : T.ok
 }
-
-// Für Phasen L1-L3: negativ=Einspeisung=grün, positiv=neutral (Leistungsfarbe bleibt)
-// Keine grüne Färbung für kleine positive Werte – grün nur bei negativem Vorzeichen
 function phasenColor(w: number): string {
-  if (isNaN(w)) return T.muted
-  if (w < 0)    return T.ok                              // Einspeisung → grün
-  if (w >= 1500) return T.err                            // sehr hoher Bezug → rot
-  if (w >= 500)  return T.warn                           // hoher Bezug → gelb
-  return T.spark.power                                   // normaler Bezug → indigo (neutral)
+  if (isNaN(w))  return T.muted
+  if (w < 0)     return T.ok
+  if (w >= 1500) return T.err
+  if (w >= 500)  return T.warn
+  return T.spark.power
+}
+
+// ── Phasen-Card (wiederverwendbar) ───────────────────────────────────────
+function PhasenCard({ group, values, minMax, hist }: {
+  group: typeof topics[0]; values: Record<string, string>
+  minMax: MinMax; hist: Record<string, number[]>
+}) {
+  const isSpan   = group.label.includes('Spannung')
+  const isStromG = group.label.includes('Strom L')
+  const isLeist  = group.label.includes('Leistung')
+  const groupColor = isSpan ? T.spark.purple : isStromG ? T.spark.orange : T.spark.power
+  const barMax   = isSpan ? 250 : isStromG ? 20 : 3000
+  const dp       = isSpan ? 0 : 1
+  return (
+    <Card accentColor={groupColor}>
+      <CardLabel icon="" color={groupColor}>{group.label}</CardLabel>
+      {group.keys?.map(({ label, key }) => {
+        const raw      = values[key]
+        const num      = raw !== undefined ? parseFloat(raw) : NaN
+        const range    = minMax[key] ?? { min: num, max: num }
+        const h        = hist[key] ?? []
+        const valColor = isLeist ? phasenColor(num) : groupColor
+        return (
+          <div key={key} style={{ marginBottom: 14, paddingBottom: 14, borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
+              <span style={{ fontFamily: T.fontLabel, fontSize: 13, fontWeight: 700, letterSpacing: '0.06em', color: groupColor, minWidth: 28 }}>{label}</span>
+              <span style={{ fontFamily: T.fontMono, fontSize: 24, fontWeight: 700, fontVariantNumeric: 'tabular-nums', lineHeight: 1, color: valColor }}>
+                {isNaN(num) ? '…' : num.toFixed(dp)}
+                <span style={{ fontSize: 13, fontWeight: 400, color: T.muted, marginLeft: 3 }}>{group.unit}</span>
+              </span>
+            </div>
+            <Bar value={num} max={barMax} color={valColor} />
+            <MinMaxRow min={range.min} max={range.max} unit={` ${group.unit}`} />
+            {h.length >= 2 && <div style={{ marginTop: 5 }}><Sparkline data={h} color={valColor} height={30} /></div>}
+          </div>
+        )
+      })}
+    </Card>
+  )
 }
 
 // ── ESS-Modal ────────────────────────────────────────────────────────────
@@ -308,11 +319,14 @@ function EssModal({ currentEssMode, currentInvMode, onSetEss, onSetInv, onClose 
 }
 
 // ── App ───────────────────────────────────────────────────────────────────
+type Tab = 'uebersicht' | 'energie' | 'victron' | 'steuerung'
+
 function App() {
   const [values, setValues]         = useState<Record<string, string>>({})
   const [lastUpdate, setLastUpdate] = useState('')
   const [minMax, setMinMax]         = useState<MinMax>(loadCachedMinMax)
   const [essOpen, setEssOpen]       = useState(false)
+  const [activeTab, setActiveTab]   = useState<Tab>('uebersicht')
   const histRef                     = useRef<Record<string, number[]>>({})
   const messageQueue                = useRef<Record<string, string>>({})
   const clientRef                   = useRef<any>(null)
@@ -339,7 +353,6 @@ function App() {
 
     client.on('message', (topic: string, message: Buffer) => {
       const payload = message.toString().trim()
-
       if (topic === MINMAX_TOPIC) {
         try { const d = JSON.parse(payload); setMinMax(d); saveCachedMinMax(d) } catch {} ; return
       }
@@ -425,15 +438,15 @@ function App() {
   const V_INV_MODE    = parseFloat(values[VICTRON_TOPICS.vebusMode]   ?? 'NaN')
   const V_ESS_MODE    = parseFloat(values[VICTRON_TOPICS.essMode]     ?? 'NaN')
 
-  const BKW_W       = parseFloat(values['tele/Balkonkraftwerk/SENSOR.ENERGY.Power.0'] ?? 'NaN')
-  const totalGen    = (!isNaN(BKW_W) ? BKW_W : 0) + (!isNaN(V_PV_W) ? V_PV_W : 0)
+  const BKW_W         = parseFloat(values['tele/Balkonkraftwerk/SENSOR.ENERGY.Power.0'] ?? 'NaN')
+  const totalGen      = (!isNaN(BKW_W) ? BKW_W : 0) + (!isNaN(V_PV_W) ? V_PV_W : 0)
   const netzAustausch = parseFloat(values['Stromzähler/Verbrauch_aktuell'] ?? 'NaN')
-  const consL1      = parseFloat(values[V('system/0/Ac/Consumption/L1/Power')] ?? '0')
-  const consL2      = parseFloat(values[V('system/0/Ac/Consumption/L2/Power')] ?? '0')
-  const consL3      = parseFloat(values[V('system/0/Ac/Consumption/L3/Power')] ?? '0')
+  const consL1        = parseFloat(values[V('system/0/Ac/Consumption/L1/Power')] ?? '0')
+  const consL2        = parseFloat(values[V('system/0/Ac/Consumption/L2/Power')] ?? '0')
+  const consL3        = parseFloat(values[V('system/0/Ac/Consumption/L3/Power')] ?? '0')
   const hausverbrauch = (!isNaN(consL1) ? consL1 : 0) + (!isNaN(consL2) ? consL2 : 0) + (!isNaN(consL3) ? consL3 : 0)
-  const verbrauch   = netzAustausch
-  const ueberschuss = totalGen - hausverbrauch
+  const verbrauch     = netzAustausch
+  const ueberschuss   = totalGen - hausverbrauch
 
   const socColor  = V_SOC >= 60 ? T.ok : V_SOC >= 30 ? T.warn : T.err
   const pvColor   = V_PV_W >= 800 ? T.ok : V_PV_W >= 300 ? T.warn : T.muted
@@ -442,6 +455,75 @@ function App() {
   const purpleAcc = '#c084fc'
   const genColor  = totalGen >= 500 ? T.ok : totalGen >= 200 ? T.warn : T.muted
   const uebColor  = ueberschuss >= 0 ? T.ok : T.err
+
+  const groupTopics = topics.filter(t => t.type === 'group')
+
+  // ── Tab-Definitionen ────────────────────────────────────────────────────
+  const TABS: { id: Tab; label: string; icon: string }[] = [
+    { id: 'uebersicht', label: 'Übersicht',  icon: '⚡' },
+    { id: 'energie',    label: 'Energie',    icon: '🌿' },
+    { id: 'victron',    label: 'Victron',    icon: '🔋' },
+    { id: 'steuerung',  label: 'Steuerung',  icon: '🔌' },
+  ]
+
+  // ── Energiefluss-Banner (geteilt zwischen Übersicht + Energie) ──────────
+  const FlowBanner = () => (
+    <div className="victron-flow-banner">
+      <Card accentColor={tealAcc}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6, marginBottom: 0 }}>
+          <CardLabel icon="⚡" color={tealAcc}>Energiefluss · Victron</CardLabel>
+          <button onClick={() => setEssOpen(true)} style={{
+            padding: '4px 12px', borderRadius: T.btnRadius, fontSize: 10, fontWeight: 700,
+            fontFamily: T.fontLabel, letterSpacing: '0.06em', textTransform: 'uppercase',
+            cursor: 'pointer', border: `1px solid ${tealAcc}44`, background: tealAcc + '15',
+            color: tealAcc, transition: 'all 0.15s', whiteSpace: 'nowrap',
+          }}>⚙️ ESS-Steuerung</button>
+        </div>
+        <div className="flow-row">
+          <div className="flow-node">
+            <span style={{ fontSize: 10, color: T.muted, fontFamily: T.fontMono, marginBottom: 2 }}>PV · Victron</span>
+            <span style={{ fontSize: 16, fontWeight: 700, fontFamily: T.fontMono, color: isNaN(V_PV_W) ? T.muted : pvColor }}>
+              {isNaN(V_PV_W) ? '…' : `${Math.round(V_PV_W)} W`}
+            </span>
+            {!isNaN(V_MPPT_STATE) && <span style={{ marginTop: 2 }}><Badge color={V_PV_W > 0 ? T.ok : T.muted}>{mpptStateLabel(V_MPPT_STATE)}</Badge></span>}
+          </div>
+          <div className="flow-arrow">+</div>
+          <div className="flow-node">
+            <span style={{ fontSize: 10, color: T.muted, fontFamily: T.fontMono, marginBottom: 2 }}>Balkonkraftwerk</span>
+            <span style={{ fontSize: 16, fontWeight: 700, fontFamily: T.fontMono, color: isNaN(BKW_W) ? T.muted : (BKW_W >= 200 ? T.ok : T.warn) }}>
+              {isNaN(BKW_W) ? '…' : `${Math.round(BKW_W)} W`}
+            </span>
+          </div>
+          <div className="flow-arrow">=</div>
+          <div className="flow-node" style={{ border: `1px solid ${genColor}33`, borderRadius: 5 }}>
+            <span style={{ fontSize: 10, color: T.muted, fontFamily: T.fontMono, marginBottom: 2 }}>Erzeugung</span>
+            <span style={{ fontSize: 18, fontWeight: 700, fontFamily: T.fontMono, color: genColor }}>{`${Math.round(totalGen)} W`}</span>
+          </div>
+          <div className="flow-arrow">→</div>
+          <div className="flow-node">
+            <span style={{ fontSize: 10, color: T.muted, fontFamily: T.fontMono, marginBottom: 2 }}>Verbrauch</span>
+            <span style={{ fontSize: 16, fontWeight: 700, fontFamily: T.fontMono, color: leistungColor(hausverbrauch) }}>
+              {hausverbrauch === 0 && isNaN(consL1) ? '…' : `${Math.round(hausverbrauch)} W`}
+            </span>
+          </div>
+          <div className="flow-arrow">→</div>
+          {(() => {
+            const netzColor = isNaN(netzAustausch) ? T.muted : netzAustausch > 0 ? T.err : T.ok
+            return (
+              <div className="flow-node" style={{ border: `1px solid ${netzColor}33`, borderRadius: 5 }}>
+                <span style={{ fontSize: 10, color: T.muted, fontFamily: T.fontMono, marginBottom: 2 }}>
+                  {isNaN(netzAustausch) ? 'Netz' : netzAustausch > 0 ? 'Netzbezug' : 'Einspeisung'}
+                </span>
+                <span style={{ fontSize: 16, fontWeight: 700, fontFamily: T.fontMono, color: netzColor }}>
+                  {isNaN(netzAustausch) ? '…' : `${netzAustausch > 0 ? '+' : ''}${Math.round(netzAustausch)} W`}
+                </span>
+              </div>
+            )
+          })()}
+        </div>
+      </Card>
+    </div>
+  )
 
   return (
     <div style={{ minHeight: '100vh', background: T.bg, color: T.text, fontFamily: T.fontBody }}>
@@ -460,300 +542,367 @@ function App() {
         </span>
       </header>
 
-      <main style={{ padding: '10px 14px 32px' }}>
+      {/* Pill Navigation */}
+      <nav style={{
+        display: 'flex', gap: 6, padding: '9px 14px', flexWrap: 'wrap',
+        background: T.bg, borderBottom: `1px solid rgba(255,255,255,0.05)`,
+        position: 'sticky', top: 37, zIndex: 9,
+      }}>
+        {TABS.map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            style={{
+              padding: '5px 14px', borderRadius: 20, fontSize: 11,
+              letterSpacing: '0.07em', cursor: 'pointer', whiteSpace: 'nowrap',
+              fontFamily: T.fontLabel, fontWeight: 700, transition: 'all 0.15s',
+              border: activeTab === tab.id
+                ? `1px solid ${T.accent}88`
+                : '1px solid rgba(255,255,255,0.1)',
+              background: activeTab === tab.id ? T.accent + '20' : 'transparent',
+              color: activeTab === tab.id ? T.accent : T.muted,
+            }}
+          >
+            {tab.icon} {tab.label}
+          </button>
+        ))}
+      </nav>
 
-        {/* Top Grid */}
-        <div className="grid-top">
+      <main style={{ padding: '10px 14px 40px' }}>
 
-          {/* 3D-Drucker */}
-          <Card accentColor={T.accent}>
-            <CardLabel icon="🖨️" color={T.accent}>3D-Drucker</CardLabel>
-            {['Sidewinder X1'].map(label => {
-              const t = topics.find(x => x.label === label)
-              if (!t) return null
-              return <SwitchRow key={label} label={label} on={isOn(values[t.statusTopic])} onClick={() => toggle(t.publishTopic!, values[t.statusTopic])} />
-            })}
-          </Card>
+        {/* ══ TAB: ÜBERSICHT ══════════════════════════════════════════════ */}
+        {activeTab === 'uebersicht' && (
+          <>
+            <FlowBanner />
+            <div className="grid-top" style={{ marginBottom: 8 }}>
 
-          {/* Pool */}
-          <Card accentColor={T.spark.energy}>
-            <CardLabel icon="🏊" color={T.spark.energy}>Pool</CardLabel>
-            {(() => {
-              const pumpe   = topics.find(x => x.label === 'Poolpumpe')
-              const tempKey = 'Pool_temp/temperatur'
-              const raw     = values[tempKey]
-              const val     = raw !== undefined ? parseFloat(raw) : NaN
-              const range   = minMax[tempKey] ?? { min: val, max: val }
-              const h       = hist[tempKey] ?? []
-              const col     = val > 23 ? T.ok : val > 17 ? T.warn : T.spark.cyan
-              return <>
-                <SwitchRow label="Pumpe" on={isOn(values[pumpe?.statusTopic ?? ''])}
-                  onClick={() => pumpe && toggle(pumpe.publishTopic!, values[pumpe.statusTopic])} />
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3 }}>
-                  <span style={{ fontSize: 14 }}>🌡️</span>
-                  <BigVal value={isNaN(val) ? '…' : `${val}`} unit="°C" size={17} color={col} />
-                </div>
-                <Bar value={val} max={40} color={col} />
-                <MinMaxRow min={range.min} max={range.max} unit=" °C" />
-                {h.length >= 2 && <div style={{ marginTop: 4 }}><Sparkline data={h} color={col} /></div>}
-              </>
-            })()}
-          </Card>
-
-          {/* Zähler */}
-          <Card accentColor={T.spark.cyan}>
-            <CardLabel icon="📊" color={T.spark.cyan}>Zähler</CardLabel>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-              {[
-                { icon: '⚡', val: values['Stromzähler/Verbrauch_gesamt'], unit: 'kWh' },
-                { icon: '🔋', val: (() => { const n = parseFloat(values['tele/Balkonkraftwerk/SENSOR.ENERGY.EnergyPTotal.0']); return !isNaN(n) ? (n + 178.779).toFixed(3) : '…' })(), unit: 'kWh' },
-                { icon: '🔥', val: values['Gaszaehler/stand'], unit: 'm³' },
-              ].map(({ icon, val, unit }, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                  <span style={{ fontSize: 14 }}>{icon}</span>
-                  <BigVal value={val ?? '…'} unit={unit} size={14} />
-                </div>
-              ))}
-            </div>
-          </Card>
-
-          {/* Strom */}
-          <Card accentColor={T.err}>
-            <CardLabel icon="⚡" color={T.err}>Strom</CardLabel>
-            {(() => {
-              const key   = 'Stromzähler/Verbrauch_aktuell'
-              const num   = parseFloat(values[key])
-              const range = minMax[key] ?? { min: num, max: num }
-              const h     = hist[key] ?? []
-              const col   = leistungColor(num)
-              return <>
-                <Sub>Verbrauch</Sub>
-                <BigVal value={isNaN(num) ? '…' : `${num}`} unit="W" size={21} color={col} />
-                <Bar value={num} max={Math.abs(range.max) > 0 ? Math.abs(range.max) : 2000} color={col} />
-                <MinMaxRow min={range.min} max={range.max} unit=" W" />
-                {h.length >= 2 && <div style={{ marginTop: 4 }}><Sparkline data={h} color={col} /></div>}
-              </>
-            })()}
-            <Div />
-            <Sub>Erzeugung gesamt</Sub>
-            <BigVal value={totalGen > 0 || !isNaN(BKW_W) ? `${Math.round(totalGen)}` : '…'} unit="W" size={21} color={genColor} />
-            <Bar value={totalGen} max={2000} color={genColor} />
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: T.muted, marginTop: 3, fontFamily: T.fontMono }}>
-              <span>Balkon: {isNaN(BKW_W) ? '…' : `${Math.round(BKW_W)} W`}</span>
-              <span>PV: {isNaN(V_PV_W) ? '…' : `${Math.round(V_PV_W)} W`}</span>
-            </div>
-            {!isNaN(verbrauch) && !isNaN(totalGen) && (
-              <div style={{ marginTop: 5, fontSize: 11, color: uebColor, fontFamily: T.fontMono, fontWeight: 700 }}>
-                {ueberschuss >= 0 ? `+${Math.round(ueberschuss)} W Überschuss` : `${Math.round(ueberschuss)} W Defizit`}
-              </div>
-            )}
-          </Card>
-
-          {/* Steckdosen 1 */}
-          <Card accentColor={T.spark.power}>
-            <CardLabel icon="🔌" color={T.spark.power}>Steckdosen 1</CardLabel>
-            {['Steckdose 1', 'Steckdose 2'].map(label => {
-              const t = topics.find(x => x.label === label)
-              if (!t) return null
-              return <SwitchRow key={label} label={label} on={isOn(values[t.statusTopic])} onClick={() => toggle(t.publishTopic!, values[t.statusTopic])} />
-            })}
-            <SwitchRow label="Doppelsteckdose"
-              on={isOn(values['stat/Doppelsteckdose/POWER'])}
-              onClick={() => toggle('cmnd/Doppelsteckdose/POWER', values['stat/Doppelsteckdose/POWER'])} />
-          </Card>
-
-          {/* Beleuchtung */}
-          <Card accentColor={T.spark.purple}>
-            <CardLabel icon="💡" color={T.spark.purple}>Steckdosen + Beleuchtung</CardLabel>
-            {[
-              { label: 'Teichpumpe',    pub: 'cmnd/Teichpumpe/POWER',    stat: 'stat/Teichpumpe/POWER' },
-              { label: 'Beleuchtung',   pub: 'cmnd/Beleuchtung/POWER',   stat: 'stat/Beleuchtung/POWER' },
-              { label: 'Carport-Licht', pub: 'cmnd/Carport-Licht/POWER', stat: 'stat/Carport-Licht/POWER' },
-            ].map(({ label, pub, stat }) => (
-              <SwitchRow key={label} label={label} on={isOn(values[stat])} onClick={() => toggle(pub, values[stat])} />
-            ))}
-          </Card>
-
-        </div>
-
-        {/* Victron-Sektion */}
-        <div className="victron-section">
-
-          {/* Energiefluss-Banner */}
-          <div className="victron-flow-banner">
-            <Card accentColor={tealAcc}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6, marginBottom: 0 }}>
-                <CardLabel icon="⚡" color={tealAcc}>Energiefluss · Victron</CardLabel>
-                <button onClick={() => setEssOpen(true)} style={{
-                  padding: '4px 12px', borderRadius: T.btnRadius, fontSize: 10, fontWeight: 700,
-                  fontFamily: T.fontLabel, letterSpacing: '0.06em', textTransform: 'uppercase',
-                  cursor: 'pointer', border: `1px solid ${tealAcc}44`, background: tealAcc + '15',
-                  color: tealAcc, transition: 'all 0.15s', whiteSpace: 'nowrap',
-                }}>⚙️ ESS-Steuerung</button>
-              </div>
-
-              <div className="flow-row">
-                <div className="flow-node">
-                  <span style={{ fontSize: 10, color: T.muted, fontFamily: T.fontMono, marginBottom: 2 }}>PV · Victron</span>
-                  <span style={{ fontSize: 16, fontWeight: 700, fontFamily: T.fontMono, color: isNaN(V_PV_W) ? T.muted : pvColor }}>
-                    {isNaN(V_PV_W) ? '…' : `${Math.round(V_PV_W)} W`}
-                  </span>
-                  {!isNaN(V_MPPT_STATE) && <span style={{ marginTop: 2 }}><Badge color={V_PV_W > 0 ? T.ok : T.muted}>{mpptStateLabel(V_MPPT_STATE)}</Badge></span>}
-                </div>
-                <div className="flow-arrow">+</div>
-                <div className="flow-node">
-                  <span style={{ fontSize: 10, color: T.muted, fontFamily: T.fontMono, marginBottom: 2 }}>Balkonkraftwerk</span>
-                  <span style={{ fontSize: 16, fontWeight: 700, fontFamily: T.fontMono, color: isNaN(BKW_W) ? T.muted : (BKW_W >= 200 ? T.ok : T.warn) }}>
-                    {isNaN(BKW_W) ? '…' : `${Math.round(BKW_W)} W`}
-                  </span>
-                </div>
-                <div className="flow-arrow">=</div>
-                <div className="flow-node" style={{ border: `1px solid ${genColor}33`, borderRadius: 5 }}>
-                  <span style={{ fontSize: 10, color: T.muted, fontFamily: T.fontMono, marginBottom: 2 }}>Erzeugung</span>
-                  <span style={{ fontSize: 18, fontWeight: 700, fontFamily: T.fontMono, color: genColor }}>{`${Math.round(totalGen)} W`}</span>
-                </div>
-                <div className="flow-arrow">→</div>
-                <div className="flow-node">
-                  <span style={{ fontSize: 10, color: T.muted, fontFamily: T.fontMono, marginBottom: 2 }}>Verbrauch</span>
-                  <span style={{ fontSize: 16, fontWeight: 700, fontFamily: T.fontMono, color: leistungColor(hausverbrauch) }}>
-                    {hausverbrauch === 0 && isNaN(consL1) ? '…' : `${Math.round(hausverbrauch)} W`}
-                  </span>
-                </div>
-                <div className="flow-arrow">→</div>
-                {(() => {
-                  const netzColor = isNaN(netzAustausch) ? T.muted : netzAustausch > 0 ? T.err : T.ok
-                  return (
-                    <div className="flow-node" style={{ border: `1px solid ${netzColor}33`, borderRadius: 5 }}>
-                      <span style={{ fontSize: 10, color: T.muted, fontFamily: T.fontMono, marginBottom: 2 }}>
-                        {isNaN(netzAustausch) ? 'Netz' : netzAustausch > 0 ? 'Netzbezug' : 'Einspeisung'}
-                      </span>
-                      <span style={{ fontSize: 16, fontWeight: 700, fontFamily: T.fontMono, color: netzColor }}>
-                        {isNaN(netzAustausch) ? '…' : `${netzAustausch > 0 ? '+' : ''}${Math.round(netzAustausch)} W`}
-                      </span>
+              {/* Batterie (Kurzform) */}
+              <Card accentColor={socColor}>
+                <CardLabel icon="🔋" color={socColor}>Batterie · Pylontech</CardLabel>
+                <div className="soc-wrap" style={{ marginBottom: 6 }}>
+                  <SocRing soc={V_SOC} size={50} />
+                  <div>
+                    <BigVal value={isNaN(V_BAT_V) ? '…' : V_BAT_V.toFixed(1)} unit="V" size={18} />
+                    <div style={{ marginTop: 3 }}>
+                      {!isNaN(V_BAT_STATE) && (
+                        <Badge color={V_BAT_STATE === 1 ? T.ok : V_BAT_STATE === 2 ? amberAcc : T.muted}>
+                          {batStateLabel(V_BAT_STATE)}
+                        </Badge>
+                      )}
                     </div>
-                  )
-                })()}
-              </div>
-            </Card>
-          </div>
-
-          {/* Victron Grid */}
-          <div className="grid-victron">
-
-            {/* Batterie */}
-            <Card accentColor={socColor}>
-              <CardLabel icon="🔋" color={socColor}>Batterie · Pylontech</CardLabel>
-              <div className="soc-wrap" style={{ marginBottom: 8 }}>
-                <SocRing soc={V_SOC} size={54} />
-                <div>
-                  <BigVal value={isNaN(V_BAT_V) ? '…' : V_BAT_V.toFixed(1)} unit="V" size={19} />
-                  <div style={{ marginTop: 4 }}>
-                    {!isNaN(V_BAT_STATE) && (
-                      <Badge color={V_BAT_STATE === 1 ? T.ok : V_BAT_STATE === 2 ? amberAcc : T.muted}>
-                        {batStateLabel(V_BAT_STATE)}
-                      </Badge>
-                    )}
                   </div>
                 </div>
-              </div>
-              <Div />
-              <StatRow label="Strom"    value={isNaN(V_BAT_A) ? '…' : `${V_BAT_A.toFixed(1)} A`} />
-              <StatRow label="Leistung" value={isNaN(V_BAT_W) ? '…' : `${Math.round(V_BAT_W)} W`} />
-              <StatRow label="Temp"     value={isNaN(V_BAT_T) ? '…' : `${V_BAT_T.toFixed(1)} °C`} />
-              {!isNaN(V_SOC) && <>
-                <Bar value={V_SOC} max={100} color={socColor} />
-                <MinMaxRow min={minMax[VICTRON_TOPICS.soc]?.min ?? V_SOC} max={minMax[VICTRON_TOPICS.soc]?.max ?? V_SOC} unit=" %" />
-              </>}
-              {(hist[VICTRON_TOPICS.soc] ?? []).length >= 2 && <div style={{ marginTop: 4 }}><Sparkline data={hist[VICTRON_TOPICS.soc]} color={socColor} /></div>}
-            </Card>
+                <StatRow label="Temp" value={isNaN(V_BAT_T) ? '…' : `${V_BAT_T.toFixed(1)} °C`} />
+              </Card>
 
-            {/* MPPT */}
-            <Card accentColor={amberAcc}>
-              <CardLabel icon="☀️" color={amberAcc}>MPPT · Solarladeregler</CardLabel>
-              <BigVal value={isNaN(V_PV_W) ? '…' : `${Math.round(V_PV_W)}`} unit="W" size={21} color={isNaN(V_PV_W) ? T.muted : amberAcc} />
-              <Sub>PV-Eingangsleistung</Sub>
-              {!isNaN(V_PV_W) && <>
-                <Bar value={V_PV_W} max={Math.max(minMax[VICTRON_TOPICS.pvPower]?.max ?? 0, 1500)} color={amberAcc} />
-                <MinMaxRow min={minMax[VICTRON_TOPICS.pvPower]?.min ?? V_PV_W} max={minMax[VICTRON_TOPICS.pvPower]?.max ?? V_PV_W} unit=" W" />
-              </>}
-              {(hist[VICTRON_TOPICS.pvPower] ?? []).length >= 2 && <div style={{ marginTop: 4 }}><Sparkline data={hist[VICTRON_TOPICS.pvPower]} color={amberAcc} /></div>}
-              <Div />
-              <StatRow label="PV Spannung" value={isNaN(V_PV_V) ? '…' : `${V_PV_V.toFixed(0)} V`} />
-              <StatRow label="PV Strom"    value={isNaN(V_PV_A) ? '…' : `${V_PV_A.toFixed(1)} A`} />
-              <StatRow label="Status"      value={isNaN(V_MPPT_STATE) ? '…' : mpptStateLabel(V_MPPT_STATE)} />
-            </Card>
+              {/* Pool */}
+              <Card accentColor={T.spark.energy}>
+                <CardLabel icon="🏊" color={T.spark.energy}>Pool</CardLabel>
+                {(() => {
+                  const pumpe   = topics.find(x => x.label === 'Poolpumpe')
+                  const tempKey = 'Pool_temp/temperatur'
+                  const raw     = values[tempKey]
+                  const val     = raw !== undefined ? parseFloat(raw) : NaN
+                  const range   = minMax[tempKey] ?? { min: val, max: val }
+                  const h       = hist[tempKey] ?? []
+                  const col     = val > 23 ? T.ok : val > 17 ? T.warn : T.spark.cyan
+                  return <>
+                    <SwitchRow label="Pumpe" on={isOn(values[pumpe?.statusTopic ?? ''])}
+                      onClick={() => pumpe && toggle(pumpe.publishTopic!, values[pumpe.statusTopic])} />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3 }}>
+                      <span style={{ fontSize: 14 }}>🌡️</span>
+                      <BigVal value={isNaN(val) ? '…' : `${val}`} unit="°C" size={17} color={col} />
+                    </div>
+                    <Bar value={val} max={40} color={col} />
+                    <MinMaxRow min={range.min} max={range.max} unit=" °C" />
+                    {h.length >= 2 && <div style={{ marginTop: 4 }}><Sparkline data={h} color={col} /></div>}
+                  </>
+                })()}
+              </Card>
 
-            {/* Wechselrichter */}
-            <Card accentColor={purpleAcc}>
-              <CardLabel icon="🔌" color={purpleAcc}>Wechselrichter · MultiPlus</CardLabel>
-              <BigVal value={isNaN(V_AC_W) ? '…' : `${Math.round(V_AC_W)}`} unit="W" size={21} color={isNaN(V_AC_W) ? T.muted : purpleAcc} />
-              <Sub>AC-Ausgangsleistung</Sub>
-              {!isNaN(V_AC_W) && <>
-                <Bar value={V_AC_W} max={Math.max(minMax[VICTRON_TOPICS.acOutPower]?.max ?? 0, 2000)} color={purpleAcc} />
-                <MinMaxRow min={minMax[VICTRON_TOPICS.acOutPower]?.min ?? V_AC_W} max={minMax[VICTRON_TOPICS.acOutPower]?.max ?? V_AC_W} unit=" W" />
-              </>}
-              {(hist[VICTRON_TOPICS.acOutPower] ?? []).length >= 2 && <div style={{ marginTop: 4 }}><Sparkline data={hist[VICTRON_TOPICS.acOutPower]} color={purpleAcc} /></div>}
-              <Div />
-              <StatRow label="Spannung"  value={isNaN(V_AC_V) ? '…' : `${V_AC_V.toFixed(0)} V`} />
-              <StatRow label="Frequenz"  value={isNaN(V_AC_F) ? '…' : `${V_AC_F.toFixed(1)} Hz`} />
-              <StatRow label="Modus"     value={isNaN(V_INV_MODE) ? '…' : (INVERTER_MODES.find(m => m.value === V_INV_MODE)?.label ?? `Mode ${V_INV_MODE}`)} />
-              {!isNaN(V_VEBUS_STATE) && (
-                <div style={{ marginTop: 5 }}>
-                  <Badge color={V_VEBUS_STATE === 9 ? T.ok : V_VEBUS_STATE === 2 ? T.err : amberAcc}>
-                    {V_VEBUS_STATE === 9 ? 'Inverting' : V_VEBUS_STATE === 3 ? 'Bulk' : V_VEBUS_STATE === 4 ? 'Absorption' : V_VEBUS_STATE === 5 ? 'Float' : `Status ${V_VEBUS_STATE}`}
-                  </Badge>
+              {/* Strom */}
+              <Card accentColor={T.err}>
+                <CardLabel icon="⚡" color={T.err}>Strom</CardLabel>
+                {(() => {
+                  const key   = 'Stromzähler/Verbrauch_aktuell'
+                  const num   = parseFloat(values[key])
+                  const range = minMax[key] ?? { min: num, max: num }
+                  const h     = hist[key] ?? []
+                  const col   = leistungColor(num)
+                  return <>
+                    <Sub>Netzbezug/-einspeisung</Sub>
+                    <BigVal value={isNaN(num) ? '…' : `${num}`} unit="W" size={21} color={col} />
+                    <Bar value={num} max={Math.abs(range.max) > 0 ? Math.abs(range.max) : 2000} color={col} />
+                    <MinMaxRow min={range.min} max={range.max} unit=" W" />
+                    {h.length >= 2 && <div style={{ marginTop: 4 }}><Sparkline data={h} color={col} /></div>}
+                  </>
+                })()}
+                <Div />
+                <Sub>Erzeugung gesamt</Sub>
+                <BigVal value={totalGen > 0 || !isNaN(BKW_W) ? `${Math.round(totalGen)}` : '…'} unit="W" size={21} color={genColor} />
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: T.muted, marginTop: 3, fontFamily: T.fontMono }}>
+                  <span>Balkon: {isNaN(BKW_W) ? '…' : `${Math.round(BKW_W)} W`}</span>
+                  <span>PV: {isNaN(V_PV_W) ? '…' : `${Math.round(V_PV_W)} W`}</span>
                 </div>
-              )}
+                {!isNaN(verbrauch) && !isNaN(totalGen) && (
+                  <div style={{ marginTop: 5, fontSize: 11, color: uebColor, fontFamily: T.fontMono, fontWeight: 700 }}>
+                    {ueberschuss >= 0 ? `+${Math.round(ueberschuss)} W Überschuss` : `${Math.round(ueberschuss)} W Defizit`}
+                  </div>
+                )}
+              </Card>
+
+              {/* MPPT Kurzform */}
+              <Card accentColor={amberAcc}>
+                <CardLabel icon="☀️" color={amberAcc}>MPPT · SmartSolar</CardLabel>
+                <BigVal value={isNaN(V_PV_W) ? '…' : `${Math.round(V_PV_W)}`} unit="W" size={21} color={isNaN(V_PV_W) ? T.muted : amberAcc} />
+                <Sub>PV-Eingangsleistung</Sub>
+                <Div />
+                <StatRow label="PV Spannung" value={isNaN(V_PV_V) ? '…' : `${V_PV_V.toFixed(0)} V`} />
+                <StatRow label="Status" value={isNaN(V_MPPT_STATE) ? '…' : mpptStateLabel(V_MPPT_STATE)} />
+              </Card>
+
+              {/* Steckdosen 1 */}
+              <Card accentColor={T.spark.power}>
+                <CardLabel icon="🔌" color={T.spark.power}>Steckdosen 1</CardLabel>
+                {['Steckdose 1', 'Steckdose 2'].map(label => {
+                  const t = topics.find(x => x.label === label)
+                  if (!t) return null
+                  return <SwitchRow key={label} label={label} on={isOn(values[t.statusTopic])} onClick={() => toggle(t.publishTopic!, values[t.statusTopic])} />
+                })}
+                <SwitchRow label="Doppelsteckdose"
+                  on={isOn(values['stat/Doppelsteckdose/POWER'])}
+                  onClick={() => toggle('cmnd/Doppelsteckdose/POWER', values['stat/Doppelsteckdose/POWER'])} />
+              </Card>
+
+              {/* Beleuchtung */}
+              <Card accentColor={T.spark.purple}>
+                <CardLabel icon="💡" color={T.spark.purple}>Steckdosen + Beleuchtung</CardLabel>
+                {[
+                  { label: 'Teichpumpe',    pub: 'cmnd/Teichpumpe/POWER',    stat: 'stat/Teichpumpe/POWER' },
+                  { label: 'Beleuchtung',   pub: 'cmnd/Beleuchtung/POWER',   stat: 'stat/Beleuchtung/POWER' },
+                  { label: 'Carport-Licht', pub: 'cmnd/Carport-Licht/POWER', stat: 'stat/Carport-Licht/POWER' },
+                ].map(({ label, pub, stat }) => (
+                  <SwitchRow key={label} label={label} on={isOn(values[stat])} onClick={() => toggle(pub, values[stat])} />
+                ))}
+              </Card>
+
+            </div>
+          </>
+        )}
+
+        {/* ══ TAB: ENERGIE ════════════════════════════════════════════════ */}
+        {activeTab === 'energie' && (
+          <>
+            <FlowBanner />
+
+            {/* Zähler */}
+            <div style={{ marginBottom: 8 }}>
+              <Card accentColor={T.spark.cyan}>
+                <CardLabel icon="📊" color={T.spark.cyan}>Zähler</CardLabel>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+                  {[
+                    { icon: '⚡', label: 'Strom gesamt', val: values['Stromzähler/Verbrauch_gesamt'], unit: 'kWh' },
+                    { icon: '🔋', label: 'Solar gesamt',  val: (() => { const n = parseFloat(values['tele/Balkonkraftwerk/SENSOR.ENERGY.EnergyPTotal.0']); return !isNaN(n) ? (n + 178.779).toFixed(3) : '…' })(), unit: 'kWh' },
+                    { icon: '🔥', label: 'Gas',           val: values['Gaszaehler/stand'], unit: 'm³' },
+                  ].map(({ icon, label, val, unit }, i) => (
+                    <div key={i}>
+                      <div style={{ fontSize: 9, color: T.muted, fontFamily: T.fontMono, marginBottom: 3 }}>{icon} {label}</div>
+                      <BigVal value={val ?? '…'} unit={unit} size={15} />
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            </div>
+
+            {/* Phasen L1–L3 */}
+            <div className="grid-groups" style={{ marginBottom: 8 }}>
+              {groupTopics.map(group => (
+                <PhasenCard key={group.label} group={group} values={values} minMax={minMax} hist={hist} />
+              ))}
+            </div>
+
+            {/* Erzeugung */}
+            <div className="grid-victron">
+              <Card accentColor={amberAcc}>
+                <CardLabel icon="☀️" color={amberAcc}>MPPT · Solarladeregler</CardLabel>
+                <BigVal value={isNaN(V_PV_W) ? '…' : `${Math.round(V_PV_W)}`} unit="W" size={21} color={isNaN(V_PV_W) ? T.muted : amberAcc} />
+                <Sub>PV-Eingangsleistung</Sub>
+                {!isNaN(V_PV_W) && <>
+                  <Bar value={V_PV_W} max={Math.max(minMax[VICTRON_TOPICS.pvPower]?.max ?? 0, 1500)} color={amberAcc} />
+                  <MinMaxRow min={minMax[VICTRON_TOPICS.pvPower]?.min ?? V_PV_W} max={minMax[VICTRON_TOPICS.pvPower]?.max ?? V_PV_W} unit=" W" />
+                </>}
+                {(hist[VICTRON_TOPICS.pvPower] ?? []).length >= 2 && <div style={{ marginTop: 4 }}><Sparkline data={hist[VICTRON_TOPICS.pvPower]} color={amberAcc} /></div>}
+                <Div />
+                <StatRow label="PV Spannung" value={isNaN(V_PV_V) ? '…' : `${V_PV_V.toFixed(0)} V`} />
+                <StatRow label="PV Strom"    value={isNaN(V_PV_A) ? '…' : `${V_PV_A.toFixed(1)} A`} />
+                <StatRow label="Status"      value={isNaN(V_MPPT_STATE) ? '…' : mpptStateLabel(V_MPPT_STATE)} />
+              </Card>
+
+              <Card accentColor={T.spark.cyan}>
+                <CardLabel icon="🌿" color={T.spark.cyan}>Balkonkraftwerk</CardLabel>
+                <BigVal value={isNaN(BKW_W) ? '…' : `${Math.round(BKW_W)}`} unit="W" size={21} color={isNaN(BKW_W) ? T.muted : (BKW_W >= 200 ? T.ok : T.warn)} />
+                <Sub>Aktuelle Erzeugung</Sub>
+                {!isNaN(BKW_W) && <>
+                  <Bar value={BKW_W} max={800} color={BKW_W >= 200 ? T.ok : T.warn} />
+                </>}
+                {(hist['tele/Balkonkraftwerk/SENSOR.ENERGY.Power.0'] ?? []).length >= 2 && (
+                  <div style={{ marginTop: 4 }}>
+                    <Sparkline data={hist['tele/Balkonkraftwerk/SENSOR.ENERGY.Power.0']} color={T.ok} />
+                  </div>
+                )}
+                <Div />
+                <div style={{ fontSize: 10, color: T.muted, fontFamily: T.fontMono, marginBottom: 3 }}>Erzeugung gesamt (heute + gestern)</div>
+                <BigVal value={totalGen > 0 || !isNaN(BKW_W) ? `${Math.round(totalGen)}` : '…'} unit="W" size={17} color={genColor} />
+              </Card>
+
+              <Card accentColor={T.err}>
+                <CardLabel icon="⚡" color={T.err}>Strom · Netzbezug</CardLabel>
+                {(() => {
+                  const key   = 'Stromzähler/Verbrauch_aktuell'
+                  const num   = parseFloat(values[key])
+                  const range = minMax[key] ?? { min: num, max: num }
+                  const h     = hist[key] ?? []
+                  const col   = leistungColor(num)
+                  return <>
+                    <BigVal value={isNaN(num) ? '…' : `${num}`} unit="W" size={21} color={col} />
+                    <Bar value={num} max={Math.abs(range.max) > 0 ? Math.abs(range.max) : 2000} color={col} />
+                    <MinMaxRow min={range.min} max={range.max} unit=" W" />
+                    {h.length >= 2 && <div style={{ marginTop: 4 }}><Sparkline data={h} color={col} /></div>}
+                  </>
+                })()}
+                <Div />
+                <Sub>Hausverbrauch (Venus OS)</Sub>
+                <BigVal value={hausverbrauch === 0 && isNaN(consL1) ? '…' : `${Math.round(hausverbrauch)}`} unit="W" size={17} color={leistungColor(hausverbrauch)} />
+                {!isNaN(verbrauch) && !isNaN(totalGen) && (
+                  <div style={{ marginTop: 5, fontSize: 11, color: uebColor, fontFamily: T.fontMono, fontWeight: 700 }}>
+                    {ueberschuss >= 0 ? `+${Math.round(ueberschuss)} W Überschuss` : `${Math.round(ueberschuss)} W Defizit`}
+                  </div>
+                )}
+              </Card>
+            </div>
+          </>
+        )}
+
+        {/* ══ TAB: VICTRON ════════════════════════════════════════════════ */}
+        {activeTab === 'victron' && (
+          <>
+            <FlowBanner />
+            <div className="grid-victron">
+
+              <Card accentColor={socColor}>
+                <CardLabel icon="🔋" color={socColor}>Batterie · Pylontech</CardLabel>
+                <div className="soc-wrap" style={{ marginBottom: 8 }}>
+                  <SocRing soc={V_SOC} size={54} />
+                  <div>
+                    <BigVal value={isNaN(V_BAT_V) ? '…' : V_BAT_V.toFixed(1)} unit="V" size={19} />
+                    <div style={{ marginTop: 4 }}>
+                      {!isNaN(V_BAT_STATE) && (
+                        <Badge color={V_BAT_STATE === 1 ? T.ok : V_BAT_STATE === 2 ? amberAcc : T.muted}>
+                          {batStateLabel(V_BAT_STATE)}
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <Div />
+                <StatRow label="Strom"    value={isNaN(V_BAT_A) ? '…' : `${V_BAT_A.toFixed(1)} A`} />
+                <StatRow label="Leistung" value={isNaN(V_BAT_W) ? '…' : `${Math.round(V_BAT_W)} W`} />
+                <StatRow label="Temp"     value={isNaN(V_BAT_T) ? '…' : `${V_BAT_T.toFixed(1)} °C`} />
+                {!isNaN(V_SOC) && <>
+                  <Bar value={V_SOC} max={100} color={socColor} />
+                  <MinMaxRow min={minMax[VICTRON_TOPICS.soc]?.min ?? V_SOC} max={minMax[VICTRON_TOPICS.soc]?.max ?? V_SOC} unit=" %" />
+                </>}
+                {(hist[VICTRON_TOPICS.soc] ?? []).length >= 2 && <div style={{ marginTop: 4 }}><Sparkline data={hist[VICTRON_TOPICS.soc]} color={socColor} /></div>}
+              </Card>
+
+              <Card accentColor={amberAcc}>
+                <CardLabel icon="☀️" color={amberAcc}>MPPT · Solarladeregler</CardLabel>
+                <BigVal value={isNaN(V_PV_W) ? '…' : `${Math.round(V_PV_W)}`} unit="W" size={21} color={isNaN(V_PV_W) ? T.muted : amberAcc} />
+                <Sub>PV-Eingangsleistung</Sub>
+                {!isNaN(V_PV_W) && <>
+                  <Bar value={V_PV_W} max={Math.max(minMax[VICTRON_TOPICS.pvPower]?.max ?? 0, 1500)} color={amberAcc} />
+                  <MinMaxRow min={minMax[VICTRON_TOPICS.pvPower]?.min ?? V_PV_W} max={minMax[VICTRON_TOPICS.pvPower]?.max ?? V_PV_W} unit=" W" />
+                </>}
+                {(hist[VICTRON_TOPICS.pvPower] ?? []).length >= 2 && <div style={{ marginTop: 4 }}><Sparkline data={hist[VICTRON_TOPICS.pvPower]} color={amberAcc} /></div>}
+                <Div />
+                <StatRow label="PV Spannung" value={isNaN(V_PV_V) ? '…' : `${V_PV_V.toFixed(0)} V`} />
+                <StatRow label="PV Strom"    value={isNaN(V_PV_A) ? '…' : `${V_PV_A.toFixed(1)} A`} />
+                <StatRow label="Status"      value={isNaN(V_MPPT_STATE) ? '…' : mpptStateLabel(V_MPPT_STATE)} />
+              </Card>
+
+              <Card accentColor={purpleAcc}>
+                <CardLabel icon="🔌" color={purpleAcc}>Wechselrichter · MultiPlus</CardLabel>
+                <BigVal value={isNaN(V_AC_W) ? '…' : `${Math.round(V_AC_W)}`} unit="W" size={21} color={isNaN(V_AC_W) ? T.muted : purpleAcc} />
+                <Sub>AC-Ausgangsleistung</Sub>
+                {!isNaN(V_AC_W) && <>
+                  <Bar value={V_AC_W} max={Math.max(minMax[VICTRON_TOPICS.acOutPower]?.max ?? 0, 2000)} color={purpleAcc} />
+                  <MinMaxRow min={minMax[VICTRON_TOPICS.acOutPower]?.min ?? V_AC_W} max={minMax[VICTRON_TOPICS.acOutPower]?.max ?? V_AC_W} unit=" W" />
+                </>}
+                {(hist[VICTRON_TOPICS.acOutPower] ?? []).length >= 2 && <div style={{ marginTop: 4 }}><Sparkline data={hist[VICTRON_TOPICS.acOutPower]} color={purpleAcc} /></div>}
+                <Div />
+                <StatRow label="Spannung"  value={isNaN(V_AC_V) ? '…' : `${V_AC_V.toFixed(0)} V`} />
+                <StatRow label="Frequenz"  value={isNaN(V_AC_F) ? '…' : `${V_AC_F.toFixed(1)} Hz`} />
+                <StatRow label="Modus"     value={isNaN(V_INV_MODE) ? '…' : (INVERTER_MODES.find(m => m.value === V_INV_MODE)?.label ?? `Mode ${V_INV_MODE}`)} />
+                {!isNaN(V_VEBUS_STATE) && (
+                  <div style={{ marginTop: 5 }}>
+                    <Badge color={V_VEBUS_STATE === 9 ? T.ok : V_VEBUS_STATE === 2 ? T.err : amberAcc}>
+                      {V_VEBUS_STATE === 9 ? 'Inverting' : V_VEBUS_STATE === 3 ? 'Bulk' : V_VEBUS_STATE === 4 ? 'Absorption' : V_VEBUS_STATE === 5 ? 'Float' : `Status ${V_VEBUS_STATE}`}
+                    </Badge>
+                  </div>
+                )}
+              </Card>
+
+            </div>
+          </>
+        )}
+
+        {/* ══ TAB: STEUERUNG ══════════════════════════════════════════════ */}
+        {activeTab === 'steuerung' && (
+          <div className="grid-top">
+
+            <Card accentColor={T.accent}>
+              <CardLabel icon="🖨️" color={T.accent}>3D-Drucker</CardLabel>
+              {['Sidewinder X1'].map(label => {
+                const t = topics.find(x => x.label === label)
+                if (!t) return null
+                return <SwitchRow key={label} label={label} on={isOn(values[t.statusTopic])} onClick={() => toggle(t.publishTopic!, values[t.statusTopic])} />
+              })}
+            </Card>
+
+            <Card accentColor={T.spark.energy}>
+              <CardLabel icon="🏊" color={T.spark.energy}>Pool</CardLabel>
+              {(() => {
+                const pumpe = topics.find(x => x.label === 'Poolpumpe')
+                return <SwitchRow label="Pumpe" on={isOn(values[pumpe?.statusTopic ?? ''])}
+                  onClick={() => pumpe && toggle(pumpe.publishTopic!, values[pumpe.statusTopic])} />
+              })()}
+            </Card>
+
+            <Card accentColor={T.spark.power}>
+              <CardLabel icon="🔌" color={T.spark.power}>Steckdosen 1</CardLabel>
+              {['Steckdose 1', 'Steckdose 2'].map(label => {
+                const t = topics.find(x => x.label === label)
+                if (!t) return null
+                return <SwitchRow key={label} label={label} on={isOn(values[t.statusTopic])} onClick={() => toggle(t.publishTopic!, values[t.statusTopic])} />
+              })}
+              <SwitchRow label="Doppelsteckdose"
+                on={isOn(values['stat/Doppelsteckdose/POWER'])}
+                onClick={() => toggle('cmnd/Doppelsteckdose/POWER', values['stat/Doppelsteckdose/POWER'])} />
+            </Card>
+
+            <Card accentColor={T.spark.purple}>
+              <CardLabel icon="💡" color={T.spark.purple}>Beleuchtung</CardLabel>
+              {[
+                { label: 'Teichpumpe',    pub: 'cmnd/Teichpumpe/POWER',    stat: 'stat/Teichpumpe/POWER' },
+                { label: 'Beleuchtung',   pub: 'cmnd/Beleuchtung/POWER',   stat: 'stat/Beleuchtung/POWER' },
+                { label: 'Carport-Licht', pub: 'cmnd/Carport-Licht/POWER', stat: 'stat/Carport-Licht/POWER' },
+              ].map(({ label, pub, stat }) => (
+                <SwitchRow key={label} label={label} on={isOn(values[stat])} onClick={() => toggle(pub, values[stat])} />
+              ))}
             </Card>
 
           </div>
-        </div>
-
-        {/* L1–L3 Groups */}
-        <div className="grid-groups">
-          {topics.filter(t => t.type === 'group').map(group => {
-            const isSpan   = group.label.includes('Spannung')
-            const isStromG = group.label.includes('Strom L')
-            const isLeist  = group.label.includes('Leistung')
-            const groupColor = isSpan ? T.spark.purple : isStromG ? T.spark.orange : T.spark.power
-            const barMax   = isSpan ? 250 : isStromG ? 20 : 3000
-            const dp       = isSpan ? 0 : 1
-            return (
-              <Card key={group.label} accentColor={groupColor}>
-                <CardLabel icon="" color={groupColor}>{group.label}</CardLabel>
-                {group.keys?.map(({ label, key }) => {
-                  const raw   = values[key]
-                  const num   = raw !== undefined ? parseFloat(raw) : NaN
-                  const range = minMax[key] ?? { min: num, max: num }
-                  const h     = hist[key] ?? []
-                  const valColor = isLeist ? phasenColor(num) : groupColor
-                  return (
-                    <div key={key} style={{ marginBottom: 14, paddingBottom: 14, borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                      {/* Label + Wert */}
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
-                        <span style={{
-                          fontFamily: T.fontLabel, fontSize: 13, fontWeight: 700,
-                          letterSpacing: '0.06em', color: groupColor, minWidth: 28,
-                        }}>{label}</span>
-                        <span style={{
-                          fontFamily: T.fontMono, fontSize: 24, fontWeight: 700,
-                          fontVariantNumeric: 'tabular-nums', lineHeight: 1,
-                          color: valColor,
-                        }}>
-                          {isNaN(num) ? '…' : num.toFixed(dp)}
-                          <span style={{ fontSize: 13, fontWeight: 400, color: T.muted, marginLeft: 3 }}>{group.unit}</span>
-                        </span>
-                      </div>
-                      <Bar value={num} max={barMax} color={valColor} />
-                      <MinMaxRow min={range.min} max={range.max} unit={` ${group.unit}`} />
-                      {h.length >= 2 && <div style={{ marginTop: 5 }}><Sparkline data={h} color={valColor} height={30} /></div>}
-                    </div>
-                  )
-                })}
-              </Card>
-            )
-          })}
-        </div>
+        )}
 
       </main>
 
