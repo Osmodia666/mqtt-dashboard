@@ -13,16 +13,6 @@ const MINMAX_CACHE_KEY = 'mqtt_minmax_cache'
 const V  = (path: string) => `N/${VICTRON_PORTAL_ID}/${path}`
 const VW = (path: string) => `W/${VICTRON_PORTAL_ID}/${path}`
 
-const BKW_OFFSET = 178.779
-
-const bkwRaw = parseFloat(values['tele/Balkonkraftwerk/SENSOR.ENERGY.EnergyPTotal.0'])
-const victronRaw = parseFloat(values['N/b827eb75907a/solarcharger/288/Yield/System'])
-
-const solarBKW = !isNaN(bkwRaw) ? bkwRaw + BKW_OFFSET : BKW_OFFSET
-const solarVictron = !isNaN(victronRaw) ? victronRaw : 0
-
-const solarGesamt = solarBKW + solarVictron
-
 const VICTRON_TOPICS = {
   soc:         V('system/0/Dc/Battery/Soc'),
   batVoltage:  V('system/0/Dc/Battery/Voltage'),
@@ -30,10 +20,10 @@ const VICTRON_TOPICS = {
   batPower:    V('system/0/Dc/Battery/Power'),
   batTemp:     V('system/0/Dc/Battery/Temperature'),
   batState:    V('system/0/Dc/Battery/State'),
-  pvPower:     V('charger/288/Yield/Power'),
-  pvVoltage:   V('charger/288/Pv/V'),
-  pvCurrent:   V('charger/288/Pv/I'),
-  mpptState:   V('charger/288/State'),
+  pvPower:     V('solarcharger/288/Yield/Power'),
+  pvVoltage:   V('solarcharger/288/Pv/V'),
+  pvCurrent:   V('solarcharger/288/Pv/I'),
+  mpptState:   V('solarcharger/288/State'),
   acOutPower:  V('vebus/288/Ac/Out/P'),
   acOutVoltage:V('vebus/288/Ac/Out/L1/V'),
   acOutFreq:   V('vebus/288/Ac/Out/L1/F'),
@@ -663,7 +653,7 @@ function App() {
 
               {/* MPPT Kurzform */}
               <Card accentColor={amberAcc}>
-                <CardLabel icon="☀️" color={amberAcc}>MPPT · Smart</CardLabel>
+                <CardLabel icon="☀️" color={amberAcc}>MPPT · SmartSolar</CardLabel>
                 <BigVal value={isNaN(V_PV_W) ? '…' : `${Math.round(V_PV_W)}`} unit="W" size={21} color={isNaN(V_PV_W) ? T.muted : amberAcc} />
                 <Sub>PV-Eingangsleistung</Sub>
                 <Div />
@@ -706,100 +696,18 @@ function App() {
             <FlowBanner />
 
             {/* Zähler */}
-    <div style={{ marginBottom: 8 }}>
-  <Card accentColor={T.spark.cyan}>
-    <CardLabel icon="📊" color={T.spark.cyan}>Zähler</CardLabel>
-
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
-
-      {/* Strom gesamt */}
-      <div>
-        <div style={{
-          fontSize: 9,
-          color: T.muted,
-          fontFamily: T.fontMono,
-          marginBottom: 3
-        }}>
-          ⚡ Strom gesamt
-        </div>
-        <BigVal
-          value={values['Stromzähler/Verbrauch_gesamt'] ?? '…'}
-          unit="kWh"
-          size={15}
-        />
-      </div>
-
-      {/* Solar gesamt */}
-      <div>
-        <div style={{
-          fontSize: 9,
-          color: T.muted,
-          fontFamily: T.fontMono,
-          marginBottom: 3
-        }}>
-          🔋 Solar gesamt
-        </div>
-
-        <BigVal
-          value={solarGesamt > 0 ? solarGesamt.toFixed(1) : '…'}
-          unit="kWh"
-          size={15}
-        />
-
-        {solarGesamt > 0 && (
-          <div style={{
-            fontSize: 10,
-            color: T.muted,
-            fontFamily: T.fontMono,
-            marginTop: 3
-          }}>
-            {solarBKW.toFixed(1)} (BKW) + {solarVictron.toFixed(1)} (Victron)
-          </div>
-        )}
-      </div>
-
-      {/* Gas */}
-      <div>
-        <div style={{
-          fontSize: 9,
-          color: T.muted,
-          fontFamily: T.fontMono,
-          marginBottom: 3
-        }}>
-          🔥 Gas
-        </div>
-        <BigVal
-          value={values['Gaszaehler/stand'] ?? '…'}
-          unit="m³"
-          size={15}
-        />
-      </div>
-
-    </div>
-  </Card>
-</div>        
             <div style={{ marginBottom: 8 }}>
               <Card accentColor={T.spark.cyan}>
                 <CardLabel icon="📊" color={T.spark.cyan}>Zähler</CardLabel>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
                   {[
                     { icon: '⚡', label: 'Strom gesamt', val: values['Stromzähler/Verbrauch_gesamt'], unit: 'kWh' },
-                    { icon: '🔋', label: 'Solar gesamt',  val: solarGesamt > 0 ? solarGesamt.toFixed(1) : '…', unit: 'kWh' },
+                    { icon: '🔋', label: 'Solar gesamt',  val: (() => { const n = parseFloat(values['tele/Balkonkraftwerk/SENSOR.ENERGY.EnergyPTotal.0']); return !isNaN(n) ? (n + 178.779).toFixed(3) : '…' })(), unit: 'kWh' },
                     { icon: '🔥', label: 'Gas',           val: values['Gaszaehler/stand'], unit: 'm³' },
                   ].map(({ icon, label, val, unit }, i) => (
                     <div key={i}>
                       <div style={{ fontSize: 9, color: T.muted, fontFamily: T.fontMono, marginBottom: 3 }}>{icon} {label}</div>
                       <BigVal value={val ?? '…'} unit={unit} size={15} />
-                      {label === 'Solar gesamt' && solarGesamt > 0 && (
-                  <div style={{
-        fontSize: 10,
-    color: T.muted,
-    fontFamily: T.fontMono,
-    marginTop: 3
-  }}>
-    {solarBKW.toFixed(1)} (BKW) + {solarVictron.toFixed(1)} (Victron)
-  </div>
-)}
                     </div>
                   ))}
                 </div>
