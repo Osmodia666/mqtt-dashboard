@@ -34,9 +34,17 @@ const VICTRON_TOPICS = {
 
 const mpptStateLabel = (s: number) => {
   switch (s) {
-    case 0: return 'Aus'; case 2: return 'Fehler'; case 3: return 'Bulk'
-    case 4: return 'Absorption'; case 5: return 'Float'; case 7: return 'Manuell'
-    case 11: return 'Laden'; default: return `Status ${s}`
+    case 0:   return 'Aus'
+    case 2:   return 'Fehler'
+    case 3:   return 'Bulk'
+    case 4:   return 'Absorption'
+    case 5:   return 'Float'
+    case 7:   return 'Manuell'
+    case 11:  return 'Laden'
+    case 245: return 'Starten'
+    case 247: return 'Laden'
+    case 252: return 'Ext. Steuerung'  // ESS steuert den MPPT
+    default:  return `Status ${s}`
   }
 }
 const batStateLabel = (s: number) => {
@@ -235,9 +243,20 @@ function StatRow({ label, value }: { label: string; value: string }) {
 // ── Leistungsfarbe: negativ = Einspeisung = grün ─────────────────────────
 // positiv = Verbrauch: grün/gelb/rot je nach Höhe
 // negativ = Einspeisung ins Netz oder Rückspeisung = immer grün
+// Für Verbrauch-Card (Nettobezug): negativ=Einspeisung=grün, positiv=Verbrauch=grün/gelb/rot
 function leistungColor(w: number): string {
   if (w < 0) return T.ok
   return w >= 1000 ? T.err : w >= 300 ? T.warn : T.ok
+}
+
+// Für Phasen L1-L3: negativ=Einspeisung=grün, positiv=neutral (Leistungsfarbe bleibt)
+// Keine grüne Färbung für kleine positive Werte – grün nur bei negativem Vorzeichen
+function phasenColor(w: number): string {
+  if (isNaN(w)) return T.muted
+  if (w < 0)    return T.ok                              // Einspeisung → grün
+  if (w >= 1500) return T.err                            // sehr hoher Bezug → rot
+  if (w >= 500)  return T.warn                           // hoher Bezug → gelb
+  return T.spark.power                                   // normaler Bezug → indigo (neutral)
 }
 
 // ── ESS-Modal ────────────────────────────────────────────────────────────
@@ -707,17 +726,27 @@ function App() {
                   const num   = raw !== undefined ? parseFloat(raw) : NaN
                   const range = minMax[key] ?? { min: num, max: num }
                   const h     = hist[key] ?? []
-                  // Leistung: negativ = Einspeisung = grün
-                  const valColor = isLeist ? leistungColor(num) : groupColor
+                  const valColor = isLeist ? phasenColor(num) : groupColor
                   return (
-                    <div key={key} style={{ marginBottom: 12 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                        <span style={{ fontFamily: T.fontLabel, fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', color: T.muted }}>{label}</span>
-                        <BigVal value={isNaN(num) ? '…' : num.toFixed(dp)} unit={group.unit} size={19} color={valColor} />
+                    <div key={key} style={{ marginBottom: 14, paddingBottom: 14, borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                      {/* Label + Wert */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
+                        <span style={{
+                          fontFamily: T.fontLabel, fontSize: 13, fontWeight: 700,
+                          letterSpacing: '0.06em', color: groupColor, minWidth: 28,
+                        }}>{label}</span>
+                        <span style={{
+                          fontFamily: T.fontMono, fontSize: 24, fontWeight: 700,
+                          fontVariantNumeric: 'tabular-nums', lineHeight: 1,
+                          color: valColor,
+                        }}>
+                          {isNaN(num) ? '…' : num.toFixed(dp)}
+                          <span style={{ fontSize: 13, fontWeight: 400, color: T.muted, marginLeft: 3 }}>{group.unit}</span>
+                        </span>
                       </div>
                       <Bar value={num} max={barMax} color={valColor} />
                       <MinMaxRow min={range.min} max={range.max} unit={` ${group.unit}`} />
-                      {h.length >= 2 && <div style={{ marginTop: 3 }}><Sparkline data={h} color={valColor} height={26} /></div>}
+                      {h.length >= 2 && <div style={{ marginTop: 5 }}><Sparkline data={h} color={valColor} height={30} /></div>}
                     </div>
                   )
                 })}
