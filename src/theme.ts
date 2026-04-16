@@ -1,11 +1,9 @@
-// src/theme.ts  ──  Signal · Share Tech Mono
-// Schrift: Share Tech Mono (wie Gaszähler)
-// Farbe: Navy-Blau, Indigo-Akzent
+// src/theme.ts  ──  Option B: dunklerer BG, Pill-Labels, farbige Card-Border
 
 export const T = {
-  bg:      '#0f1520',
-  surf:    '#171f2e',
-  border:  'rgba(255,255,255,0.08)',
+  bg:      '#080d14',
+  surf:    '#0d1422',
+  border:  'rgba(255,255,255,0.07)',
 
   text:    '#e0eaff',
   muted:   'rgba(224,234,255,0.35)',
@@ -30,6 +28,6 @@ export const T = {
   fontMono:  '"Share Tech Mono", monospace',
 
   labelSize: '11px',
-  radius:    8,
+  radius:    7,
   btnRadius: '3px',
 } as const

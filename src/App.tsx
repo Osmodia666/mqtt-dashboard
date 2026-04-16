@@ -10,58 +10,38 @@ const REQUEST_TOPIC = 'dashboard/minmax/request'
 const HISTORY_LENGTH = 60
 const MINMAX_CACHE_KEY = 'mqtt_minmax_cache'
 
-// ── Victron MQTT-Pfade (Venus OS MQTT-Bridge) ─────────────────────────────
-// Lesen:  N/<portal-id>/<service>/<device-id>/<path>
-// Schreiben: W/<portal-id>/<service>/<device-id>/<path>   Payload: {"value": x}
-const V = (path: string) => `N/${VICTRON_PORTAL_ID}/${path}`
+const V  = (path: string) => `N/${VICTRON_PORTAL_ID}/${path}`
 const VW = (path: string) => `W/${VICTRON_PORTAL_ID}/${path}`
 
 const VICTRON_TOPICS = {
-  // Batterie (Pylontech, Device-ID 512)
-  soc:         V('system/0/Dc/Battery/Soc'),         // system-Aggregat – zuverlässiger als battery/512
+  soc:         V('system/0/Dc/Battery/Soc'),
   batVoltage:  V('system/0/Dc/Battery/Voltage'),
   batCurrent:  V('system/0/Dc/Battery/Current'),
   batPower:    V('system/0/Dc/Battery/Power'),
   batTemp:     V('system/0/Dc/Battery/Temperature'),
-  batState:    V('system/0/Dc/Battery/State'),         // 0=idle 1=charging 2=discharging
-
-  // MPPT Solarladeregler (SmartSolar, Device-ID 288)
+  batState:    V('system/0/Dc/Battery/State'),
   pvPower:     V('solarcharger/288/Yield/Power'),
   pvVoltage:   V('solarcharger/288/Pv/V'),
   pvCurrent:   V('solarcharger/288/Pv/I'),
-  mpptState:   V('solarcharger/288/State'),           // 0=Off 3=Bulk 4=Absorption 5=Float
-
-  // Wechselrichter/Charger (MultiPlus-II, Device-ID 288)
+  mpptState:   V('solarcharger/288/State'),
   acOutPower:  V('vebus/288/Ac/Out/P'),
   acOutVoltage:V('vebus/288/Ac/Out/L1/V'),
   acOutFreq:   V('vebus/288/Ac/Out/L1/F'),
-  vebusState:  V('vebus/288/VebusStatus'),            // 2=Fault 3=Bulk 4=Absorption 5=Float 9=Inverting
-  vebusMode:   V('vebus/288/Mode'),                   // 1=Charger 2=Inverter 3=On 4=Off
-
-  // ESS
+  vebusState:  V('vebus/288/VebusStatus'),
+  vebusMode:   V('vebus/288/Mode'),
   essMode:     V('settings/0/Settings/CGwacs/BatteryLife/State'),
 }
 
-// MPPT-Status-Text
 const mpptStateLabel = (s: number) => {
   switch (s) {
-    case 0:  return 'Aus'
-    case 2:  return 'Fehler'
-    case 3:  return 'Bulk'
-    case 4:  return 'Absorption'
-    case 5:  return 'Float'
-    case 7:  return 'Manuell'
-    case 11: return 'Laden'
-    default: return `Status ${s}`
+    case 0: return 'Aus'; case 2: return 'Fehler'; case 3: return 'Bulk'
+    case 4: return 'Absorption'; case 5: return 'Float'; case 7: return 'Manuell'
+    case 11: return 'Laden'; default: return `Status ${s}`
   }
 }
-
-// Batterie-Status-Text
 const batStateLabel = (s: number) => {
   switch (s) {
-    case 0: return 'Bereit'
-    case 1: return 'Laden'
-    case 2: return 'Entladen'
+    case 0: return 'Bereit'; case 1: return 'Laden'; case 2: return 'Entladen'
     default: return `Status ${s}`
   }
 }
@@ -74,9 +54,7 @@ const EXPLICIT_SUBSCRIBES = [
   'stat/+/POWER',
   'stat/+/POWER1',
   MINMAX_TOPIC,
-  // Einzelne Stromzähler-Topics (retained, von Tasmota publish2)
   'Stromzähler/#',
-  // Victron: alle N/<portal-id>/# abonnieren (inkl. system/0/Ac/Consumption)
   `N/${VICTRON_PORTAL_ID}/#`,
 ]
 
@@ -87,8 +65,8 @@ function saveCachedMinMax(data: MinMax) {
   try { localStorage.setItem(MINMAX_CACHE_KEY, JSON.stringify(data)) } catch {}
 }
 
-// ── Sparkline ──────────────────────────────────────────────────────────────
-function Sparkline({ data, color, height = 30 }: { data: number[]; color: string; height?: number }) {
+// ── Sparkline ────────────────────────────────────────────────────────────
+function Sparkline({ data, color, height = 28 }: { data: number[]; color: string; height?: number }) {
   if (data.length < 2) return <div style={{ height }} />
   const min = Math.min(...data), max = Math.max(...data), range = max - min || 1
   const w = 200, h = height, pad = 2
@@ -114,81 +92,67 @@ function sparkColor(label: string, value: number): string {
   return T.spark.power
 }
 
-// ── Card ──────────────────────────────────────────────────────────────────
-function Card({ children, accentColor, highlight = false, style }: {
-  children: React.ReactNode; accentColor?: string; highlight?: boolean; style?: React.CSSProperties
+// ── Card (Option B: farbige Border, kein Top-Bar) ────────────────────────
+function Card({ children, accentColor, style }: {
+  children: React.ReactNode; accentColor?: string; style?: React.CSSProperties
 }) {
   const color = accentColor ?? T.accent
   return (
     <div style={{
       background: T.surf,
-      border: `1px solid ${highlight ? color + '40' : T.border}`,
+      border: `1px solid ${color}28`,
       borderRadius: T.radius,
-      padding: '13px 15px',
+      padding: '11px 13px',
       height: '100%',
-      position: 'relative',
-      overflow: 'hidden',
       ...style,
     }}>
-      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: color }} />
       {children}
     </div>
   )
 }
 
-// ── Card Label ────────────────────────────────────────────────────────────
+// ── Pill Label (Option B) ────────────────────────────────────────────────
 function CardLabel({ icon, children, color }: { icon: string; children: React.ReactNode; color?: string }) {
+  const c = color ?? T.accent
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
-      <span style={{ fontSize: 15, lineHeight: 1, fontStyle: 'normal', textTransform: 'none', letterSpacing: 0 }}>
-        {icon}
-      </span>
-      <span className="card-label-text" style={{
-        fontFamily: T.fontLabel,
-        fontSize: T.labelSize,
-        fontWeight: 700,
-        letterSpacing: '0.09em',
-        textTransform: 'uppercase',
-        color: color ?? T.accent,
-      }}>
-        {children}
-      </span>
+    <div className="pill-label" style={{ background: c + '18', color: c }}>
+      {icon && <span style={{ fontSize: 13 }}>{icon}</span>}
+      <span className="card-label-text">{children}</span>
     </div>
   )
 }
 
-// ── Bar ───────────────────────────────────────────────────────────────────
+// ── Bar ──────────────────────────────────────────────────────────────────
 function Bar({ value, max, color }: { value: number; max: number; color: string }) {
-  const pct = Math.min(100, max > 0 ? (value / max) * 100 : 0)
+  const pct = Math.min(100, max > 0 ? (Math.abs(value) / max) * 100 : 0)
   return (
-    <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 3, height: 4, marginTop: 7, overflow: 'hidden' }}>
-      <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: 3, transition: 'width 0.4s ease' }} />
+    <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 2, height: 3, marginTop: 6, overflow: 'hidden' }}>
+      <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: 2, transition: 'width 0.4s ease' }} />
     </div>
   )
 }
 
-// ── MinMax ────────────────────────────────────────────────────────────────
+// ── MinMax kompakt ───────────────────────────────────────────────────────
 function MinMaxRow({ min, max, unit }: { min: number; max: number; unit?: string }) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: T.muted, marginTop: 4, fontFamily: T.fontMono }}>
-      <span>Min: {min?.toFixed(1)}{unit}</span>
-      <span>Max: {max?.toFixed(1)}{unit}</span>
+    <div className="minmax-compact">
+      Min: {min?.toFixed(1)}{unit} · Max: {max?.toFixed(1)}{unit}
     </div>
   )
 }
 
-// ── Toggle Button ─────────────────────────────────────────────────────────
+// ── Toggle Button ────────────────────────────────────────────────────────
 function ToggleBtn({ on, onClick }: { on: boolean; onClick: () => void }) {
   return (
     <button onClick={onClick} style={{
-      padding: '4px 13px',
+      padding: '3px 11px',
       borderRadius: T.btnRadius,
-      fontSize: 12,
+      fontSize: 11,
       fontWeight: 700,
       fontFamily: T.fontLabel,
       cursor: 'pointer',
       border: `1px solid ${on ? T.ok + '55' : T.err + '55'}`,
-      background: on ? T.ok + '22' : T.err + '22',
+      background: on ? T.ok + '20' : T.err + '20',
       color: on ? T.ok : T.err,
       letterSpacing: '0.05em',
       transition: 'all 0.15s',
@@ -199,66 +163,53 @@ function ToggleBtn({ on, onClick }: { on: boolean; onClick: () => void }) {
   )
 }
 
-// ── Switch Row ────────────────────────────────────────────────────────────
+// ── Switch Row ───────────────────────────────────────────────────────────
 function SwitchRow({ label, on, onClick }: { label: string; on: boolean; onClick: () => void }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
-      <span style={{ fontSize: 14, fontFamily: T.fontBody, color: T.text, minWidth: 0, wordBreak: 'break-word' }}>{label}</span>
-      <div style={{ flexShrink: 0 }}>
-        <ToggleBtn on={on} onClick={onClick} />
-      </div>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 7 }}>
+      <span style={{ fontSize: 13, fontFamily: T.fontBody, color: T.text, minWidth: 0, wordBreak: 'break-word' }}>{label}</span>
+      <div style={{ flexShrink: 0 }}><ToggleBtn on={on} onClick={onClick} /></div>
     </div>
   )
 }
 
-// ── Value Display ─────────────────────────────────────────────────────────
-function BigVal({ value, unit, size = 20 }: { value: string; unit?: string; size?: number }) {
+// ── Value Display ────────────────────────────────────────────────────────
+function BigVal({ value, unit, size = 20, color }: { value: string; unit?: string; size?: number; color?: string }) {
   return (
-    <div style={{ fontFamily: T.fontMono, fontSize: size, fontWeight: 700, fontVariantNumeric: 'tabular-nums', lineHeight: 1.15, color: T.text }}>
+    <div style={{ fontFamily: T.fontMono, fontSize: size, fontWeight: 700, fontVariantNumeric: 'tabular-nums', lineHeight: 1.15, color: color ?? T.text }}>
       {value}
-      {unit && <span style={{ fontSize: size * 0.62, fontWeight: 400, color: T.muted, marginLeft: 3 }}>{unit}</span>}
+      {unit && <span style={{ fontSize: size * 0.6, fontWeight: 400, color: T.muted, marginLeft: 2 }}>{unit}</span>}
     </div>
   )
 }
 
-// ── Badge ─────────────────────────────────────────────────────────────────
+// ── Badge ────────────────────────────────────────────────────────────────
 function Badge({ children, color = T.ok }: { children: React.ReactNode; color?: string }) {
   return (
     <span style={{
-      display: 'inline-block',
-      fontSize: 10,
-      fontWeight: 700,
-      fontFamily: T.fontLabel,
-      letterSpacing: '0.05em',
-      padding: '2px 7px',
-      borderRadius: 3,
-      background: color + '22',
-      border: `1px solid ${color}55`,
-      color,
+      display: 'inline-block', fontSize: 10, fontWeight: 700, fontFamily: T.fontLabel,
+      letterSpacing: '0.05em', padding: '2px 6px', borderRadius: 3,
+      background: color + '20', border: `1px solid ${color}44`, color,
     }}>
       {children}
     </span>
   )
 }
 
-// ── SOC Ring ──────────────────────────────────────────────────────────────
+// ── SOC Ring ─────────────────────────────────────────────────────────────
 function SocRing({ soc, size = 52 }: { soc: number; size?: number }) {
-  const r       = (size / 2) - 5
-  const circ    = 2 * Math.PI * r
-  const filled  = isNaN(soc) ? 0 : Math.min(100, soc)
-  const offset  = circ - (filled / 100) * circ
-  const color   = soc >= 60 ? T.ok : soc >= 30 ? T.warn : T.err
+  const r = (size / 2) - 5
+  const circ = 2 * Math.PI * r
+  const filled = isNaN(soc) ? 0 : Math.min(100, soc)
+  const offset = circ - (filled / 100) * circ
+  const color = soc >= 60 ? T.ok : soc >= 30 ? T.warn : T.err
   return (
     <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ flexShrink: 0 }}>
-      <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth={4} />
-      <circle
-        cx={size/2} cy={size/2} r={r}
-        fill="none" stroke={color} strokeWidth={4}
-        strokeDasharray={circ} strokeDashoffset={offset}
-        strokeLinecap="round"
+      <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={4} />
+      <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={color} strokeWidth={4}
+        strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round"
         transform={`rotate(-90 ${size/2} ${size/2})`}
-        style={{ transition: 'stroke-dashoffset 0.6s ease' }}
-      />
+        style={{ transition: 'stroke-dashoffset 0.6s ease' }} />
       <text x={size/2} y={size/2 + 4} textAnchor="middle" fontSize={11} fill={T.text} fontWeight={700} fontFamily={T.fontMono}>
         {isNaN(soc) ? '…' : `${Math.round(soc)}%`}
       </text>
@@ -266,110 +217,72 @@ function SocRing({ soc, size = 52 }: { soc: number; size?: number }) {
   )
 }
 
-// ── Divider ───────────────────────────────────────────────────────────────
 function Div() {
-  return <div style={{ height: 1, background: 'rgba(255,255,255,0.07)', margin: '9px 0' }} />
+  return <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '8px 0' }} />
 }
-
-// ── Subdim Label ─────────────────────────────────────────────────────────
 function Sub({ children }: { children: React.ReactNode }) {
-  return <div style={{ fontSize: 11, color: T.muted, marginBottom: 3, fontFamily: T.fontMono }}>{children}</div>
+  return <div style={{ fontSize: 10, color: T.muted, marginBottom: 2, fontFamily: T.fontMono }}>{children}</div>
 }
-
-// ── Stat Row ─────────────────────────────────────────────────────────────
 function StatRow({ label, value }: { label: string; value: string }) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', fontSize: 12, marginBottom: 4, fontFamily: T.fontMono }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', fontSize: 11, marginBottom: 4, fontFamily: T.fontMono }}>
       <span style={{ color: T.muted }}>{label}</span>
       <span style={{ color: T.text, fontWeight: 700 }}>{value}</span>
     </div>
   )
 }
 
-// ── ESS-Modal ─────────────────────────────────────────────────────────────
-function EssModal({
-  currentEssMode,
-  currentInvMode,
-  onSetEss,
-  onSetInv,
-  onClose,
-}: {
-  currentEssMode: number
-  currentInvMode: number
-  onSetEss: (v: number) => void
-  onSetInv: (v: number) => void
-  onClose: () => void
+// ── Leistungsfarbe: negativ = Einspeisung = grün ─────────────────────────
+// positiv = Verbrauch: grün/gelb/rot je nach Höhe
+// negativ = Einspeisung ins Netz oder Rückspeisung = immer grün
+function leistungColor(w: number): string {
+  if (w < 0) return T.ok
+  return w >= 1000 ? T.err : w >= 300 ? T.warn : T.ok
+}
+
+// ── ESS-Modal ────────────────────────────────────────────────────────────
+function EssModal({ currentEssMode, currentInvMode, onSetEss, onSetInv, onClose }: {
+  currentEssMode: number; currentInvMode: number
+  onSetEss: (v: number) => void; onSetInv: (v: number) => void; onClose: () => void
 }) {
   const tealC = '#2dd4bf'
   return (
     <div className="ess-overlay" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
       <div className="ess-modal">
-        {/* Accent bar */}
         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: tealC, borderRadius: '12px 12px 0 0' }} />
-
-        {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 16 }}>⚙️</span>
-            <span style={{ fontFamily: T.fontLabel, fontSize: 13, fontWeight: 700, letterSpacing: '0.09em', textTransform: 'uppercase', color: tealC }}>
-              ESS-Steuerung
-            </span>
+            <span style={{ fontSize: 15 }}>⚙️</span>
+            <span style={{ fontFamily: T.fontLabel, fontSize: 12, fontWeight: 700, letterSpacing: '0.09em', textTransform: 'uppercase', color: tealC }}>ESS-Steuerung</span>
           </div>
-          <button onClick={onClose} style={{
-            background: 'none', border: 'none', cursor: 'pointer', color: T.muted,
-            fontSize: 18, lineHeight: 1, padding: '2px 6px', borderRadius: 4,
-          }}>✕</button>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.muted, fontSize: 18, lineHeight: 1, padding: '2px 6px' }}>✕</button>
         </div>
-
-        {/* ESS-Modus */}
-        <div style={{ fontFamily: T.fontLabel, fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: T.muted, marginBottom: 8 }}>
-          ESS-Betriebsmodus
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 18 }}>
+        <div style={{ fontFamily: T.fontLabel, fontSize: 10, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: T.muted, marginBottom: 7 }}>ESS-Betriebsmodus</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginBottom: 16 }}>
           {ESS_MODES.map(m => (
-            <button
-              key={m.value}
-              className={`ess-mode-btn${currentEssMode === m.value ? ' active' : ''}`}
-              onClick={() => onSetEss(m.value)}
-            >
+            <button key={m.value} className={`ess-mode-btn${currentEssMode === m.value ? ' active' : ''}`} onClick={() => onSetEss(m.value)}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                  <span style={{ fontFamily: T.fontMono, fontSize: 13, color: T.text, fontWeight: 700 }}>{m.label}</span>
-                  <span style={{ fontFamily: T.fontMono, fontSize: 11, color: T.muted, marginLeft: 8 }}>{m.sub}</span>
+                  <span style={{ fontFamily: T.fontMono, fontSize: 12, color: T.text, fontWeight: 700 }}>{m.label}</span>
+                  <span style={{ fontFamily: T.fontMono, fontSize: 10, color: T.muted, marginLeft: 7 }}>{m.sub}</span>
                 </div>
-                {currentEssMode === m.value && (
-                  <span style={{ color: T.accent, fontSize: 14 }}>●</span>
-                )}
+                {currentEssMode === m.value && <span style={{ color: T.accent, fontSize: 13 }}>●</span>}
               </div>
             </button>
           ))}
         </div>
-
         <Div />
-
-        {/* Wechselrichter-Modus */}
-        <div style={{ fontFamily: T.fontLabel, fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: T.muted, marginBottom: 8, marginTop: 14 }}>
-          Wechselrichter-Modus
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+        <div style={{ fontFamily: T.fontLabel, fontSize: 10, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: T.muted, marginBottom: 7, marginTop: 12 }}>Wechselrichter-Modus</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 5 }}>
           {INVERTER_MODES.map(m => (
-            <button
-              key={m.value}
-              className={`ess-mode-btn${currentInvMode === m.value ? ' active' : ''}`}
-              onClick={() => onSetInv(m.value)}
-            >
+            <button key={m.value} className={`ess-mode-btn${currentInvMode === m.value ? ' active' : ''}`} onClick={() => onSetInv(m.value)}>
               <div style={{ fontFamily: T.fontMono, fontSize: 12, color: T.text, fontWeight: 700 }}>{m.label}</div>
               <div style={{ fontFamily: T.fontMono, fontSize: 10, color: T.muted }}>{m.sub}</div>
-              {currentInvMode === m.value && (
-                <div style={{ marginTop: 4 }}><Badge color={T.accent}>aktiv</Badge></div>
-              )}
+              {currentInvMode === m.value && <div style={{ marginTop: 3 }}><Badge color={T.accent}>aktiv</Badge></div>}
             </button>
           ))}
         </div>
-
-        <div style={{ marginTop: 16, fontSize: 11, color: T.muted, fontFamily: T.fontMono, lineHeight: 1.5 }}>
-          Änderungen werden sofort per MQTT an Venus OS gesendet.
-        </div>
+        <div style={{ marginTop: 14, fontSize: 10, color: T.muted, fontFamily: T.fontMono, lineHeight: 1.5 }}>Änderungen werden sofort per MQTT an Venus OS gesendet.</div>
       </div>
     </div>
   )
@@ -394,56 +307,36 @@ function App() {
     })
     clientRef.current = client
 
-  client.on('connect', () => {
-  client.subscribe(EXPLICIT_SUBSCRIBES, { qos: 0 })
-
-  // Victron keepalive sofort senden damit Venus OS retained Messages pushed,
-  // dann nochmal alle 30s wiederholen
-  const sendKeepalive = () => {
-    client.publish(`R/${VICTRON_PORTAL_ID}/system/0/Serial`, '')
-  }
-  sendKeepalive()
-
-  // MinMax-Request nach kurzer Pause (retained Messages kommen zuerst)
-  setTimeout(() => {
-    client.publish(REQUEST_TOPIC, JSON.stringify({ ts: Date.now() }))
-  }, 500)
-
-  const keepalive = setInterval(sendKeepalive, 30_000)
-  ;(client as any)._keepalive = keepalive
-})
+    client.on('connect', () => {
+      client.subscribe(EXPLICIT_SUBSCRIBES, { qos: 0 })
+      const sendKeepalive = () => { client.publish(`R/${VICTRON_PORTAL_ID}/system/0/Serial`, '') }
+      sendKeepalive()
+      setTimeout(() => { client.publish(REQUEST_TOPIC, JSON.stringify({ ts: Date.now() })) }, 500)
+      const keepalive = setInterval(sendKeepalive, 30_000)
+      ;(client as any)._keepalive = keepalive
+    })
 
     client.on('error', err => console.error('MQTT:', err))
 
     client.on('message', (topic: string, message: Buffer) => {
       const payload = message.toString().trim()
-      console.log("MQTT:", topic, payload)
 
       if (topic === MINMAX_TOPIC) {
-        try { const d = JSON.parse(payload); setMinMax(d); saveCachedMinMax(d) } catch {}
-        return
+        try { const d = JSON.parse(payload); setMinMax(d); saveCachedMinMax(d) } catch {} ; return
       }
       if (topic === 'Pool_temp/temperatur' || topic === 'Gaszaehler/stand') {
         messageQueue.current[topic] = payload; return
       }
-
-      // Einzelne Stromzaehler-Topics: Plain-Number-Payload direkt speichern
       if (topic.startsWith('Stromzähler/')) {
-        messageQueue.current[topic] = payload
-        return
+        messageQueue.current[topic] = payload; return
       }
-
-      // Venus OS liefert JSON: {"value": x}
       if (topic.startsWith(`N/${VICTRON_PORTAL_ID}/`)) {
         try {
           const parsed = JSON.parse(payload)
-          if (parsed && 'value' in parsed) {
-            messageQueue.current[topic] = String(parsed.value)
-          }
+          if (parsed && 'value' in parsed) messageQueue.current[topic] = String(parsed.value)
         } catch {}
         return
       }
-
       try {
         const json = JSON.parse(payload)
         const flatten = (obj: any, prefix = ''): Record<string, string> =>
@@ -468,129 +361,89 @@ function App() {
       for (const [key, val] of Object.entries(updates)) {
         const n = parseFloat(val)
         if (isNaN(n)) continue
-        if (!h[key]) {
-          // Ersten Wert als Mini-History vorbelegen damit Sparkline sofort rendert
-          h[key] = Array(Math.min(HISTORY_LENGTH, 10)).fill(n)
-        } else if (h[key].length >= HISTORY_LENGTH) {
-          h[key] = [...h[key].slice(1), n]
-        } else {
-          h[key].push(n)
-        }
+        if (!h[key]) h[key] = Array(Math.min(HISTORY_LENGTH, 10)).fill(n)
+        else if (h[key].length >= HISTORY_LENGTH) h[key] = [...h[key].slice(1), n]
+        else h[key].push(n)
       }
       setValues(prev => ({ ...prev, ...updates }))
       setLastUpdate(new Date().toLocaleTimeString())
     }
 
     const iv = setInterval(flush, 150)
-    return () => {
-      clearInterval(iv)
-      clearInterval((client as any)._keepalive)
-      client.end(true)
-    }
+    return () => { clearInterval(iv); clearInterval((client as any)._keepalive); client.end(true) }
   }, [])
 
-  // ── MQTT publish helper ──────────────────────────────────────────────────
   const toggle = (pub: string, cur: string) => {
     const next = cur?.toUpperCase() === 'ON' ? 'OFF' : 'ON'
     setValues(prev => ({ ...prev, [pub.replace('cmnd/', 'stat/')]: next }))
     clientRef.current?.publish(pub, next)
   }
-
-  // Venus OS Write: Payload muss JSON {"value": x} sein
   const victronWrite = (path: string, value: number) => {
     const topic = VW(path.replace(`N/${VICTRON_PORTAL_ID}/`, ''))
     clientRef.current?.publish(topic, JSON.stringify({ value }))
-    // Optimistisch lokalen State aktualisieren
     setValues(prev => ({ ...prev, [`N/${VICTRON_PORTAL_ID}/${path.replace(`N/${VICTRON_PORTAL_ID}/`, '')}`]: String(value) }))
   }
+  const setEssMode      = (v: number) => victronWrite('settings/0/Settings/CGwacs/BatteryLife/State', v)
+  const setInverterMode = (v: number) => victronWrite('vebus/288/Mode', v)
 
-  const setEssMode = (v: number) => {
-    victronWrite('settings/0/Settings/CGwacs/BatteryLife/State', v)
-  }
-  const setInverterMode = (v: number) => {
-    victronWrite('vebus/288/Mode', v)
-  }
+  const isOn = (v: string) => v?.toUpperCase() === 'ON'
+  const hist = histRef.current
 
-  const isOn       = (v: string) => v?.toUpperCase() === 'ON'
-  const hist       = histRef.current
-  const powerColor = (w: number) => w >= 1000 ? T.err : w >= 300 ? T.warn : T.ok
-
-  // ── Victron-Werte auslesen ───────────────────────────────────────────────
-  const V_SOC         = parseFloat(values[VICTRON_TOPICS.soc]       ?? 'NaN')
-  const V_BAT_V       = parseFloat(values[VICTRON_TOPICS.batVoltage] ?? 'NaN')
-  const V_BAT_A       = parseFloat(values[VICTRON_TOPICS.batCurrent] ?? 'NaN')
-  const V_BAT_W       = parseFloat(values[VICTRON_TOPICS.batPower]   ?? 'NaN')
-  const V_BAT_T       = parseFloat(values[VICTRON_TOPICS.batTemp]    ?? 'NaN')
-  const V_BAT_STATE   = parseFloat(values[VICTRON_TOPICS.batState]   ?? 'NaN')
-  const V_PV_W        = parseFloat(values[VICTRON_TOPICS.pvPower]    ?? 'NaN')
-  const V_PV_V        = parseFloat(values[VICTRON_TOPICS.pvVoltage]  ?? 'NaN')
-  const V_PV_A        = parseFloat(values[VICTRON_TOPICS.pvCurrent]  ?? 'NaN')
-  const V_MPPT_STATE  = parseFloat(values[VICTRON_TOPICS.mpptState]  ?? 'NaN')
-  const V_AC_W        = parseFloat(values[VICTRON_TOPICS.acOutPower] ?? 'NaN')
+  const V_SOC         = parseFloat(values[VICTRON_TOPICS.soc]        ?? 'NaN')
+  const V_BAT_V       = parseFloat(values[VICTRON_TOPICS.batVoltage]  ?? 'NaN')
+  const V_BAT_A       = parseFloat(values[VICTRON_TOPICS.batCurrent]  ?? 'NaN')
+  const V_BAT_W       = parseFloat(values[VICTRON_TOPICS.batPower]    ?? 'NaN')
+  const V_BAT_T       = parseFloat(values[VICTRON_TOPICS.batTemp]     ?? 'NaN')
+  const V_BAT_STATE   = parseFloat(values[VICTRON_TOPICS.batState]    ?? 'NaN')
+  const V_PV_W        = parseFloat(values[VICTRON_TOPICS.pvPower]     ?? 'NaN')
+  const V_PV_V        = parseFloat(values[VICTRON_TOPICS.pvVoltage]   ?? 'NaN')
+  const V_PV_A        = parseFloat(values[VICTRON_TOPICS.pvCurrent]   ?? 'NaN')
+  const V_MPPT_STATE  = parseFloat(values[VICTRON_TOPICS.mpptState]   ?? 'NaN')
+  const V_AC_W        = parseFloat(values[VICTRON_TOPICS.acOutPower]  ?? 'NaN')
   const V_AC_V        = parseFloat(values[VICTRON_TOPICS.acOutVoltage]?? 'NaN')
-  const V_AC_F        = parseFloat(values[VICTRON_TOPICS.acOutFreq]  ?? 'NaN')
-  const V_VEBUS_STATE = parseFloat(values[VICTRON_TOPICS.vebusState] ?? 'NaN')
-  const V_INV_MODE    = parseFloat(values[VICTRON_TOPICS.vebusMode]  ?? 'NaN')
-  const V_ESS_MODE    = parseFloat(values[VICTRON_TOPICS.essMode]    ?? 'NaN')
+  const V_AC_F        = parseFloat(values[VICTRON_TOPICS.acOutFreq]   ?? 'NaN')
+  const V_VEBUS_STATE = parseFloat(values[VICTRON_TOPICS.vebusState]  ?? 'NaN')
+  const V_INV_MODE    = parseFloat(values[VICTRON_TOPICS.vebusMode]   ?? 'NaN')
+  const V_ESS_MODE    = parseFloat(values[VICTRON_TOPICS.essMode]     ?? 'NaN')
 
-  // Balkon-BKW Erzeugung
-  const BKW_W = parseFloat(values['tele/Balkonkraftwerk/SENSOR.ENERGY.Power.0'] ?? 'NaN')
-
-  // Kombinierte Gesamterzeugung = Balkon + Victron-PV
-  const totalGen = (!isNaN(BKW_W) ? BKW_W : 0) + (!isNaN(V_PV_W) ? V_PV_W : 0)
-
-  // Netz-Austausch (positiv = Bezug, negativ = Einspeisung)
+  const BKW_W       = parseFloat(values['tele/Balkonkraftwerk/SENSOR.ENERGY.Power.0'] ?? 'NaN')
+  const totalGen    = (!isNaN(BKW_W) ? BKW_W : 0) + (!isNaN(V_PV_W) ? V_PV_W : 0)
   const netzAustausch = parseFloat(values['Stromzähler/Verbrauch_aktuell'] ?? 'NaN')
-
-  // Hausverbrauch aus Venus OS (immer positiv, unabhängig von Einspeisung)
-  const consL1 = parseFloat(values[V('system/0/Ac/Consumption/L1/Power')] ?? '0')
-  const consL2 = parseFloat(values[V('system/0/Ac/Consumption/L2/Power')] ?? '0')
-  const consL3 = parseFloat(values[V('system/0/Ac/Consumption/L3/Power')] ?? '0')
+  const consL1      = parseFloat(values[V('system/0/Ac/Consumption/L1/Power')] ?? '0')
+  const consL2      = parseFloat(values[V('system/0/Ac/Consumption/L2/Power')] ?? '0')
+  const consL3      = parseFloat(values[V('system/0/Ac/Consumption/L3/Power')] ?? '0')
   const hausverbrauch = (!isNaN(consL1) ? consL1 : 0) + (!isNaN(consL2) ? consL2 : 0) + (!isNaN(consL3) ? consL3 : 0)
-
-  // Für Strom-Card: Netz-Austausch (wie bisher)
-  const verbrauch = netzAustausch
-
-  // Überschuss = Erzeugung − Hausverbrauch (positiv = mehr erzeugt als verbraucht)
+  const verbrauch   = netzAustausch
   const ueberschuss = totalGen - hausverbrauch
 
-  // Farben
-  const socColor       = V_SOC >= 60 ? T.ok : V_SOC >= 30 ? T.warn : T.err
-  const pvColor        = V_PV_W >= 800 ? T.ok : V_PV_W >= 300 ? T.warn : T.muted
-  const tealAcc        = '#2dd4bf'
-  const amberAcc       = '#fbbf24'
-  const purpleAcc      = '#c084fc'
-  const genColor       = totalGen >= 500 ? T.ok : totalGen >= 200 ? T.warn : T.muted
-  const uebColor       = ueberschuss >= 0 ? T.ok : T.err
+  const socColor  = V_SOC >= 60 ? T.ok : V_SOC >= 30 ? T.warn : T.err
+  const pvColor   = V_PV_W >= 800 ? T.ok : V_PV_W >= 300 ? T.warn : T.muted
+  const tealAcc   = '#2dd4bf'
+  const amberAcc  = '#fbbf24'
+  const purpleAcc = '#c084fc'
+  const genColor  = totalGen >= 500 ? T.ok : totalGen >= 200 ? T.warn : T.muted
+  const uebColor  = ueberschuss >= 0 ? T.ok : T.err
 
   return (
     <div style={{ minHeight: '100vh', background: T.bg, color: T.text, fontFamily: T.fontBody }}>
 
-      {/* ── Header ── */}
-      <header className="dash-header" style={{
-        background: T.surf,
-        borderBottom: `2px solid ${T.accent}`,
-        position: 'sticky',
-        top: 0,
-        zIndex: 10,
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span style={{ fontFamily: T.fontLabel, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: T.text, opacity: 0.75 }}>
-            MQTT Dashboard
-          </span>
-          <span style={{ width: 7, height: 7, borderRadius: '50%', background: lastUpdate ? T.ok : T.warn, display: 'inline-block', flexShrink: 0 }} />
-          <span style={{ fontFamily: T.fontLabel, color: lastUpdate ? T.ok : T.warn, whiteSpace: 'nowrap' }}>
+      {/* Header */}
+      <header className="dash-header" style={{ background: T.surf, borderBottom: `1px solid ${T.accent}33`, position: 'sticky', top: 0, zIndex: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontFamily: T.fontLabel, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: T.text, opacity: 0.7 }}>MQTT Dashboard</span>
+          <span style={{ width: 6, height: 6, borderRadius: '50%', background: lastUpdate ? T.ok : T.warn, display: 'inline-block', flexShrink: 0 }} />
+          <span style={{ fontFamily: T.fontLabel, color: lastUpdate ? T.ok : T.warn, whiteSpace: 'nowrap', fontSize: 11 }}>
             {lastUpdate ? 'verbunden' : 'verbinde…'}
           </span>
         </div>
-        <span style={{ fontFamily: T.fontMono, color: T.muted, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
+        <span style={{ fontFamily: T.fontMono, color: T.muted, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', fontSize: 11 }}>
           {lastUpdate ? `Letztes Update: ${lastUpdate}` : ''}
         </span>
       </header>
 
-      <main style={{ padding: '14px 18px 32px' }}>
+      <main style={{ padding: '10px 14px 32px' }}>
 
-        {/* ── Top grid ── */}
+        {/* Top Grid */}
         <div className="grid-top">
 
           {/* 3D-Drucker */}
@@ -617,13 +470,13 @@ function App() {
               return <>
                 <SwitchRow label="Pumpe" on={isOn(values[pumpe?.statusTopic ?? ''])}
                   onClick={() => pumpe && toggle(pumpe.publishTopic!, values[pumpe.statusTopic])} />
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, marginTop: 4 }}>
-                  <span style={{ fontSize: 16 }}>🌡️</span>
-                  <BigVal value={isNaN(val) ? '…' : `${val}`} unit="°C" size={18} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3 }}>
+                  <span style={{ fontSize: 14 }}>🌡️</span>
+                  <BigVal value={isNaN(val) ? '…' : `${val}`} unit="°C" size={17} color={col} />
                 </div>
                 <Bar value={val} max={40} color={col} />
                 <MinMaxRow min={range.min} max={range.max} unit=" °C" />
-                {h.length >= 2 && <div style={{ marginTop: 5 }}><Sparkline data={h} color={col} /></div>}
+                {h.length >= 2 && <div style={{ marginTop: 4 }}><Sparkline data={h} color={col} /></div>}
               </>
             })()}
           </Card>
@@ -631,50 +484,47 @@ function App() {
           {/* Zähler */}
           <Card accentColor={T.spark.cyan}>
             <CardLabel icon="📊" color={T.spark.cyan}>Zähler</CardLabel>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
               {[
                 { icon: '⚡', val: values['Stromzähler/Verbrauch_gesamt'], unit: 'kWh' },
                 { icon: '🔋', val: (() => { const n = parseFloat(values['tele/Balkonkraftwerk/SENSOR.ENERGY.EnergyPTotal.0']); return !isNaN(n) ? (n + 178.779).toFixed(3) : '…' })(), unit: 'kWh' },
                 { icon: '🔥', val: values['Gaszaehler/stand'], unit: 'm³' },
               ].map(({ icon, val, unit }, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-                  <span style={{ fontSize: 16 }}>{icon}</span>
-                  <BigVal value={val ?? '…'} unit={unit} size={15} />
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                  <span style={{ fontSize: 14 }}>{icon}</span>
+                  <BigVal value={val ?? '…'} unit={unit} size={14} />
                 </div>
               ))}
             </div>
           </Card>
 
-          {/* Strom — Verbrauch + kombinierte Erzeugung */}
+          {/* Strom */}
           <Card accentColor={T.err}>
             <CardLabel icon="⚡" color={T.err}>Strom</CardLabel>
-            {/* Verbrauch */}
             {(() => {
               const key   = 'Stromzähler/Verbrauch_aktuell'
               const num   = parseFloat(values[key])
               const range = minMax[key] ?? { min: num, max: num }
               const h     = hist[key] ?? []
-              const col   = powerColor(num)
+              const col   = leistungColor(num)
               return <>
                 <Sub>Verbrauch</Sub>
-                <BigVal value={isNaN(num) ? '…' : `${num}`} unit="W" size={22} />
-                <Bar value={num} max={range.max > 0 ? range.max : 2000} color={col} />
+                <BigVal value={isNaN(num) ? '…' : `${num}`} unit="W" size={21} color={col} />
+                <Bar value={num} max={Math.abs(range.max) > 0 ? Math.abs(range.max) : 2000} color={col} />
                 <MinMaxRow min={range.min} max={range.max} unit=" W" />
-                {h.length >= 2 && <div style={{ marginTop: 5 }}><Sparkline data={h} color={col} /></div>}
+                {h.length >= 2 && <div style={{ marginTop: 4 }}><Sparkline data={h} color={col} /></div>}
               </>
             })()}
             <Div />
-            {/* Kombinierte Erzeugung */}
             <Sub>Erzeugung gesamt</Sub>
-            <BigVal value={totalGen > 0 || !isNaN(BKW_W) ? `${Math.round(totalGen)}` : '…'} unit="W" size={22} />
+            <BigVal value={totalGen > 0 || !isNaN(BKW_W) ? `${Math.round(totalGen)}` : '…'} unit="W" size={21} color={genColor} />
             <Bar value={totalGen} max={2000} color={genColor} />
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: T.muted, marginTop: 3, fontFamily: T.fontMono }}>
               <span>Balkon: {isNaN(BKW_W) ? '…' : `${Math.round(BKW_W)} W`}</span>
               <span>PV: {isNaN(V_PV_W) ? '…' : `${Math.round(V_PV_W)} W`}</span>
             </div>
-            {/* Überschuss */}
             {!isNaN(verbrauch) && !isNaN(totalGen) && (
-              <div style={{ marginTop: 6, fontSize: 12, color: uebColor, fontFamily: T.fontMono, fontWeight: 700 }}>
+              <div style={{ marginTop: 5, fontSize: 11, color: uebColor, fontFamily: T.fontMono, fontWeight: 700 }}>
                 {ueberschuss >= 0 ? `+${Math.round(ueberschuss)} W Überschuss` : `${Math.round(ueberschuss)} W Defizit`}
               </div>
             )}
@@ -705,121 +555,60 @@ function App() {
             ))}
           </Card>
 
-          {/* Dynamische Topics */}
-          {topics.filter(t =>
-            t.type !== 'group' &&
-            !['Sidewinder X1', 'Poolpumpe', 'Steckdose 1', 'Steckdose 2'].includes(t.label)
-          ).map(({ label, type, unit, favorite, statusTopic, publishTopic, topic }) => {
-            const key    = statusTopic ?? topic
-            const raw    = values[key]
-            const num    = parseFloat(raw)
-            const isNum  = type === 'number' && !isNaN(num)
-            const showMM = !label.includes('gesamt') && (key.includes('sml_L') || key.includes('sml_m') || key.includes('Balkonkraftwerk'))
-            const range  = minMax[key] ?? { min: num, max: num }
-            const h      = hist[key] ?? []
-            const col    = sparkColor(label, num)
-            return (
-              <Card key={key} accentColor={col} highlight={favorite}>
-                <CardLabel icon="" color={col}>{label}</CardLabel>
-                {type === 'boolean' && <ToggleBtn on={isOn(raw)} onClick={() => toggle(publishTopic ?? key, raw)} />}
-                {isNum && <>
-                  <BigVal value={raw} unit={unit} size={22} />
-                  {showMM && <Bar value={num} max={range.max > 0 ? range.max : 100} color={powerColor(num)} />}
-                  {showMM && <MinMaxRow min={range.min} max={range.max} unit={unit ? ` ${unit}` : ''} />}
-                  {h.length >= 2 && <div style={{ marginTop: 6 }}><Sparkline data={h} color={col} /></div>}
-                </>}
-                {type === 'string' && <div style={{ fontSize: 15 }}>{raw ?? '…'}</div>}
-              </Card>
-            )
-          })}
         </div>
 
-        {/* ════════════════════════════════════════════════════════════════ */}
-        {/* ── Victron-Sektion ──────────────────────────────────────────── */}
-        {/* ════════════════════════════════════════════════════════════════ */}
+        {/* Victron-Sektion */}
         <div className="victron-section">
 
-          {/* ── Energiefluss-Banner ── */}
+          {/* Energiefluss-Banner */}
           <div className="victron-flow-banner">
             <Card accentColor={tealAcc}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6, marginBottom: 0 }}>
                 <CardLabel icon="⚡" color={tealAcc}>Energiefluss · Victron</CardLabel>
-                {/* ESS-Steuerung Button */}
-                <button
-                  onClick={() => setEssOpen(true)}
-                  style={{
-                    padding: '5px 14px',
-                    borderRadius: T.btnRadius,
-                    fontSize: 11,
-                    fontWeight: 700,
-                    fontFamily: T.fontLabel,
-                    letterSpacing: '0.06em',
-                    textTransform: 'uppercase',
-                    cursor: 'pointer',
-                    border: `1px solid ${tealAcc}55`,
-                    background: tealAcc + '18',
-                    color: tealAcc,
-                    transition: 'all 0.15s',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  ⚙️ ESS-Steuerung
-                </button>
+                <button onClick={() => setEssOpen(true)} style={{
+                  padding: '4px 12px', borderRadius: T.btnRadius, fontSize: 10, fontWeight: 700,
+                  fontFamily: T.fontLabel, letterSpacing: '0.06em', textTransform: 'uppercase',
+                  cursor: 'pointer', border: `1px solid ${tealAcc}44`, background: tealAcc + '15',
+                  color: tealAcc, transition: 'all 0.15s', whiteSpace: 'nowrap',
+                }}>⚙️ ESS-Steuerung</button>
               </div>
 
               <div className="flow-row">
-                {/* PV Victron */}
                 <div className="flow-node">
-                  <span style={{ fontSize: 11, color: T.muted, fontFamily: T.fontMono, marginBottom: 3 }}>PV · Victron</span>
-                  <span style={{ fontSize: 18, fontWeight: 700, fontFamily: T.fontMono, color: isNaN(V_PV_W) ? T.muted : pvColor }}>
+                  <span style={{ fontSize: 10, color: T.muted, fontFamily: T.fontMono, marginBottom: 2 }}>PV · Victron</span>
+                  <span style={{ fontSize: 16, fontWeight: 700, fontFamily: T.fontMono, color: isNaN(V_PV_W) ? T.muted : pvColor }}>
                     {isNaN(V_PV_W) ? '…' : `${Math.round(V_PV_W)} W`}
                   </span>
-                  {!isNaN(V_MPPT_STATE) && (
-                    <span style={{ marginTop: 3 }}><Badge color={V_PV_W > 0 ? T.ok : T.muted}>{mpptStateLabel(V_MPPT_STATE)}</Badge></span>
-                  )}
+                  {!isNaN(V_MPPT_STATE) && <span style={{ marginTop: 2 }}><Badge color={V_PV_W > 0 ? T.ok : T.muted}>{mpptStateLabel(V_MPPT_STATE)}</Badge></span>}
                 </div>
-
                 <div className="flow-arrow">+</div>
-
-                {/* Balkon BKW */}
                 <div className="flow-node">
-                  <span style={{ fontSize: 11, color: T.muted, fontFamily: T.fontMono, marginBottom: 3 }}>Balkonkraftwerk</span>
-                  <span style={{ fontSize: 18, fontWeight: 700, fontFamily: T.fontMono, color: isNaN(BKW_W) ? T.muted : (BKW_W >= 200 ? T.ok : T.warn) }}>
+                  <span style={{ fontSize: 10, color: T.muted, fontFamily: T.fontMono, marginBottom: 2 }}>Balkonkraftwerk</span>
+                  <span style={{ fontSize: 16, fontWeight: 700, fontFamily: T.fontMono, color: isNaN(BKW_W) ? T.muted : (BKW_W >= 200 ? T.ok : T.warn) }}>
                     {isNaN(BKW_W) ? '…' : `${Math.round(BKW_W)} W`}
                   </span>
                 </div>
-
                 <div className="flow-arrow">=</div>
-
-                {/* Gesamterzeugung */}
-                <div className="flow-node" style={{ border: `1px solid ${genColor}44`, borderRadius: 6 }}>
-                  <span style={{ fontSize: 11, color: T.muted, fontFamily: T.fontMono, marginBottom: 3 }}>Erzeugung gesamt</span>
-                  <span style={{ fontSize: 20, fontWeight: 700, fontFamily: T.fontMono, color: genColor }}>
-                    {`${Math.round(totalGen)} W`}
-                  </span>
+                <div className="flow-node" style={{ border: `1px solid ${genColor}33`, borderRadius: 5 }}>
+                  <span style={{ fontSize: 10, color: T.muted, fontFamily: T.fontMono, marginBottom: 2 }}>Erzeugung</span>
+                  <span style={{ fontSize: 18, fontWeight: 700, fontFamily: T.fontMono, color: genColor }}>{`${Math.round(totalGen)} W`}</span>
                 </div>
-
                 <div className="flow-arrow">→</div>
-
-                {/* Hausverbrauch (aus Venus OS) */}
                 <div className="flow-node">
-                  <span style={{ fontSize: 11, color: T.muted, fontFamily: T.fontMono, marginBottom: 3 }}>Verbrauch</span>
-                  <span style={{ fontSize: 18, fontWeight: 700, fontFamily: T.fontMono, color: powerColor(hausverbrauch) }}>
+                  <span style={{ fontSize: 10, color: T.muted, fontFamily: T.fontMono, marginBottom: 2 }}>Verbrauch</span>
+                  <span style={{ fontSize: 16, fontWeight: 700, fontFamily: T.fontMono, color: leistungColor(hausverbrauch) }}>
                     {hausverbrauch === 0 && isNaN(consL1) ? '…' : `${Math.round(hausverbrauch)} W`}
                   </span>
                 </div>
-
                 <div className="flow-arrow">→</div>
-
-                {/* Netz: positiv = Bezug, negativ = Einspeisung */}
                 {(() => {
                   const netzColor = isNaN(netzAustausch) ? T.muted : netzAustausch > 0 ? T.err : T.ok
                   return (
-                    <div className="flow-node" style={{ border: `1px solid ${netzColor}44`, borderRadius: 6 }}>
-                      <span style={{ fontSize: 11, color: T.muted, fontFamily: T.fontMono, marginBottom: 3 }}>
+                    <div className="flow-node" style={{ border: `1px solid ${netzColor}33`, borderRadius: 5 }}>
+                      <span style={{ fontSize: 10, color: T.muted, fontFamily: T.fontMono, marginBottom: 2 }}>
                         {isNaN(netzAustausch) ? 'Netz' : netzAustausch > 0 ? 'Netzbezug' : 'Einspeisung'}
                       </span>
-                      <span style={{ fontSize: 18, fontWeight: 700, fontFamily: T.fontMono, color: netzColor }}>
+                      <span style={{ fontSize: 16, fontWeight: 700, fontFamily: T.fontMono, color: netzColor }}>
                         {isNaN(netzAustausch) ? '…' : `${netzAustausch > 0 ? '+' : ''}${Math.round(netzAustausch)} W`}
                       </span>
                     </div>
@@ -829,17 +618,17 @@ function App() {
             </Card>
           </div>
 
-          {/* ── Victron-Grid: Batterie · MPPT · Wechselrichter ── */}
+          {/* Victron Grid */}
           <div className="grid-victron">
 
             {/* Batterie */}
             <Card accentColor={socColor}>
               <CardLabel icon="🔋" color={socColor}>Batterie · Pylontech</CardLabel>
-              <div className="soc-wrap" style={{ marginBottom: 10 }}>
-                <SocRing soc={V_SOC} size={56} />
+              <div className="soc-wrap" style={{ marginBottom: 8 }}>
+                <SocRing soc={V_SOC} size={54} />
                 <div>
-                  <BigVal value={isNaN(V_BAT_V) ? '…' : V_BAT_V.toFixed(1)} unit="V" size={20} />
-                  <div style={{ marginTop: 4, display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                  <BigVal value={isNaN(V_BAT_V) ? '…' : V_BAT_V.toFixed(1)} unit="V" size={19} />
+                  <div style={{ marginTop: 4 }}>
                     {!isNaN(V_BAT_STATE) && (
                       <Badge color={V_BAT_STATE === 1 ? T.ok : V_BAT_STATE === 2 ? amberAcc : T.muted}>
                         {batStateLabel(V_BAT_STATE)}
@@ -849,46 +638,26 @@ function App() {
                 </div>
               </div>
               <Div />
-              <StatRow label="Strom"   value={isNaN(V_BAT_A) ? '…' : `${V_BAT_A.toFixed(1)} A`} />
+              <StatRow label="Strom"    value={isNaN(V_BAT_A) ? '…' : `${V_BAT_A.toFixed(1)} A`} />
               <StatRow label="Leistung" value={isNaN(V_BAT_W) ? '…' : `${Math.round(V_BAT_W)} W`} />
-              <StatRow label="Temp"    value={isNaN(V_BAT_T) ? '…' : `${V_BAT_T.toFixed(1)} °C`} />
-              {!isNaN(V_SOC) && (
-                <>
-                  <Bar value={V_SOC} max={100} color={socColor} />
-                  <MinMaxRow
-                    min={minMax[VICTRON_TOPICS.soc]?.min ?? V_SOC}
-                    max={minMax[VICTRON_TOPICS.soc]?.max ?? V_SOC}
-                    unit=" %"
-                  />
-                </>
-              )}
-              {(hist[VICTRON_TOPICS.soc] ?? []).length >= 2 && (
-                <div style={{ marginTop: 5 }}>
-                  <Sparkline data={hist[VICTRON_TOPICS.soc]} color={socColor} />
-                </div>
-              )}
+              <StatRow label="Temp"     value={isNaN(V_BAT_T) ? '…' : `${V_BAT_T.toFixed(1)} °C`} />
+              {!isNaN(V_SOC) && <>
+                <Bar value={V_SOC} max={100} color={socColor} />
+                <MinMaxRow min={minMax[VICTRON_TOPICS.soc]?.min ?? V_SOC} max={minMax[VICTRON_TOPICS.soc]?.max ?? V_SOC} unit=" %" />
+              </>}
+              {(hist[VICTRON_TOPICS.soc] ?? []).length >= 2 && <div style={{ marginTop: 4 }}><Sparkline data={hist[VICTRON_TOPICS.soc]} color={socColor} /></div>}
             </Card>
 
             {/* MPPT */}
             <Card accentColor={amberAcc}>
               <CardLabel icon="☀️" color={amberAcc}>MPPT · Solarladeregler</CardLabel>
-              <BigVal value={isNaN(V_PV_W) ? '…' : `${Math.round(V_PV_W)}`} unit="W" size={22} />
+              <BigVal value={isNaN(V_PV_W) ? '…' : `${Math.round(V_PV_W)}`} unit="W" size={21} color={isNaN(V_PV_W) ? T.muted : amberAcc} />
               <Sub>PV-Eingangsleistung</Sub>
-              {!isNaN(V_PV_W) && (
-                <>
-                  <Bar value={V_PV_W} max={Math.max(minMax[VICTRON_TOPICS.pvPower]?.max ?? 0, 1500)} color={amberAcc} />
-                  <MinMaxRow
-                    min={minMax[VICTRON_TOPICS.pvPower]?.min ?? V_PV_W}
-                    max={minMax[VICTRON_TOPICS.pvPower]?.max ?? V_PV_W}
-                    unit=" W"
-                  />
-                </>
-              )}
-              {(hist[VICTRON_TOPICS.pvPower] ?? []).length >= 2 && (
-                <div style={{ marginTop: 5 }}>
-                  <Sparkline data={hist[VICTRON_TOPICS.pvPower]} color={amberAcc} />
-                </div>
-              )}
+              {!isNaN(V_PV_W) && <>
+                <Bar value={V_PV_W} max={Math.max(minMax[VICTRON_TOPICS.pvPower]?.max ?? 0, 1500)} color={amberAcc} />
+                <MinMaxRow min={minMax[VICTRON_TOPICS.pvPower]?.min ?? V_PV_W} max={minMax[VICTRON_TOPICS.pvPower]?.max ?? V_PV_W} unit=" W" />
+              </>}
+              {(hist[VICTRON_TOPICS.pvPower] ?? []).length >= 2 && <div style={{ marginTop: 4 }}><Sparkline data={hist[VICTRON_TOPICS.pvPower]} color={amberAcc} /></div>}
               <Div />
               <StatRow label="PV Spannung" value={isNaN(V_PV_V) ? '…' : `${V_PV_V.toFixed(0)} V`} />
               <StatRow label="PV Strom"    value={isNaN(V_PV_A) ? '…' : `${V_PV_A.toFixed(1)} A`} />
@@ -898,31 +667,19 @@ function App() {
             {/* Wechselrichter */}
             <Card accentColor={purpleAcc}>
               <CardLabel icon="🔌" color={purpleAcc}>Wechselrichter · MultiPlus</CardLabel>
-              <BigVal value={isNaN(V_AC_W) ? '…' : `${Math.round(V_AC_W)}`} unit="W" size={22} />
+              <BigVal value={isNaN(V_AC_W) ? '…' : `${Math.round(V_AC_W)}`} unit="W" size={21} color={isNaN(V_AC_W) ? T.muted : purpleAcc} />
               <Sub>AC-Ausgangsleistung</Sub>
-              {!isNaN(V_AC_W) && (
-                <>
-                  <Bar value={V_AC_W} max={Math.max(minMax[VICTRON_TOPICS.acOutPower]?.max ?? 0, 2000)} color={purpleAcc} />
-                  <MinMaxRow
-                    min={minMax[VICTRON_TOPICS.acOutPower]?.min ?? V_AC_W}
-                    max={minMax[VICTRON_TOPICS.acOutPower]?.max ?? V_AC_W}
-                    unit=" W"
-                  />
-                </>
-              )}
-              {(hist[VICTRON_TOPICS.acOutPower] ?? []).length >= 2 && (
-                <div style={{ marginTop: 5 }}>
-                  <Sparkline data={hist[VICTRON_TOPICS.acOutPower]} color={purpleAcc} />
-                </div>
-              )}
+              {!isNaN(V_AC_W) && <>
+                <Bar value={V_AC_W} max={Math.max(minMax[VICTRON_TOPICS.acOutPower]?.max ?? 0, 2000)} color={purpleAcc} />
+                <MinMaxRow min={minMax[VICTRON_TOPICS.acOutPower]?.min ?? V_AC_W} max={minMax[VICTRON_TOPICS.acOutPower]?.max ?? V_AC_W} unit=" W" />
+              </>}
+              {(hist[VICTRON_TOPICS.acOutPower] ?? []).length >= 2 && <div style={{ marginTop: 4 }}><Sparkline data={hist[VICTRON_TOPICS.acOutPower]} color={purpleAcc} /></div>}
               <Div />
               <StatRow label="Spannung"  value={isNaN(V_AC_V) ? '…' : `${V_AC_V.toFixed(0)} V`} />
               <StatRow label="Frequenz"  value={isNaN(V_AC_F) ? '…' : `${V_AC_F.toFixed(1)} Hz`} />
-              <StatRow label="Modus"     value={
-                isNaN(V_INV_MODE) ? '…' : (INVERTER_MODES.find(m => m.value === V_INV_MODE)?.label ?? `Mode ${V_INV_MODE}`)
-              } />
+              <StatRow label="Modus"     value={isNaN(V_INV_MODE) ? '…' : (INVERTER_MODES.find(m => m.value === V_INV_MODE)?.label ?? `Mode ${V_INV_MODE}`)} />
               {!isNaN(V_VEBUS_STATE) && (
-                <div style={{ marginTop: 6 }}>
+                <div style={{ marginTop: 5 }}>
                   <Badge color={V_VEBUS_STATE === 9 ? T.ok : V_VEBUS_STATE === 2 ? T.err : amberAcc}>
                     {V_VEBUS_STATE === 9 ? 'Inverting' : V_VEBUS_STATE === 3 ? 'Bulk' : V_VEBUS_STATE === 4 ? 'Absorption' : V_VEBUS_STATE === 5 ? 'Float' : `Status ${V_VEBUS_STATE}`}
                   </Badge>
@@ -932,16 +689,16 @@ function App() {
 
           </div>
         </div>
-        {/* ════════════════════════════════════════════════════════════════ */}
 
-        {/* ── Group cards L1–L3 ── */}
+        {/* L1–L3 Groups */}
         <div className="grid-groups">
           {topics.filter(t => t.type === 'group').map(group => {
-            const isSpan  = group.label.includes('Spannung')
-            const isStrom = group.label.includes('Strom L')
-            const groupColor = isSpan ? T.spark.purple : isStrom ? T.spark.orange : T.spark.power
-            const barMax  = isSpan ? 250 : isStrom ? 20 : 1000
-            const dp      = isSpan ? 0 : 1
+            const isSpan   = group.label.includes('Spannung')
+            const isStromG = group.label.includes('Strom L')
+            const isLeist  = group.label.includes('Leistung')
+            const groupColor = isSpan ? T.spark.purple : isStromG ? T.spark.orange : T.spark.power
+            const barMax   = isSpan ? 250 : isStromG ? 20 : 3000
+            const dp       = isSpan ? 0 : 1
             return (
               <Card key={group.label} accentColor={groupColor}>
                 <CardLabel icon="" color={groupColor}>{group.label}</CardLabel>
@@ -950,15 +707,17 @@ function App() {
                   const num   = raw !== undefined ? parseFloat(raw) : NaN
                   const range = minMax[key] ?? { min: num, max: num }
                   const h     = hist[key] ?? []
+                  // Leistung: negativ = Einspeisung = grün
+                  const valColor = isLeist ? leistungColor(num) : groupColor
                   return (
-                    <div key={key} style={{ marginBottom: 14 }}>
+                    <div key={key} style={{ marginBottom: 12 }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                        <span style={{ fontFamily: T.fontLabel, fontSize: 12, fontWeight: 700, letterSpacing: '0.07em', color: T.muted }}>{label}</span>
-                        <BigVal value={isNaN(num) ? '…' : num.toFixed(dp)} unit={group.unit} size={20} />
+                        <span style={{ fontFamily: T.fontLabel, fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', color: T.muted }}>{label}</span>
+                        <BigVal value={isNaN(num) ? '…' : num.toFixed(dp)} unit={group.unit} size={19} color={valColor} />
                       </div>
-                      <Bar value={num} max={barMax} color={groupColor} />
+                      <Bar value={num} max={barMax} color={valColor} />
                       <MinMaxRow min={range.min} max={range.max} unit={` ${group.unit}`} />
-                      {h.length >= 2 && <div style={{ marginTop: 4 }}><Sparkline data={h} color={groupColor} height={28} /></div>}
+                      {h.length >= 2 && <div style={{ marginTop: 3 }}><Sparkline data={h} color={valColor} height={26} /></div>}
                     </div>
                   )
                 })}
@@ -969,13 +728,12 @@ function App() {
 
       </main>
 
-      {/* ── ESS-Modal ── */}
       {essOpen && (
         <EssModal
           currentEssMode={isNaN(V_ESS_MODE) ? -1 : V_ESS_MODE}
           currentInvMode={isNaN(V_INV_MODE) ? -1 : V_INV_MODE}
-          onSetEss={v => { setEssMode(v); }}
-          onSetInv={v => { setInverterMode(v); }}
+          onSetEss={v => setEssMode(v)}
+          onSetInv={v => setInverterMode(v)}
           onClose={() => setEssOpen(false)}
         />
       )}
