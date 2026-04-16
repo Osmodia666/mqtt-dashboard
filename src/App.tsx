@@ -706,6 +706,78 @@ function App() {
             <FlowBanner />
 
             {/* Zähler */}
+    <div style={{ marginBottom: 8 }}>
+  <Card accentColor={T.spark.cyan}>
+    <CardLabel icon="📊" color={T.spark.cyan}>Zähler</CardLabel>
+
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+
+      {/* Strom gesamt */}
+      <div>
+        <div style={{
+          fontSize: 9,
+          color: T.muted,
+          fontFamily: T.fontMono,
+          marginBottom: 3
+        }}>
+          ⚡ Strom gesamt
+        </div>
+        <BigVal
+          value={values['Stromzähler/Verbrauch_gesamt'] ?? '…'}
+          unit="kWh"
+          size={15}
+        />
+      </div>
+
+      {/* Solar gesamt */}
+      <div>
+        <div style={{
+          fontSize: 9,
+          color: T.muted,
+          fontFamily: T.fontMono,
+          marginBottom: 3
+        }}>
+          🔋 Solar gesamt
+        </div>
+
+        <BigVal
+          value={solarGesamt > 0 ? solarGesamt.toFixed(1) : '…'}
+          unit="kWh"
+          size={15}
+        />
+
+        {solarGesamt > 0 && (
+          <div style={{
+            fontSize: 10,
+            color: T.muted,
+            fontFamily: T.fontMono,
+            marginTop: 3
+          }}>
+            {solarBKW.toFixed(1)} (BKW) + {solarVictron.toFixed(1)} (Victron)
+          </div>
+        )}
+      </div>
+
+      {/* Gas */}
+      <div>
+        <div style={{
+          fontSize: 9,
+          color: T.muted,
+          fontFamily: T.fontMono,
+          marginBottom: 3
+        }}>
+          🔥 Gas
+        </div>
+        <BigVal
+          value={values['Gaszaehler/stand'] ?? '…'}
+          unit="m³"
+          size={15}
+        />
+      </div>
+
+    </div>
+  </Card>
+</div>        
             <div style={{ marginBottom: 8 }}>
               <Card accentColor={T.spark.cyan}>
                 <CardLabel icon="📊" color={T.spark.cyan}>Zähler</CardLabel>
