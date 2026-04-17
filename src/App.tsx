@@ -29,7 +29,7 @@ const VICTRON_TOPICS = {
   acOutFreq:   V('vebus/288/Ac/Out/L1/F'),
   vebusState:  V('vebus/288/VebusStatus'),
   vebusMode:   V('vebus/288/Mode'),
-  essMode:     V('settings/0/Settings/CGwacs/BatteryLife/State'),
+  essMode:     V('system/0/Control/EssState'),  // Venus OS 3.x: Lesewert
   // Netz per Phase (für Fluss-Layouts)
   gridL1:      V('grid/30/Ac/L1/Power'),
   gridL2:      V('grid/30/Ac/L2/Power'),
@@ -331,7 +331,6 @@ function EssModal({ currentEssMode, currentInvMode, onSetEss, onSetInv, onClose 
 
 // ── App ───────────────────────────────────────────────────────────────────
 type Tab = 'uebersicht' | 'energie' | 'victron' | 'steuerung'
-type VLayout = 'A' | 'B' | 'C'
 
 function App() {
   const [values, setValues]         = useState<Record<string, string>>({})
@@ -339,7 +338,6 @@ function App() {
   const [minMax, setMinMax]         = useState<MinMax>(loadCachedMinMax)
   const [essOpen, setEssOpen]       = useState(false)
   const [activeTab, setActiveTab]     = useState<Tab>('uebersicht')
-  const [victronLayout, setVictronLayout] = useState<VLayout>('A')
   const histRef                     = useRef<Record<string, number[]>>({})
   const messageQueue                = useRef<Record<string, string>>({})
   const clientRef                   = useRef<any>(null)
@@ -355,7 +353,12 @@ function App() {
 
     client.on('connect', () => {
       client.subscribe(EXPLICIT_SUBSCRIBES, { qos: 0 })
-      const sendKeepalive = () => { client.publish(`R/${VICTRON_PORTAL_ID}/system/0/Serial`, '') }
+      const sendKeepalive = () => {
+        client.publish(`R/${VICTRON_PORTAL_ID}/system/0/Serial`, '')
+        // ESS-Modus extra anfordern da settings selten gepublished werden
+        client.publish(`R/${VICTRON_PORTAL_ID}/settings/0/Settings/CGwacs/BatteryLife/State`, '')
+        client.publish(`R/${VICTRON_PORTAL_ID}/vebus/288/Mode`, '')
+      }
       sendKeepalive()
       setTimeout(() => { client.publish(REQUEST_TOPIC, JSON.stringify({ ts: Date.now() })) }, 500)
       const keepalive = setInterval(sendKeepalive, 30_000)
@@ -795,294 +798,6 @@ function App() {
     )
   }
 
-  // ── LAYOUT B: Batterie zentral ────────────────────────────────────────
-  const LayoutB = () => {
-    // viewBox 900×420, Batterie mittig
-    // Kacheln [x, y, w, h]
-    const P = {
-      solar:  [0,   0,   270, 130] as [number,number,number,number],
-      netz:   [630, 0,   270, 130] as [number,number,number,number],
-      wr:     [0,   150, 270, 140] as [number,number,number,number],
-      batt:   [295, 100, 310, 200] as [number,number,number,number],
-      acLast: [630, 150, 270, 140] as [number,number,number,number],
-      dcLast: [0,   320, 900,  80] as [number,number,number,number],
-    }
-    const cx = (p: [number,number,number,number]) => p[0]+p[2]/2
-    const cy = (p: [number,number,number,number]) => p[1]+p[3]/2
-    const right = (p: [number,number,number,number]) => [p[0]+p[2], cy(p)] as [number,number]
-    const left  = (p: [number,number,number,number]) => [p[0],      cy(p)] as [number,number]
-    const bot   = (p: [number,number,number,number]) => [cx(p), p[1]+p[3]] as [number,number]
-    const top   = (p: [number,number,number,number]) => [cx(p), p[1]     ] as [number,number]
-
-    return (
-      <svg viewBox="0 0 900 420" style={{ width: '100%', display: 'block', overflow: 'visible' }} preserveAspectRatio="xMidYMid meet">
-        <defs>
-          <style>{`
-            @keyframes flow-fwd { from{stroke-dashoffset:10} to{stroke-dashoffset:0} }
-            @keyframes flow-rev { from{stroke-dashoffset:0}  to{stroke-dashoffset:10} }
-          `}</style>
-        </defs>
-
-        {/* Solar → Batterie (von oben links nach Batt-oben) */}
-        <FlowLine x1={right(P.solar)[0]} y1={right(P.solar)[1]} x2={left(P.batt)[0]-8} y2={left(P.batt)[1]}
-          active={pvActive} color={amberAcc} />
-        {/* Netz → Batterie (von oben rechts nach Batt-oben-rechts) */}
-        <FlowLine x1={left(P.netz)[0]} y1={left(P.netz)[1]} x2={right(P.batt)[0]+8} y2={right(P.batt)[1]-30}
-          active={netActive} color={netzColor} reverse={!netIn} />
-        {/* WR ↔ Batterie */}
-        <FlowLine x1={right(P.wr)[0]} y1={right(P.wr)[1]} x2={left(P.batt)[0]-8} y2={left(P.batt)[1]+30}
-          active={batActive} color={batIn ? amberAcc : T.ok} reverse={!batIn} />
-        {/* Batterie → AC-Lasten */}
-        <FlowLine x1={right(P.batt)[0]} y1={right(P.batt)[1]-30} x2={left(P.acLast)[0]-8} y2={left(P.acLast)[1]}
-          active={consActive} color={amberAcc} />
-        {/* Batterie → DC-Lasten (nach unten) */}
-        <FlowLine x1={bot(P.batt)[0]} y1={bot(P.batt)[1]} x2={cx(P.dcLast)} y2={P.dcLast[1]+8}
-          active={dcActive} color={dcColor} />
-
-        {/* Kacheln */}
-        {([
-          ['solar',  P.solar,  amberAcc,  false],
-          ['netz',   P.netz,   netzColor, false],
-          ['wr',     P.wr,     purpleAcc, false],
-          ['batt',   P.batt,   socColor,  true],
-          ['acLast', P.acLast, amberAcc,  false],
-          ['dcLast', P.dcLast, dcColor,   false],
-        ] as [string, [number,number,number,number], string, boolean][]).map(([key, [x,y,w,h], accent, hi]) => (
-          <foreignObject key={key} x={x} y={y} width={w} height={h}>
-            <div style={{ width: '100%', height: '100%', ...fc(accent, hi) }}>
-
-              {key === 'solar' && <>
-                <div style={{ fontSize: 9, color: amberAcc, letterSpacing: '0.1em', marginBottom: 4 }}>☀ SOLAR · MPPT</div>
-                <div style={{ fontSize: 20, fontWeight: 700, color: isNaN(V_PV_W) ? T.muted : amberAcc }}>
-                  {fr(V_PV_W ?? 0)}<span style={{ fontSize: 10, color: T.muted, fontWeight: 400 }}> W</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginTop: 5 }}>
-                  <span style={{ color: T.muted }}>PV</span><span style={{ color: T.text, fontWeight: 700 }}>{fw(V_PV_V)} V</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginTop: 2 }}>
-                  <span style={{ color: T.muted }}>Status</span><span style={{ color: T.text, fontWeight: 700 }}>{isNaN(V_MPPT_STATE) ? '…' : mpptStateLabel(V_MPPT_STATE)}</span>
-                </div>
-              </>}
-
-              {key === 'netz' && <>
-                <div style={{ fontSize: 9, color: netzColor, letterSpacing: '0.1em', marginBottom: 4 }}>⚡ NETZ</div>
-                <div style={{ fontSize: 20, fontWeight: 700, color: netzColor }}>
-                  {fr(Math.abs(V_GRID_TOT ?? 0))}<span style={{ fontSize: 10, color: T.muted, fontWeight: 400 }}> W</span>
-                </div>
-                <PhaseRows l1={V_GRID_L1} l2={V_GRID_L2} l3={V_GRID_L3} />
-              </>}
-
-              {key === 'wr' && <>
-                <div style={{ fontSize: 9, color: purpleAcc, letterSpacing: '0.1em', marginBottom: 4 }}>⚙ WECHSELRICHTER</div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: purpleAcc, marginBottom: 6 }}>
-                  {isNaN(V_INV_MODE) ? '…' : (INVERTER_MODES.find(m => m.value === V_INV_MODE)?.label ?? `Mode ${V_INV_MODE}`)}
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 2 }}>
-                  <span style={{ color: T.muted }}>AC Out</span><span style={{ color: T.text, fontWeight: 700 }}>{fr(V_AC_W)} W</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 2 }}>
-                  <span style={{ color: T.muted }}>Spannung</span><span style={{ color: T.text, fontWeight: 700 }}>{fw(V_AC_V)} V</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10 }}>
-                  <span style={{ color: T.muted }}>Frequenz</span><span style={{ color: T.text, fontWeight: 700 }}>{fw(V_AC_F, 1)} Hz</span>
-                </div>
-              </>}
-
-              {key === 'batt' && <>
-                <div style={{ fontSize: 9, color: socColor, letterSpacing: '0.1em', marginBottom: 6 }}>🔋 BATTERIE · PYLONTECH</div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                  {socRingSvg(50)}
-                  <div>
-                    <div style={{ fontSize: 18, fontWeight: 700, color: socColor }}>
-                      {fw(V_BAT_V, 1)}<span style={{ fontSize: 10, color: T.muted, fontWeight: 400 }}> V</span>
-                    </div>
-                    <div style={{ marginTop: 3 }}>
-                      <Badge color={V_BAT_STATE === 1 ? T.ok : V_BAT_STATE === 2 ? amberAcc : T.muted}>
-                        {isNaN(V_BAT_STATE) ? '…' : batStateLabel(V_BAT_STATE)}
-                      </Badge>
-                    </div>
-                  </div>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 2 }}>
-                  <span style={{ color: T.muted }}>Strom</span><span style={{ color: T.text, fontWeight: 700 }}>{fw(V_BAT_A, 1)} A</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 2 }}>
-                  <span style={{ color: T.muted }}>Leistung</span><span style={{ color: T.text, fontWeight: 700 }}>{fr(V_BAT_W)} W</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10 }}>
-                  <span style={{ color: T.muted }}>Temp</span><span style={{ color: T.text, fontWeight: 700 }}>{fw(V_BAT_T, 1)} °C</span>
-                </div>
-              </>}
-
-              {key === 'acLast' && <>
-                <div style={{ fontSize: 9, color: amberAcc, letterSpacing: '0.1em', marginBottom: 4 }}>🏠 AC-LASTEN</div>
-                <div style={{ fontSize: 20, fontWeight: 700, color: amberAcc }}>
-                  {V_CONS_TOT === 0 && isNaN(V_CONS_L1) ? '…' : fr(V_CONS_TOT)}<span style={{ fontSize: 10, color: T.muted, fontWeight: 400 }}> W</span>
-                </div>
-                <PhaseRows l1={V_CONS_L1} l2={V_CONS_L2} l3={V_CONS_L3} />
-              </>}
-
-              {key === 'dcLast' && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 14, height: '100%' }}>
-                  <div>
-                    <div style={{ fontSize: 9, color: dcColor, letterSpacing: '0.1em', marginBottom: 4 }}>DC-LASTEN · SYSTEM</div>
-                    <div style={{ fontSize: 20, fontWeight: 700, color: dcColor }}>
-                      {fr(V_DC_SYS ?? 0)}<span style={{ fontSize: 10, color: T.muted, fontWeight: 400 }}> W</span>
-                    </div>
-                  </div>
-                  <div style={{ fontSize: 10, color: T.muted }}>
-                    {isNaN(V_DC_SYS) ? '' : V_DC_SYS < 0 ? 'DC-System nimmt Energie auf' : 'DC-System gibt Energie ab'}
-                  </div>
-                </div>
-              )}
-
-            </div>
-          </foreignObject>
-        ))}
-      </svg>
-    )
-  }
-
-  // ── LAYOUT C: Horizontal Links → Rechts ──────────────────────────────
-  const LayoutC = () => {
-    // viewBox 900×360
-    // Quellen links, Batterie mitte, Verbraucher rechts
-    const P = {
-      solar:  [0,   0,   260, 140] as [number,number,number,number],
-      netz:   [0,   160, 260, 140] as [number,number,number,number],
-      batt:   [320, 60,  260, 220] as [number,number,number,number],
-      acLast: [640, 0,   260, 150] as [number,number,number,number],
-      dcLast: [640, 170, 260, 130] as [number,number,number,number],
-      wr:     [0,   320, 900,  70] as [number,number,number,number],
-    }
-    const cy  = (p: [number,number,number,number]) => p[1]+p[3]/2
-    const cx  = (p: [number,number,number,number]) => p[0]+p[2]/2
-    const right = (p: [number,number,number,number], dy=0) => [p[0]+p[2], cy(p)+dy] as [number,number]
-    const left  = (p: [number,number,number,number], dy=0) => [p[0],      cy(p)+dy] as [number,number]
-
-    return (
-      <svg viewBox="0 0 900 400" style={{ width: '100%', display: 'block', overflow: 'visible' }} preserveAspectRatio="xMidYMid meet">
-        <defs>
-          <style>{`
-            @keyframes flow-fwd { from{stroke-dashoffset:10} to{stroke-dashoffset:0} }
-            @keyframes flow-rev { from{stroke-dashoffset:0}  to{stroke-dashoffset:10} }
-          `}</style>
-        </defs>
-
-        {/* Solar → Batterie */}
-        <FlowLine x1={right(P.solar)[0]} y1={right(P.solar)[1]} x2={left(P.batt, -40)[0]-8} y2={left(P.batt, -40)[1]}
-          active={pvActive} color={amberAcc} />
-        {/* Netz → Batterie */}
-        <FlowLine x1={right(P.netz)[0]} y1={right(P.netz)[1]} x2={left(P.batt, 40)[0]-8} y2={left(P.batt, 40)[1]}
-          active={netActive} color={netzColor} reverse={!netIn} />
-        {/* Batterie → AC-Lasten */}
-        <FlowLine x1={right(P.batt, -40)[0]} y1={right(P.batt, -40)[1]} x2={left(P.acLast)[0]-8} y2={left(P.acLast)[1]}
-          active={consActive} color={amberAcc} />
-        {/* Batterie → DC-Lasten */}
-        <FlowLine x1={right(P.batt, 40)[0]} y1={right(P.batt, 40)[1]} x2={left(P.dcLast)[0]-8} y2={left(P.dcLast)[1]}
-          active={dcActive} color={dcColor} />
-
-        {/* Kacheln */}
-        {([
-          ['solar',  P.solar,  amberAcc,  false],
-          ['netz',   P.netz,   netzColor, false],
-          ['batt',   P.batt,   socColor,  true],
-          ['acLast', P.acLast, amberAcc,  false],
-          ['dcLast', P.dcLast, dcColor,   false],
-          ['wr',     P.wr,     purpleAcc, false],
-        ] as [string, [number,number,number,number], string, boolean][]).map(([key, [x,y,w,h], accent, hi]) => (
-          <foreignObject key={key} x={x} y={y} width={w} height={h}>
-            <div style={{ width: '100%', height: '100%', ...fc(accent as string, hi as boolean) }}>
-
-              {key === 'solar' && <>
-                <div style={{ fontSize: 9, color: amberAcc, letterSpacing: '0.1em', marginBottom: 4 }}>☀ SOLAR · MPPT</div>
-                <div style={{ fontSize: 20, fontWeight: 700, color: isNaN(V_PV_W) ? T.muted : amberAcc }}>
-                  {fr(V_PV_W ?? 0)}<span style={{ fontSize: 10, color: T.muted, fontWeight: 400 }}> W</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginTop: 5 }}>
-                  <span style={{ color: T.muted }}>PV</span><span style={{ color: T.text, fontWeight: 700 }}>{fw(V_PV_V)} V</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginTop: 2 }}>
-                  <span style={{ color: T.muted }}>Status</span><span style={{ color: T.text, fontWeight: 700 }}>{isNaN(V_MPPT_STATE) ? '…' : mpptStateLabel(V_MPPT_STATE)}</span>
-                </div>
-              </>}
-
-              {key === 'netz' && <>
-                <div style={{ fontSize: 9, color: netzColor, letterSpacing: '0.1em', marginBottom: 4 }}>⚡ NETZ</div>
-                <div style={{ fontSize: 20, fontWeight: 700, color: netzColor }}>
-                  {fr(Math.abs(V_GRID_TOT ?? 0))}<span style={{ fontSize: 10, color: T.muted, fontWeight: 400 }}> W</span>
-                </div>
-                <PhaseRows l1={V_GRID_L1} l2={V_GRID_L2} l3={V_GRID_L3} />
-              </>}
-
-              {key === 'batt' && <>
-                <div style={{ fontSize: 9, color: socColor, letterSpacing: '0.1em', marginBottom: 6 }}>🔋 BATTERIE · PYLONTECH</div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                  {socRingSvg(52)}
-                  <div>
-                    <div style={{ fontSize: 18, fontWeight: 700, color: socColor }}>
-                      {fw(V_BAT_V, 1)}<span style={{ fontSize: 10, color: T.muted, fontWeight: 400 }}> V</span>
-                    </div>
-                    <div style={{ marginTop: 3 }}>
-                      <Badge color={V_BAT_STATE === 1 ? T.ok : V_BAT_STATE === 2 ? amberAcc : T.muted}>
-                        {isNaN(V_BAT_STATE) ? '…' : batStateLabel(V_BAT_STATE)}
-                      </Badge>
-                    </div>
-                  </div>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 2 }}>
-                  <span style={{ color: T.muted }}>Strom</span><span style={{ color: T.text, fontWeight: 700 }}>{fw(V_BAT_A, 1)} A</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 2 }}>
-                  <span style={{ color: T.muted }}>Leistung</span><span style={{ color: T.text, fontWeight: 700 }}>{fr(V_BAT_W)} W</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10 }}>
-                  <span style={{ color: T.muted }}>Temp</span><span style={{ color: T.text, fontWeight: 700 }}>{fw(V_BAT_T, 1)} °C</span>
-                </div>
-              </>}
-
-              {key === 'acLast' && <>
-                <div style={{ fontSize: 9, color: amberAcc, letterSpacing: '0.1em', marginBottom: 4 }}>🏠 AC-LASTEN</div>
-                <div style={{ fontSize: 20, fontWeight: 700, color: amberAcc }}>
-                  {V_CONS_TOT === 0 && isNaN(V_CONS_L1) ? '…' : fr(V_CONS_TOT)}<span style={{ fontSize: 10, color: T.muted, fontWeight: 400 }}> W</span>
-                </div>
-                <PhaseRows l1={V_CONS_L1} l2={V_CONS_L2} l3={V_CONS_L3} />
-              </>}
-
-              {key === 'dcLast' && <>
-                <div style={{ fontSize: 9, color: dcColor, letterSpacing: '0.1em', marginBottom: 4 }}>DC-LASTEN · SYSTEM</div>
-                <div style={{ fontSize: 20, fontWeight: 700, color: dcColor }}>
-                  {fr(V_DC_SYS ?? 0)}<span style={{ fontSize: 10, color: T.muted, fontWeight: 400 }}> W</span>
-                </div>
-                <div style={{ fontSize: 10, color: T.muted, marginTop: 5 }}>
-                  {isNaN(V_DC_SYS) ? '' : V_DC_SYS < 0 ? 'DC nimmt Energie auf' : 'DC gibt Energie ab'}
-                </div>
-              </>}
-
-              {key === 'wr' && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 16, height: '100%' }}>
-                  <div style={{ fontSize: 9, color: purpleAcc, letterSpacing: '0.1em', whiteSpace: 'nowrap' }}>⚙ WECHSELRICHTER · MULTIPLUS</div>
-                  <div style={{ fontWeight: 700, color: purpleAcc, fontSize: 13 }}>
-                    {isNaN(V_INV_MODE) ? '…' : (INVERTER_MODES.find(m => m.value === V_INV_MODE)?.label ?? `Mode ${V_INV_MODE}`)}
-                  </div>
-                  <div style={{ display: 'flex', gap: 18, marginLeft: 'auto' }}>
-                    {([['AC Out', `${fr(V_AC_W)} W`], ['Spannung', `${fw(V_AC_V)} V`], ['Frequenz', `${fw(V_AC_F, 1)} Hz`]] as [string,string][]).map(([l, v]) => (
-                      <div key={l} style={{ textAlign: 'right' }}>
-                        <div style={{ fontSize: 9, color: T.muted }}>{l}</div>
-                        <div style={{ fontSize: 12, color: T.text, fontWeight: 700 }}>{v}</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-            </div>
-          </foreignObject>
-        ))}
-      </svg>
-    )
-  }
-
   return (
     <div style={{ minHeight: '100vh', background: T.bg, color: T.text, fontFamily: T.fontBody }}>
 
@@ -1372,37 +1087,7 @@ function App() {
         )}
 
         {/* ══ TAB: VICTRON ════════════════════════════════════════════════ */}
-        {activeTab === 'victron' && (
-          <>
-            {/* Layout-Umschalter */}
-            <div style={{ display: 'flex', gap: 5, marginBottom: 10 }}>
-              {(['A', 'B', 'C'] as VLayout[]).map(l => (
-                <button key={l} onClick={() => setVictronLayout(l)} style={{
-                  padding: '4px 14px', borderRadius: 20, fontSize: 11,
-                  fontFamily: T.fontLabel, fontWeight: 700, letterSpacing: '0.07em',
-                  cursor: 'pointer', transition: 'all 0.15s',
-                  border: victronLayout === l ? `1px solid ${tealAcc}88` : '1px solid rgba(255,255,255,0.1)',
-                  background: victronLayout === l ? tealAcc + '20' : 'transparent',
-                  color: victronLayout === l ? tealAcc : T.muted,
-                }}>
-                  {l === 'A' ? 'A — Victron-Klon' : l === 'B' ? 'B — Batterie zentral' : 'C — Links → Rechts'}
-                </button>
-              ))}
-            </div>
-
-            {/* CSS-Animationen für Fluss-Pfeile */}
-            <style>{`
-              @keyframes fa-r { from{stroke-dashoffset:8} to{stroke-dashoffset:0} }
-              @keyframes fa-l { from{stroke-dashoffset:0} to{stroke-dashoffset:8} }
-              @keyframes fa-d { from{stroke-dashoffset:8} to{stroke-dashoffset:0} }
-              @keyframes fa-u { from{stroke-dashoffset:0} to{stroke-dashoffset:8} }
-            `}</style>
-
-            {victronLayout === 'A' && <LayoutA />}
-            {victronLayout === 'B' && <LayoutB />}
-            {victronLayout === 'C' && <LayoutC />}
-          </>
-        )}
+        {activeTab === 'victron' && <LayoutA />}
 
         {/* ══ TAB: STEUERUNG ══════════════════════════════════════════════ */}
         {activeTab === 'steuerung' && (
