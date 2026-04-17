@@ -658,12 +658,12 @@ function App() {
     // Kachel-Koordinaten (px) im 900×340-Viewport
     // [x, y, w, h]
     const pos = {
-      netz:    [0,   0,   270, 160],
-      wr:      [315, 0,   270, 160],
-      acLast:  [630, 0,   270, 160],
-      solar:   [0,   180, 270, 160],
-      batt:    [315, 180, 270, 160],
-      dcLast:  [630, 180, 270, 160],
+      netz:    [0,   0,   270, 140],
+      wr:      [315, 0,   270, 140],
+      acLast:  [630, 0,   270, 140],
+      solar:   [0,   200, 270, 140],
+      batt:    [315, 200, 270, 140],
+      dcLast:  [630, 200, 270, 140],
     } as Record<string, [number,number,number,number]>
     const mid = (p: [number,number,number,number]) => [p[0]+p[2]/2, p[1]+p[3]/2] as [number,number]
     const right = (p: [number,number,number,number]) => [p[0]+p[2], p[1]+p[3]/2] as [number,number]
@@ -674,7 +674,7 @@ function App() {
     return (
       <div style={{ position: 'relative', width: '100%' }}>
         <svg
-          viewBox="0 0 900 340"
+          viewBox="0 0 900 360"
           style={{ width: '100%', display: 'block', overflow: 'visible' }}
           preserveAspectRatio="xMidYMid meet"
         >
