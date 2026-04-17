@@ -825,11 +825,128 @@ function App() {
 
     return (
       <div style={{ position: 'relative', width: '100%' }}>
-        <svg
-          viewBox="0 0 900 360"
-          style={{ width: '100%', display: 'block', overflow: 'visible' }}
-          preserveAspectRatio="xMidYMid meet"
-        >
+        <svg viewBox="0 0 900 360" style={{ width: '100%', display: 'block', overflow: 'visible' }} preserveAspectRatio="xMidYMid meet">
+          <defs>
+            <style>{`
+              @keyframes flow-fwd { from{stroke-dashoffset:10} to{stroke-dashoffset:0} }
+              @keyframes flow-rev { from{stroke-dashoffset:0}  to{stroke-dashoffset:10} }
+            `}</style>
+          </defs>
+
+          {/* Verbindungslinien */}
+          <FlowLine x1={right(pos.netz)[0]+10} y1={right(pos.netz)[1]} x2={left(pos.wr)[0]-10} y2={left(pos.wr)[1]}
+            active={netActive} color={netzColor} reverse={!netIn} />
+          <FlowLine x1={right(pos.wr)[0]+10} y1={right(pos.wr)[1]} x2={left(pos.acLast)[0]-10} y2={left(pos.acLast)[1]}
+            active={consActive} color={amberAcc} />
+          <FlowLine x1={right(pos.solar)[0]+10} y1={right(pos.solar)[1]} x2={left(pos.batt)[0]-10} y2={left(pos.batt)[1]}
+            active={pvActive} color={amberAcc} />
+          <FlowLine x1={bot(pos.wr)[0]} y1={bot(pos.wr)[1]+10} x2={top(pos.batt)[0]} y2={top(pos.batt)[1]-10}
+            active={batActive} color={batIn ? amberAcc : T.ok} reverse={!batIn} />
+          <FlowLine x1={right(pos.batt)[0]+10} y1={right(pos.batt)[1]} x2={left(pos.dcLast)[0]-10} y2={left(pos.dcLast)[1]}
+            active={dcActive} color={dcColor} />
+
+          {/* Kacheln als foreignObject */}
+          {Object.entries(pos).map(([key, [x, y, w, h]]) => (
+            <foreignObject key={key} x={x} y={y} width={w} height={h}>
+              <div style={{ width: '100%', height: '100%', ...fc(
+                key==='netz'  ? netzColor :
+                key==='wr'    ? purpleAcc :
+                key==='acLast'? amberAcc  :
+                key==='solar' ? amberAcc  :
+                key==='batt'  ? socColor  :
+                dcColor,
+                key === 'batt'
+              ) }}>
+
+                {key === 'netz' && <>
+                  <div style={{ fontSize: 9, color: netzColor, letterSpacing: '0.1em', marginBottom: 4 }}>NETZ</div>
+                  <div style={{ fontSize: 22, fontWeight: 700, color: isNaN(V_GRID_TOT) ? T.muted : netzColor, lineHeight: 1 }}>
+                    {fr(Math.abs(V_GRID_TOT ?? 0))}<span style={{ fontSize: 11, color: T.muted, fontWeight: 400 }}> W</span>
+                  </div>
+                  <PhaseRows l1={V_GRID_L1} l2={V_GRID_L2} l3={V_GRID_L3} />
+                </>}
+
+                {key === 'wr' && <>
+                  <div style={{ fontSize: 9, color: purpleAcc, letterSpacing: '0.1em', marginBottom: 4 }}>WECHSELRICHTER · MULTIPLUS</div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: purpleAcc, marginBottom: 8 }}>
+                    {isNaN(V_INV_MODE) ? '…' : (INVERTER_MODES.find(m => m.value === V_INV_MODE)?.label ?? `Mode ${V_INV_MODE}`)}
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 2 }}>
+                    <span style={{ color: T.muted }}>AC Out</span><span style={{ color: T.text, fontWeight: 700 }}>{fr(V_AC_W)} W</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 2 }}>
+                    <span style={{ color: T.muted }}>Spannung</span><span style={{ color: T.text, fontWeight: 700 }}>{fw(V_AC_V)} V</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10 }}>
+                    <span style={{ color: T.muted }}>Frequenz</span><span style={{ color: T.text, fontWeight: 700 }}>{fw(V_AC_F, 1)} Hz</span>
+                  </div>
+                </>}
+
+                {key === 'acLast' && <>
+                  <div style={{ fontSize: 9, color: amberAcc, letterSpacing: '0.1em', marginBottom: 4 }}>AC-LASTEN</div>
+                  <div style={{ fontSize: 22, fontWeight: 700, color: amberAcc, lineHeight: 1 }}>
+                    {V_CONS_TOT === 0 && isNaN(V_CONS_L1) ? '…' : fr(V_CONS_TOT)}<span style={{ fontSize: 11, color: T.muted, fontWeight: 400 }}> W</span>
+                  </div>
+                  <PhaseRows l1={V_CONS_L1} l2={V_CONS_L2} l3={V_CONS_L3} />
+                </>}
+
+                {key === 'solar' && <>
+                  <div style={{ fontSize: 9, color: amberAcc, letterSpacing: '0.1em', marginBottom: 4 }}>SOLARERTRAG · MPPT</div>
+                  <div style={{ fontSize: 22, fontWeight: 700, color: isNaN(V_PV_W) ? T.muted : amberAcc, lineHeight: 1 }}>
+                    {fr(V_PV_W ?? 0)}<span style={{ fontSize: 11, color: T.muted, fontWeight: 400 }}> W</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginTop: 6, marginBottom: 2 }}>
+                    <span style={{ color: T.muted }}>PV Spannung</span><span style={{ color: T.text, fontWeight: 700 }}>{fw(V_PV_V)} V</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10 }}>
+                    <span style={{ color: T.muted }}>Status</span><span style={{ color: T.text, fontWeight: 700 }}>{isNaN(V_MPPT_STATE) ? '…' : mpptStateLabel(V_MPPT_STATE)}</span>
+                  </div>
+                </>}
+
+                {key === 'batt' && <>
+                  <div style={{ fontSize: 9, color: socColor, letterSpacing: '0.1em', marginBottom: 6 }}>BATTERIE · PYLONTECH</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                    {socRingSvg(46)}
+                    <div>
+                      <div style={{ fontSize: 18, fontWeight: 700, color: socColor }}>
+                        {fw(V_BAT_V, 1)}<span style={{ fontSize: 10, color: T.muted, fontWeight: 400 }}> V</span>
+                      </div>
+                      <div style={{ marginTop: 3 }}>
+                        <Badge color={V_BAT_STATE === 1 ? T.ok : V_BAT_STATE === 2 ? amberAcc : T.muted}>
+                          {isNaN(V_BAT_STATE) ? '…' : batStateLabel(V_BAT_STATE)}
+                        </Badge>
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 2 }}>
+                    <span style={{ color: T.muted }}>Strom</span><span style={{ color: T.text, fontWeight: 700 }}>{fw(V_BAT_A, 1)} A</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 2 }}>
+                    <span style={{ color: T.muted }}>Leistung</span><span style={{ color: T.text, fontWeight: 700 }}>{fr(V_BAT_W)} W</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10 }}>
+                    <span style={{ color: T.muted }}>Temp</span><span style={{ color: T.text, fontWeight: 700 }}>{fw(V_BAT_T, 1)} °C</span>
+                  </div>
+                </>}
+
+                {key === 'dcLast' && <>
+                  <div style={{ fontSize: 9, color: dcColor, letterSpacing: '0.1em', marginBottom: 4 }}>DC-LASTEN · SYSTEM</div>
+                  <div style={{ fontSize: 22, fontWeight: 700, color: dcColor, lineHeight: 1 }}>
+                    {fr(V_DC_SYS ?? 0)}<span style={{ fontSize: 11, color: T.muted, fontWeight: 400 }}> W</span>
+                  </div>
+                  <div style={{ fontSize: 10, color: T.muted, marginTop: 6 }}>
+                    {isNaN(V_DC_SYS) ? '' : V_DC_SYS < 0 ? 'DC nimmt Energie auf' : 'DC gibt Energie ab'}
+                  </div>
+                </>}
+
+              </div>
+            </foreignObject>
+          ))}
+        </svg>
+      </div>
+    )
+  }
+
   return (
     <div style={{ minHeight: '100vh', background: T.bg, color: T.text, fontFamily: T.fontBody }}>
 
