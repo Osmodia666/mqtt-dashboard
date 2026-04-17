@@ -338,6 +338,12 @@ function App() {
   const [minMax, setMinMax]         = useState<MinMax>(loadCachedMinMax)
   const [essOpen, setEssOpen]       = useState(false)
   const [activeTab, setActiveTab]     = useState<Tab>('uebersicht')
+  const [winW, setWinW]               = useState(window.innerWidth)
+  useEffect(() => {
+    const onResize = () => setWinW(window.innerWidth)
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
   const histRef                     = useRef<Record<string, number[]>>({})
   const messageQueue                = useRef<Record<string, string>>({})
   const clientRef                   = useRef<any>(null)
@@ -653,10 +659,156 @@ function App() {
     </div>
   )
 
-  // ── LAYOUT A: Victron-Klon (2×3 Grid wie Venus OS) ───────────────────
+  // ── Mobil: einfache Card-Liste mit Pfeil-Divider ────────────────────
+  const MobileFlowCard = ({ accent, highlight=false, children }: {
+    accent: string; highlight?: boolean; children: React.ReactNode
+  }) => (
+    <div style={{ ...fc(accent, highlight), marginBottom: 0 }}>{children}</div>
+  )
+
+  const MobileArrow = ({ active, color, reverse=false }: { active: boolean; color: string; reverse?: boolean }) => (
+    <div style={{ display: 'flex', justifyContent: 'center', padding: '4px 0' }}>
+      <svg width="24" height="28" viewBox="0 0 24 28">
+        <line x1="12" y1={reverse?22:6} x2="12" y2={reverse?6:22}
+          stroke={active ? color : 'rgba(255,255,255,0.15)'}
+          strokeWidth={active ? 2 : 1.5}
+          strokeDasharray={active ? '5 3' : undefined}
+          style={active ? { animation: (reverse?'flow-rev':'flow-fwd') + ' 0.7s linear infinite' } : {}}
+        />
+        <polygon
+          points={reverse ? '12,2 7,12 17,12' : '12,26 7,16 17,16'}
+          fill={active ? color : 'rgba(255,255,255,0.15)'}
+        />
+      </svg>
+    </div>
+  )
+
+  // ── LAYOUT A: Victron-Klon ────────────────────────────────────────────
+  // Desktop: SVG mit foreignObject (pixel-genaue Verbindungslinien)
+  // Mobil:   vertikale Card-Liste mit Pfeil-Divider
   const LayoutA = () => {
-    // Kachel-Koordinaten (px) im 900×340-Viewport
-    // [x, y, w, h]
+    const isMobile = winW < 700
+
+    // ── Mobil-Layout ───────────────────────────────────────────────────
+    if (isMobile) {
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+          <style>{`
+            @keyframes flow-fwd { from{stroke-dashoffset:10} to{stroke-dashoffset:0} }
+            @keyframes flow-rev { from{stroke-dashoffset:0}  to{stroke-dashoffset:10} }
+          `}</style>
+
+          {/* Zeile 1: Netz + WR nebeneinander */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
+            <MobileFlowCard accent={netzColor}>
+              <div style={{ fontSize: 9, color: netzColor, letterSpacing: '0.1em', marginBottom: 4 }}>NETZ</div>
+              <div style={{ fontSize: 20, fontWeight: 700, color: netzColor, lineHeight: 1 }}>
+                {fr(Math.abs(V_GRID_TOT ?? 0))}<span style={{ fontSize: 10, color: T.muted, fontWeight: 400 }}> W</span>
+              </div>
+              {[['L1', V_GRID_L1], ['L2', V_GRID_L2], ['L3', V_GRID_L3]].map(([l, v]) => (
+                <div key={String(l)} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, marginTop: 3 }}>
+                  <span style={{ color: T.muted }}>{l}</span>
+                  <span style={{ color: (v as number) < 0 ? T.ok : T.text, fontWeight: 700 }}>{isNaN(v as number) ? '…' : `${Math.round(v as number)} W`}</span>
+                </div>
+              ))}
+            </MobileFlowCard>
+            <MobileFlowCard accent={purpleAcc}>
+              <div style={{ fontSize: 9, color: purpleAcc, letterSpacing: '0.1em', marginBottom: 4 }}>WECHSELRICHTER</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: purpleAcc, marginBottom: 6 }}>
+                {isNaN(V_INV_MODE) ? '…' : (INVERTER_MODES.find(m => m.value === V_INV_MODE)?.label ?? `Mode ${V_INV_MODE}`)}
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, marginBottom: 2 }}>
+                <span style={{ color: T.muted }}>AC Out</span><span style={{ color: T.text, fontWeight: 700 }}>{fr(V_AC_W)} W</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, marginBottom: 2 }}>
+                <span style={{ color: T.muted }}>Spannung</span><span style={{ color: T.text, fontWeight: 700 }}>{fw(V_AC_V)} V</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9 }}>
+                <span style={{ color: T.muted }}>Frequenz</span><span style={{ color: T.text, fontWeight: 700 }}>{fw(V_AC_F, 1)} Hz</span>
+              </div>
+            </MobileFlowCard>
+          </div>
+
+          {/* Pfeil WR ↔ Batterie */}
+          <MobileArrow active={batActive} color={batIn ? amberAcc : T.ok} reverse={!batIn} />
+
+          {/* Batterie */}
+          <MobileFlowCard accent={socColor} highlight>
+            <div style={{ fontSize: 9, color: socColor, letterSpacing: '0.1em', marginBottom: 6 }}>🔋 BATTERIE · PYLONTECH</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+              {socRingSvg(46)}
+              <div>
+                <div style={{ fontSize: 18, fontWeight: 700, color: socColor }}>
+                  {fw(V_BAT_V, 1)}<span style={{ fontSize: 10, color: T.muted, fontWeight: 400 }}> V</span>
+                </div>
+                <div style={{ marginTop: 3 }}>
+                  <Badge color={V_BAT_STATE === 1 ? T.ok : V_BAT_STATE === 2 ? amberAcc : T.muted}>
+                    {isNaN(V_BAT_STATE) ? '…' : batStateLabel(V_BAT_STATE)}
+                  </Badge>
+                </div>
+              </div>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 2 }}>
+              <span style={{ color: T.muted }}>Strom</span><span style={{ color: T.text, fontWeight: 700 }}>{fw(V_BAT_A, 1)} A</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 2 }}>
+              <span style={{ color: T.muted }}>Leistung</span><span style={{ color: T.text, fontWeight: 700 }}>{fr(V_BAT_W)} W</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10 }}>
+              <span style={{ color: T.muted }}>Temp</span><span style={{ color: T.text, fontWeight: 700 }}>{fw(V_BAT_T, 1)} °C</span>
+            </div>
+          </MobileFlowCard>
+
+          {/* Pfeile Solar + DC */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 0 }}>
+            <MobileArrow active={pvActive} color={amberAcc} />
+            <MobileArrow active={dcActive} color={dcColor} />
+          </div>
+
+          {/* Zeile 3: Solar + DC-Lasten + AC-Lasten */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            <MobileFlowCard accent={amberAcc}>
+              <div style={{ fontSize: 9, color: amberAcc, letterSpacing: '0.1em', marginBottom: 4 }}>☀ SOLAR · MPPT</div>
+              <div style={{ fontSize: 20, fontWeight: 700, color: isNaN(V_PV_W) ? T.muted : amberAcc }}>
+                {fr(V_PV_W ?? 0)}<span style={{ fontSize: 10, color: T.muted, fontWeight: 400 }}> W</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, marginTop: 4 }}>
+                <span style={{ color: T.muted }}>Status</span>
+                <span style={{ color: T.text, fontWeight: 700 }}>{isNaN(V_MPPT_STATE) ? '…' : mpptStateLabel(V_MPPT_STATE)}</span>
+              </div>
+            </MobileFlowCard>
+            <MobileFlowCard accent={dcColor}>
+              <div style={{ fontSize: 9, color: dcColor, letterSpacing: '0.1em', marginBottom: 4 }}>DC-LASTEN</div>
+              <div style={{ fontSize: 20, fontWeight: 700, color: dcColor }}>
+                {fr(V_DC_SYS ?? 0)}<span style={{ fontSize: 10, color: T.muted, fontWeight: 400 }}> W</span>
+              </div>
+              <div style={{ fontSize: 9, color: T.muted, marginTop: 4 }}>
+                {isNaN(V_DC_SYS) ? '' : V_DC_SYS < 0 ? 'DC nimmt Energie auf' : 'DC gibt Energie ab'}
+              </div>
+            </MobileFlowCard>
+          </div>
+
+          {/* Pfeil → AC-Lasten */}
+          <MobileArrow active={consActive} color={amberAcc} />
+
+          {/* AC-Lasten */}
+          <MobileFlowCard accent={amberAcc}>
+            <div style={{ fontSize: 9, color: amberAcc, letterSpacing: '0.1em', marginBottom: 4 }}>🏠 AC-LASTEN</div>
+            <div style={{ fontSize: 20, fontWeight: 700, color: amberAcc }}>
+              {V_CONS_TOT === 0 && isNaN(V_CONS_L1) ? '…' : fr(V_CONS_TOT)}<span style={{ fontSize: 10, color: T.muted, fontWeight: 400 }}> W</span>
+            </div>
+            {[['L1', V_CONS_L1], ['L2', V_CONS_L2], ['L3', V_CONS_L3]].map(([l, v]) => (
+              <div key={String(l)} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, marginTop: 3 }}>
+                <span style={{ color: T.muted }}>{l}</span>
+                <span style={{ color: T.text, fontWeight: 700 }}>{isNaN(v as number) ? '…' : `${Math.round(v as number)} W`}</span>
+              </div>
+            ))}
+          </MobileFlowCard>
+        </div>
+      )
+    }
+
+    // ── Desktop-Layout (SVG) ───────────────────────────────────────────
     const pos = {
       netz:    [0,   0,   270, 140],
       wr:      [315, 0,   270, 140],
@@ -678,132 +830,6 @@ function App() {
           style={{ width: '100%', display: 'block', overflow: 'visible' }}
           preserveAspectRatio="xMidYMid meet"
         >
-          <defs>
-            <style>{`
-              @keyframes flow-fwd { from{stroke-dashoffset:10} to{stroke-dashoffset:0} }
-              @keyframes flow-rev { from{stroke-dashoffset:0}  to{stroke-dashoffset:10} }
-            `}</style>
-          </defs>
-
-          {/* Verbindungslinien – 10px Abstand zu Kachel-Kanten */}
-          {/* Netz ↔ WR */}
-          <FlowLine x1={right(pos.netz)[0]+10} y1={right(pos.netz)[1]} x2={left(pos.wr)[0]-10} y2={left(pos.wr)[1]}
-            active={netActive} color={netzColor} reverse={!netIn} />
-          {/* WR → AC-Lasten */}
-          <FlowLine x1={right(pos.wr)[0]+10} y1={right(pos.wr)[1]} x2={left(pos.acLast)[0]-10} y2={left(pos.acLast)[1]}
-            active={consActive} color={amberAcc} />
-          {/* Solar → Batt */}
-          <FlowLine x1={right(pos.solar)[0]+10} y1={right(pos.solar)[1]} x2={left(pos.batt)[0]-10} y2={left(pos.batt)[1]}
-            active={pvActive} color={amberAcc} />
-          {/* WR ↔ Batt (vertikal) */}
-          <FlowLine x1={bot(pos.wr)[0]} y1={bot(pos.wr)[1]+10} x2={top(pos.batt)[0]} y2={top(pos.batt)[1]-10}
-            active={batActive} color={batIn ? amberAcc : T.ok} reverse={!batIn} />
-          {/* Batt → DC-Lasten */}
-          <FlowLine x1={right(pos.batt)[0]+10} y1={right(pos.batt)[1]} x2={left(pos.dcLast)[0]-10} y2={left(pos.dcLast)[1]}
-            active={dcActive} color={dcColor} />
-
-          {/* Kacheln als foreignObject */}
-          {Object.entries(pos).map(([key, [x, y, w, h]]) => (
-            <foreignObject key={key} x={x} y={y} width={w} height={h}>
-              <div style={{ width: '100%', height: '100%', ...fc(
-                key==='netz'  ? netzColor :
-                key==='wr'    ? purpleAcc :
-                key==='acLast'? amberAcc  :
-                key==='solar' ? amberAcc  :
-                key==='batt'  ? socColor  :
-                dcColor,
-                key === 'batt'
-              ) }}>
-
-                {key === 'netz' && <>
-                  <div style={{ fontSize: 9, color: netzColor, letterSpacing: '0.1em', marginBottom: 4 }}>NETZ</div>
-                  <div style={{ fontSize: 22, fontWeight: 700, color: isNaN(V_GRID_TOT) ? T.muted : netzColor, lineHeight: 1 }}>
-                    {fr(Math.abs(V_GRID_TOT ?? 0))}<span style={{ fontSize: 11, color: T.muted, fontWeight: 400 }}> W</span>
-                  </div>
-                  <PhaseRows l1={V_GRID_L1} l2={V_GRID_L2} l3={V_GRID_L3} />
-                </>}
-
-                {key === 'wr' && <>
-                  <div style={{ fontSize: 9, color: purpleAcc, letterSpacing: '0.1em', marginBottom: 4 }}>WECHSELRICHTER · MULTIPLUS</div>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: purpleAcc, marginBottom: 8 }}>
-                    {isNaN(V_INV_MODE) ? '…' : (INVERTER_MODES.find(m => m.value === V_INV_MODE)?.label ?? `Mode ${V_INV_MODE}`)}
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 2 }}>
-                    <span style={{ color: T.muted }}>AC Out</span><span style={{ color: T.text, fontWeight: 700 }}>{fr(V_AC_W)} W</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 2 }}>
-                    <span style={{ color: T.muted }}>Spannung</span><span style={{ color: T.text, fontWeight: 700 }}>{fw(V_AC_V)} V</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10 }}>
-                    <span style={{ color: T.muted }}>Frequenz</span><span style={{ color: T.text, fontWeight: 700 }}>{fw(V_AC_F, 1)} Hz</span>
-                  </div>
-                </>}
-
-                {key === 'acLast' && <>
-                  <div style={{ fontSize: 9, color: amberAcc, letterSpacing: '0.1em', marginBottom: 4 }}>AC-LASTEN</div>
-                  <div style={{ fontSize: 22, fontWeight: 700, color: amberAcc, lineHeight: 1 }}>
-                    {V_CONS_TOT === 0 && isNaN(V_CONS_L1) ? '…' : fr(V_CONS_TOT)}<span style={{ fontSize: 11, color: T.muted, fontWeight: 400 }}> W</span>
-                  </div>
-                  <PhaseRows l1={V_CONS_L1} l2={V_CONS_L2} l3={V_CONS_L3} />
-                </>}
-
-                {key === 'solar' && <>
-                  <div style={{ fontSize: 9, color: amberAcc, letterSpacing: '0.1em', marginBottom: 4 }}>SOLARERTRAG · MPPT</div>
-                  <div style={{ fontSize: 22, fontWeight: 700, color: isNaN(V_PV_W) ? T.muted : amberAcc, lineHeight: 1 }}>
-                    {fr(V_PV_W ?? 0)}<span style={{ fontSize: 11, color: T.muted, fontWeight: 400 }}> W</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginTop: 6, marginBottom: 2 }}>
-                    <span style={{ color: T.muted }}>PV Spannung</span><span style={{ color: T.text, fontWeight: 700 }}>{fw(V_PV_V)} V</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10 }}>
-                    <span style={{ color: T.muted }}>Status</span><span style={{ color: T.text, fontWeight: 700 }}>{isNaN(V_MPPT_STATE) ? '…' : mpptStateLabel(V_MPPT_STATE)}</span>
-                  </div>
-                </>}
-
-                {key === 'batt' && <>
-                  <div style={{ fontSize: 9, color: socColor, letterSpacing: '0.1em', marginBottom: 6 }}>BATTERIE · PYLONTECH</div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                    {socRingSvg(46)}
-                    <div>
-                      <div style={{ fontSize: 18, fontWeight: 700, color: socColor }}>
-                        {fw(V_BAT_V, 1)}<span style={{ fontSize: 10, color: T.muted, fontWeight: 400 }}> V</span>
-                      </div>
-                      <div style={{ marginTop: 3 }}>
-                        <Badge color={V_BAT_STATE === 1 ? T.ok : V_BAT_STATE === 2 ? amberAcc : T.muted}>
-                          {isNaN(V_BAT_STATE) ? '…' : batStateLabel(V_BAT_STATE)}
-                        </Badge>
-                      </div>
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 2 }}>
-                    <span style={{ color: T.muted }}>Strom</span><span style={{ color: T.text, fontWeight: 700 }}>{fw(V_BAT_A, 1)} A</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 2 }}>
-                    <span style={{ color: T.muted }}>Leistung</span><span style={{ color: T.text, fontWeight: 700 }}>{fr(V_BAT_W)} W</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10 }}>
-                    <span style={{ color: T.muted }}>Temp</span><span style={{ color: T.text, fontWeight: 700 }}>{fw(V_BAT_T, 1)} °C</span>
-                  </div>
-                </>}
-
-                {key === 'dcLast' && <>
-                  <div style={{ fontSize: 9, color: dcColor, letterSpacing: '0.1em', marginBottom: 4 }}>DC-LASTEN · SYSTEM</div>
-                  <div style={{ fontSize: 22, fontWeight: 700, color: dcColor, lineHeight: 1 }}>
-                    {fr(V_DC_SYS ?? 0)}<span style={{ fontSize: 11, color: T.muted, fontWeight: 400 }}> W</span>
-                  </div>
-                  <div style={{ fontSize: 10, color: T.muted, marginTop: 6 }}>
-                    {isNaN(V_DC_SYS) ? '' : V_DC_SYS < 0 ? 'DC nimmt Energie auf' : 'DC gibt Energie ab'}
-                  </div>
-                </>}
-
-              </div>
-            </foreignObject>
-          ))}
-        </svg>
-      </div>
-    )
-  }
-
   return (
     <div style={{ minHeight: '100vh', background: T.bg, color: T.text, fontFamily: T.fontBody }}>
 
