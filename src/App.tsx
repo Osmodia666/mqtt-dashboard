@@ -685,21 +685,21 @@ function App() {
             `}</style>
           </defs>
 
-          {/* Verbindungslinien */}
-          {/* Netz → WR */}
-          <FlowLine x1={right(pos.netz)[0]} y1={right(pos.netz)[1]} x2={left(pos.wr)[0]-8} y2={left(pos.wr)[1]}
+          {/* Verbindungslinien – 10px Abstand zu Kachel-Kanten */}
+          {/* Netz ↔ WR */}
+          <FlowLine x1={right(pos.netz)[0]+10} y1={right(pos.netz)[1]} x2={left(pos.wr)[0]-10} y2={left(pos.wr)[1]}
             active={netActive} color={netzColor} reverse={!netIn} />
           {/* WR → AC-Lasten */}
-          <FlowLine x1={right(pos.wr)[0]} y1={right(pos.wr)[1]} x2={left(pos.acLast)[0]-8} y2={left(pos.acLast)[1]}
+          <FlowLine x1={right(pos.wr)[0]+10} y1={right(pos.wr)[1]} x2={left(pos.acLast)[0]-10} y2={left(pos.acLast)[1]}
             active={consActive} color={amberAcc} />
-          {/* Solar → Batt (horizontal) */}
-          <FlowLine x1={right(pos.solar)[0]} y1={right(pos.solar)[1]} x2={left(pos.batt)[0]-8} y2={left(pos.batt)[1]}
+          {/* Solar → Batt */}
+          <FlowLine x1={right(pos.solar)[0]+10} y1={right(pos.solar)[1]} x2={left(pos.batt)[0]-10} y2={left(pos.batt)[1]}
             active={pvActive} color={amberAcc} />
           {/* WR ↔ Batt (vertikal) */}
-          <FlowLine x1={bot(pos.wr)[0]} y1={bot(pos.wr)[1]} x2={top(pos.batt)[0]} y2={top(pos.batt)[1]+8}
+          <FlowLine x1={bot(pos.wr)[0]} y1={bot(pos.wr)[1]+10} x2={top(pos.batt)[0]} y2={top(pos.batt)[1]-10}
             active={batActive} color={batIn ? amberAcc : T.ok} reverse={!batIn} />
           {/* Batt → DC-Lasten */}
-          <FlowLine x1={right(pos.batt)[0]} y1={right(pos.batt)[1]} x2={left(pos.dcLast)[0]-8} y2={left(pos.dcLast)[1]}
+          <FlowLine x1={right(pos.batt)[0]+10} y1={right(pos.batt)[1]} x2={left(pos.dcLast)[0]-10} y2={left(pos.dcLast)[1]}
             active={dcActive} color={dcColor} />
 
           {/* Kacheln als foreignObject */}
@@ -724,7 +724,7 @@ function App() {
                 </>}
 
                 {key === 'wr' && <>
-                  <div style={{ fontSize: 9, color: purpleAcc, letterSpacing: '0.1em', marginBottom: 4 }}>WECHSELRICHTER · MULTIPLUS II 30000</div>
+                  <div style={{ fontSize: 9, color: purpleAcc, letterSpacing: '0.1em', marginBottom: 4 }}>WECHSELRICHTER · MULTIPLUS</div>
                   <div style={{ fontSize: 14, fontWeight: 700, color: purpleAcc, marginBottom: 8 }}>
                     {isNaN(V_INV_MODE) ? '…' : (INVERTER_MODES.find(m => m.value === V_INV_MODE)?.label ?? `Mode ${V_INV_MODE}`)}
                   </div>
@@ -748,7 +748,7 @@ function App() {
                 </>}
 
                 {key === 'solar' && <>
-                  <div style={{ fontSize: 9, color: amberAcc, letterSpacing: '0.1em', marginBottom: 4 }}>SOLARERTRAG · Smart Solar 250/60 MPPT</div>
+                  <div style={{ fontSize: 9, color: amberAcc, letterSpacing: '0.1em', marginBottom: 4 }}>SOLARERTRAG · MPPT</div>
                   <div style={{ fontSize: 22, fontWeight: 700, color: isNaN(V_PV_W) ? T.muted : amberAcc, lineHeight: 1 }}>
                     {fr(V_PV_W ?? 0)}<span style={{ fontSize: 11, color: T.muted, fontWeight: 400 }}> W</span>
                   </div>
@@ -761,7 +761,7 @@ function App() {
                 </>}
 
                 {key === 'batt' && <>
-                  <div style={{ fontSize: 9, color: socColor, letterSpacing: '0.1em', marginBottom: 6 }}>BATTERIE · PYLONTECH US3000C 3,5kWh</div>
+                  <div style={{ fontSize: 9, color: socColor, letterSpacing: '0.1em', marginBottom: 6 }}>BATTERIE · PYLONTECH</div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
                     {socRingSvg(46)}
                     <div>
