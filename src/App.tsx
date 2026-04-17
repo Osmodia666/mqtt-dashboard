@@ -696,23 +696,53 @@ function App() {
             <FlowBanner />
 
             {/* Zähler */}
-            <div style={{ marginBottom: 8 }}>
-              <Card accentColor={T.spark.cyan}>
-                <CardLabel icon="📊" color={T.spark.cyan}>Zähler</CardLabel>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
-                  {[
-                    { icon: '⚡', label: 'Strom gesamt', val: values['Stromzähler/Verbrauch_gesamt'], unit: 'kWh' },
-                    { icon: '🔋', label: 'Solar gesamt',  val: (() => { const n = parseFloat(values['tele/Balkonkraftwerk/SENSOR.ENERGY.EnergyPTotal.0']); return !isNaN(n) ? (n + 178.779).toFixed(3) : '…' })(), unit: 'kWh' },
-                    { icon: '🔥', label: 'Gas',           val: values['Gaszaehler/stand'], unit: 'm³' },
-                  ].map(({ icon, label, val, unit }, i) => (
-                    <div key={i}>
-                      <div style={{ fontSize: 9, color: T.muted, fontFamily: T.fontMono, marginBottom: 3 }}>{icon} {label}</div>
-                      <BigVal value={val ?? '…'} unit={unit} size={15} />
+            {(() => {
+              const bkwRaw    = parseFloat(values['tele/Balkonkraftwerk/SENSOR.ENERGY.EnergyPTotal.0'])
+              const bkwKwh    = !isNaN(bkwRaw) ? bkwRaw + 178.779 : NaN
+              const victronKwh = parseFloat(values[V('solarcharger/288/Yield/System')] ?? 'NaN')
+              const solarTotal = (!isNaN(bkwKwh) ? bkwKwh : 0) + (!isNaN(victronKwh) ? victronKwh : 0)
+              const hasSolar   = !isNaN(bkwKwh) || !isNaN(victronKwh)
+              return (
+                <div style={{ marginBottom: 8 }}>
+                  <Card accentColor={T.spark.cyan}>
+                    <CardLabel icon="📊" color={T.spark.cyan}>Zähler</CardLabel>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+
+                      {/* Strom gesamt */}
+                      <div>
+                        <div style={{ fontSize: 9, color: T.muted, fontFamily: T.fontMono, marginBottom: 3 }}>⚡ Strom gesamt</div>
+                        <BigVal value={values['Stromzähler/Verbrauch_gesamt'] ?? '…'} unit="kWh" size={15} />
+                      </div>
+
+                      {/* Solar gesamt: BKW + Victron */}
+                      <div>
+                        <div style={{ fontSize: 9, color: T.muted, fontFamily: T.fontMono, marginBottom: 3 }}>🔋 Solar gesamt</div>
+                        <BigVal
+                          value={hasSolar ? solarTotal.toFixed(2) : '…'}
+                          unit="kWh"
+                          size={15}
+                          color={hasSolar ? T.ok : T.muted}
+                        />
+                        {hasSolar && (
+                          <div style={{ fontSize: 9, color: T.muted, fontFamily: T.fontMono, marginTop: 3, lineHeight: 1.6 }}>
+                            {!isNaN(bkwKwh)    && <span>{bkwKwh.toFixed(2)} BKW</span>}
+                            {!isNaN(bkwKwh) && !isNaN(victronKwh) && <span style={{ margin: '0 3px' }}>+</span>}
+                            {!isNaN(victronKwh) && <span>{victronKwh.toFixed(2)} Victron</span>}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Gas */}
+                      <div>
+                        <div style={{ fontSize: 9, color: T.muted, fontFamily: T.fontMono, marginBottom: 3 }}>🔥 Gas</div>
+                        <BigVal value={values['Gaszaehler/stand'] ?? '…'} unit="m³" size={15} />
+                      </div>
+
                     </div>
-                  ))}
+                  </Card>
                 </div>
-              </Card>
-            </div>
+              )
+            })()}
 
             {/* Phasen L1–L3 */}
             <div className="grid-groups" style={{ marginBottom: 8 }}>
