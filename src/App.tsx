@@ -578,11 +578,16 @@ function App() {
   }) => {
     const id = `fl-${x1}-${y1}-${x2}-${y2}`.replace(/\./g,'-')
     const animDir = reverse ? 'flow-rev' : 'flow-fwd'
+    const markColor = active ? color : 'rgba(255,255,255,0.12)'
+    // Bei reverse: Pfeil am Start (zeigt von x2→x1), sonst am Ende (zeigt von x1→x2)
     return (
       <g>
         <defs>
-          <marker id={`arr-${id}`} markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
-            <path d="M0,0 L6,3 L0,6 Z" fill={active ? color : 'rgba(255,255,255,0.12)'} />
+          <marker id={`arr-e-${id}`} markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+            <path d="M0,0 L6,3 L0,6 Z" fill={markColor} />
+          </marker>
+          <marker id={`arr-s-${id}`} markerWidth="6" markerHeight="6" refX="1" refY="3" orient="auto-start-reverse">
+            <path d="M0,0 L6,3 L0,6 Z" fill={markColor} />
           </marker>
         </defs>
         <line
@@ -590,7 +595,8 @@ function App() {
           stroke={active ? color : 'rgba(255,255,255,0.1)'}
           strokeWidth={active ? 2 : 1.5}
           strokeDasharray={active ? '6 4' : undefined}
-          markerEnd={`url(#arr-${id})`}
+          markerEnd={reverse ? undefined : `url(#arr-e-${id})`}
+          markerStart={reverse ? `url(#arr-s-${id})` : undefined}
           style={active ? { animation: `${animDir} 0.7s linear infinite` } : {}}
         />
       </g>
@@ -718,7 +724,7 @@ function App() {
                 </>}
 
                 {key === 'wr' && <>
-                  <div style={{ fontSize: 9, color: purpleAcc, letterSpacing: '0.1em', marginBottom: 4 }}>WECHSELRICHTER · MULTIPLUS II 3000 </div>
+                  <div style={{ fontSize: 9, color: purpleAcc, letterSpacing: '0.1em', marginBottom: 4 }}>WECHSELRICHTER · MULTIPLUS II 30000</div>
                   <div style={{ fontSize: 14, fontWeight: 700, color: purpleAcc, marginBottom: 8 }}>
                     {isNaN(V_INV_MODE) ? '…' : (INVERTER_MODES.find(m => m.value === V_INV_MODE)?.label ?? `Mode ${V_INV_MODE}`)}
                   </div>
@@ -742,7 +748,7 @@ function App() {
                 </>}
 
                 {key === 'solar' && <>
-                  <div style={{ fontSize: 9, color: amberAcc, letterSpacing: '0.1em', marginBottom: 4 }}>SOLARERTRAG · MPPT SmartSolar 250/60</div>
+                  <div style={{ fontSize: 9, color: amberAcc, letterSpacing: '0.1em', marginBottom: 4 }}>SOLARERTRAG · Smart Solar 250/60 MPPT</div>
                   <div style={{ fontSize: 22, fontWeight: 700, color: isNaN(V_PV_W) ? T.muted : amberAcc, lineHeight: 1 }}>
                     {fr(V_PV_W ?? 0)}<span style={{ fontSize: 11, color: T.muted, fontWeight: 400 }}> W</span>
                   </div>
@@ -755,7 +761,7 @@ function App() {
                 </>}
 
                 {key === 'batt' && <>
-                  <div style={{ fontSize: 9, color: socColor, letterSpacing: '0.1em', marginBottom: 6 }}>BATTERIE · PYLONTECH US3000C</div>
+                  <div style={{ fontSize: 9, color: socColor, letterSpacing: '0.1em', marginBottom: 6 }}>BATTERIE · PYLONTECH US3000C 3,5kWh</div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
                     {socRingSvg(46)}
                     <div>
