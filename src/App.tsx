@@ -30,6 +30,17 @@ const VICTRON_TOPICS = {
   vebusState:  V('vebus/288/VebusStatus'),
   vebusMode:   V('vebus/288/Mode'),
   essMode:     V('settings/0/Settings/CGwacs/BatteryLife/State'),
+  // Netz per Phase (für Fluss-Layouts)
+  gridL1:      V('grid/30/Ac/L1/Power'),
+  gridL2:      V('grid/30/Ac/L2/Power'),
+  gridL3:      V('grid/30/Ac/L3/Power'),
+  gridTotal:   V('grid/30/Ac/Power'),
+  // AC-Lasten per Phase
+  consL1:      V('system/0/Ac/Consumption/L1/Power'),
+  consL2:      V('system/0/Ac/Consumption/L2/Power'),
+  consL3:      V('system/0/Ac/Consumption/L3/Power'),
+  // DC-System
+  dcSystem:    V('system/0/Dc/System/Power'),
 }
 
 const mpptStateLabel = (s: number) => {
@@ -320,13 +331,15 @@ function EssModal({ currentEssMode, currentInvMode, onSetEss, onSetInv, onClose 
 
 // ── App ───────────────────────────────────────────────────────────────────
 type Tab = 'uebersicht' | 'energie' | 'victron' | 'steuerung'
+type VLayout = 'A' | 'B' | 'C'
 
 function App() {
   const [values, setValues]         = useState<Record<string, string>>({})
   const [lastUpdate, setLastUpdate] = useState('')
   const [minMax, setMinMax]         = useState<MinMax>(loadCachedMinMax)
   const [essOpen, setEssOpen]       = useState(false)
-  const [activeTab, setActiveTab]   = useState<Tab>('uebersicht')
+  const [activeTab, setActiveTab]     = useState<Tab>('uebersicht')
+  const [victronLayout, setVictronLayout] = useState<VLayout>('A')
   const histRef                     = useRef<Record<string, number[]>>({})
   const messageQueue                = useRef<Record<string, string>>({})
   const clientRef                   = useRef<any>(null)
@@ -438,6 +451,19 @@ function App() {
   const V_INV_MODE    = parseFloat(values[VICTRON_TOPICS.vebusMode]   ?? 'NaN')
   const V_ESS_MODE    = parseFloat(values[VICTRON_TOPICS.essMode]     ?? 'NaN')
 
+  // Netz per Phase
+  const V_GRID_L1     = parseFloat(values[VICTRON_TOPICS.gridL1]   ?? 'NaN')
+  const V_GRID_L2     = parseFloat(values[VICTRON_TOPICS.gridL2]   ?? 'NaN')
+  const V_GRID_L3     = parseFloat(values[VICTRON_TOPICS.gridL3]   ?? 'NaN')
+  const V_GRID_TOT    = parseFloat(values[VICTRON_TOPICS.gridTotal] ?? 'NaN')
+  // AC-Lasten per Phase
+  const V_CONS_L1     = parseFloat(values[VICTRON_TOPICS.consL1]   ?? 'NaN')
+  const V_CONS_L2     = parseFloat(values[VICTRON_TOPICS.consL2]   ?? 'NaN')
+  const V_CONS_L3     = parseFloat(values[VICTRON_TOPICS.consL3]   ?? 'NaN')
+  const V_CONS_TOT    = (!isNaN(V_CONS_L1)?V_CONS_L1:0) + (!isNaN(V_CONS_L2)?V_CONS_L2:0) + (!isNaN(V_CONS_L3)?V_CONS_L3:0)
+  // DC-System
+  const V_DC_SYS      = parseFloat(values[VICTRON_TOPICS.dcSystem] ?? 'NaN')
+
   const BKW_W         = parseFloat(values['tele/Balkonkraftwerk/SENSOR.ENERGY.Power.0'] ?? 'NaN')
   const totalGen      = (!isNaN(BKW_W) ? BKW_W : 0) + (!isNaN(V_PV_W) ? V_PV_W : 0)
   const netzAustausch = parseFloat(values['Stromzähler/Verbrauch_aktuell'] ?? 'NaN')
@@ -524,6 +550,475 @@ function App() {
       </Card>
     </div>
   )
+
+  // ── CSS-Keyframes für Fluss-Animation ───────────────────────────────
+  // Inline via <style> Tag in den Layouts injiziert
+
+  // ── Hilfs-Komponenten für Fluss-Layouts ─────────────────────────────
+  const fmono: React.CSSProperties = { fontFamily: T.fontMono }
+  const fcard = (accent: string): React.CSSProperties => ({
+    background: T.surf, border: `1px solid ${accent}33`,
+    borderRadius: 7, padding: '10px 12px',
+  })
+
+  // Animierter Pfeil: dir = 'right'|'left'|'down'|'up', active = Fluss vorhanden
+  const FlowArrow = ({ dir, active, color, size = 36 }: {
+    dir: 'right'|'left'|'down'|'up'; active: boolean; color: string; size?: number
+  }) => {
+    const isH = dir === 'right' || dir === 'left'
+    const w = isH ? size : 14
+    const h = isH ? 14 : size
+    const mid = isH ? h/2 : w/2
+    const len = isH ? w - 8 : h - 8
+    // Linie + Pfeilspitze je nach Richtung
+    const line = isH
+      ? `M4,${mid} L${w-8},${mid}`
+      : `M${mid},4 L${mid},${h-8}`
+    const arrow = dir === 'right'  ? `M${w-8},${mid-4} L${w-2},${mid} L${w-8},${mid+4}`
+                : dir === 'left'   ? `M8,${mid-4} L2,${mid} L8,${mid+4}`
+                : dir === 'down'   ? `M${mid-4},${h-8} L${mid},${h-2} L${mid+4},${h-8}`
+                :                   `M${mid-4},8 L${mid},2 L${mid+4},8`
+    const dashLen  = isH ? len : len
+    const animName = { right:'fa-r', left:'fa-l', down:'fa-d', up:'fa-u' }[dir]
+    return (
+      <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ flexShrink: 0 }}>
+        <path d={line} fill="none" stroke={active ? color : 'rgba(255,255,255,0.1)'}
+          strokeWidth={active ? 2 : 1.5}
+          strokeDasharray={active ? '5 3' : 'none'}
+          style={active ? { animation: `${animName} 0.55s linear infinite` } : {}} />
+        <path d={arrow} fill="none" stroke={active ? color : 'rgba(255,255,255,0.1)'}
+          strokeWidth={active ? 2 : 1.5} strokeLinejoin="round" strokeLinecap="round" />
+      </svg>
+    )
+  }
+
+  // SOC-Ring kompakt
+  const SocRingMini = ({ soc }: { soc: number }) => {
+    const r = 18, circ = 2*Math.PI*r
+    const filled = isNaN(soc) ? 0 : Math.min(100, soc)
+    const offset = circ - (filled/100)*circ
+    const color = soc >= 60 ? T.ok : soc >= 30 ? T.warn : T.err
+    return (
+      <svg width={44} height={44} viewBox="0 0 44 44" style={{ flexShrink: 0 }}>
+        <circle cx={22} cy={22} r={r} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={3.5}/>
+        <circle cx={22} cy={22} r={r} fill="none" stroke={color} strokeWidth={3.5}
+          strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round"
+          transform="rotate(-90 22 22)" style={{ transition: 'stroke-dashoffset 0.6s' }}/>
+        <text x={22} y={26} textAnchor="middle" fontSize={10} fill={T.text}
+          fontWeight={700} fontFamily={T.fontMono}>
+          {isNaN(soc) ? '…' : `${Math.round(soc)}%`}
+        </text>
+      </svg>
+    )
+  }
+
+  // ── LAYOUT A: Victron-Klon ───────────────────────────────────────────
+  const LayoutA = () => {
+    const netzColor = !isNaN(V_GRID_TOT) && V_GRID_TOT < 0 ? T.ok : T.err
+    const pvActive  = !isNaN(V_PV_W) && V_PV_W > 0
+    const netActive = !isNaN(V_GRID_TOT) && Math.abs(V_GRID_TOT) > 5
+    const batActive = !isNaN(V_BAT_W) && Math.abs(V_BAT_W) > 5
+    const batIn     = !isNaN(V_BAT_W) && V_BAT_W > 0   // Batterie lädt
+    const netIn     = !isNaN(V_GRID_TOT) && V_GRID_TOT > 0 // Netzbezug
+    return (
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gridTemplateRows: 'auto 44px auto', gap: 8 }}>
+
+        {/* Zeile 1: Netz | WR | AC-Lasten */}
+        <div style={fcard(T.err)}>
+          <div style={{ fontSize: 9, color: T.err, letterSpacing: '0.1em', marginBottom: 4 }}>NETZ</div>
+          <div style={{ fontSize: 22, fontWeight: 700, color: isNaN(V_GRID_TOT) ? T.muted : netzColor, lineHeight: 1 }}>
+            {isNaN(V_GRID_TOT) ? '…' : `${Math.round(Math.abs(V_GRID_TOT))}`}
+            <span style={{ fontSize: 12, color: T.muted, fontWeight: 400 }}> W</span>
+          </div>
+          <div style={{ marginTop: 6 }}>
+            {[['L1', V_GRID_L1], ['L2', V_GRID_L2], ['L3', V_GRID_L3]].map(([l, v]) => (
+              <div key={String(l)} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 2 }}>
+                <span style={{ color: T.muted }}>{l}</span>
+                <span style={{ color: (v as number) < 0 ? T.ok : T.text, fontWeight: 700 }}>
+                  {isNaN(v as number) ? '…' : `${Math.round(v as number)} W`}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div style={fcard(purpleAcc)}>
+          <div style={{ fontSize: 9, color: purpleAcc, letterSpacing: '0.1em', marginBottom: 4 }}>WECHSELRICHTER · MULTIPLUS</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: purpleAcc, marginBottom: 6 }}>
+            {isNaN(V_INV_MODE) ? '…' : (INVERTER_MODES.find(m => m.value === V_INV_MODE)?.label ?? `Mode ${V_INV_MODE}`)}
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10 }}>
+              <span style={{ color: T.muted }}>AC Out</span>
+              <span style={{ color: T.text, fontWeight: 700 }}>{isNaN(V_AC_W) ? '…' : `${Math.round(V_AC_W)} W`}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10 }}>
+              <span style={{ color: T.muted }}>Spannung</span>
+              <span style={{ color: T.text, fontWeight: 700 }}>{isNaN(V_AC_V) ? '…' : `${V_AC_V.toFixed(0)} V`}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10 }}>
+              <span style={{ color: T.muted }}>Frequenz</span>
+              <span style={{ color: T.text, fontWeight: 700 }}>{isNaN(V_AC_F) ? '…' : `${V_AC_F.toFixed(1)} Hz`}</span>
+            </div>
+          </div>
+        </div>
+
+        <div style={fcard(amberAcc)}>
+          <div style={{ fontSize: 9, color: amberAcc, letterSpacing: '0.1em', marginBottom: 4 }}>AC-LASTEN</div>
+          <div style={{ fontSize: 22, fontWeight: 700, color: amberAcc, lineHeight: 1 }}>
+            {V_CONS_TOT === 0 && isNaN(V_CONS_L1) ? '…' : Math.round(V_CONS_TOT)}
+            <span style={{ fontSize: 12, color: T.muted, fontWeight: 400 }}> W</span>
+          </div>
+          <div style={{ marginTop: 6 }}>
+            {[['L1', V_CONS_L1], ['L2', V_CONS_L2], ['L3', V_CONS_L3]].map(([l, v]) => (
+              <div key={String(l)} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 2 }}>
+                <span style={{ color: T.muted }}>{l}</span>
+                <span style={{ color: T.text, fontWeight: 700 }}>{isNaN(v as number) ? '…' : `${Math.round(v as number)} W`}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Zeile 2: Pfeile */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <FlowArrow dir={netIn ? 'right' : 'left'} active={netActive} color={netzColor} size={60} />
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <FlowArrow dir="down" active={batActive} color={batIn ? amberAcc : T.ok} size={44} />
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <FlowArrow dir="right" active={V_CONS_TOT > 5} color={amberAcc} size={60} />
+        </div>
+
+        {/* Zeile 3: Solar | Batterie | DC-Lasten */}
+        <div style={fcard(amberAcc)}>
+          <div style={{ fontSize: 9, color: amberAcc, letterSpacing: '0.1em', marginBottom: 4 }}>SOLARERTRAG · MPPT</div>
+          <div style={{ fontSize: 22, fontWeight: 700, color: isNaN(V_PV_W) ? T.muted : amberAcc, lineHeight: 1 }}>
+            {isNaN(V_PV_W) ? '…' : Math.round(V_PV_W)}
+            <span style={{ fontSize: 12, color: T.muted, fontWeight: 400 }}> W</span>
+          </div>
+          <div style={{ marginTop: 6 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 2 }}>
+              <span style={{ color: T.muted }}>PV Spannung</span>
+              <span style={{ color: T.text, fontWeight: 700 }}>{isNaN(V_PV_V) ? '…' : `${V_PV_V.toFixed(0)} V`}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10 }}>
+              <span style={{ color: T.muted }}>Status</span>
+              <span style={{ color: T.text, fontWeight: 700 }}>{isNaN(V_MPPT_STATE) ? '…' : mpptStateLabel(V_MPPT_STATE)}</span>
+            </div>
+          </div>
+        </div>
+
+        <div style={{ ...fcard(socColor), background: socColor === T.ok ? '#0a1a10' : T.surf }}>
+          <div style={{ fontSize: 9, color: socColor, letterSpacing: '0.1em', marginBottom: 6 }}>BATTERIE · PYLONTECH</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+            <SocRingMini soc={V_SOC} />
+            <div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: socColor }}>
+                {isNaN(V_BAT_V) ? '…' : V_BAT_V.toFixed(1)}
+                <span style={{ fontSize: 11, color: T.muted, fontWeight: 400 }}> V</span>
+              </div>
+              <Badge color={V_BAT_STATE === 1 ? T.ok : V_BAT_STATE === 2 ? amberAcc : T.muted}>
+                {isNaN(V_BAT_STATE) ? '…' : batStateLabel(V_BAT_STATE)}
+              </Badge>
+            </div>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 2 }}>
+            <span style={{ color: T.muted }}>Strom</span><span style={{ color: T.text, fontWeight: 700 }}>{isNaN(V_BAT_A) ? '…' : `${V_BAT_A.toFixed(1)} A`}</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 2 }}>
+            <span style={{ color: T.muted }}>Leistung</span><span style={{ color: T.text, fontWeight: 700 }}>{isNaN(V_BAT_W) ? '…' : `${Math.round(V_BAT_W)} W`}</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10 }}>
+            <span style={{ color: T.muted }}>Temp</span><span style={{ color: T.text, fontWeight: 700 }}>{isNaN(V_BAT_T) ? '…' : `${V_BAT_T.toFixed(1)} °C`}</span>
+          </div>
+        </div>
+
+        <div style={fcard(T.spark.cyan)}>
+          <div style={{ fontSize: 9, color: T.spark.cyan, letterSpacing: '0.1em', marginBottom: 4 }}>DC-LASTEN · SYSTEM</div>
+          <div style={{ fontSize: 22, fontWeight: 700, color: !isNaN(V_DC_SYS) && V_DC_SYS < 0 ? T.ok : T.spark.cyan, lineHeight: 1 }}>
+            {isNaN(V_DC_SYS) ? '…' : Math.round(V_DC_SYS)}
+            <span style={{ fontSize: 12, color: T.muted, fontWeight: 400 }}> W</span>
+          </div>
+          <div style={{ fontSize: 10, color: T.muted, marginTop: 6 }}>
+            {isNaN(V_DC_SYS) ? '' : V_DC_SYS < 0 ? 'DC-System nimmt Energie auf' : 'DC-System gibt Energie ab'}
+          </div>
+        </div>
+
+      </div>
+    )
+  }
+
+  // ── LAYOUT B: Batterie zentral ───────────────────────────────────────
+  const LayoutB = () => {
+    const netzColor = !isNaN(V_GRID_TOT) && V_GRID_TOT < 0 ? T.ok : T.err
+    const netActive = !isNaN(V_GRID_TOT) && Math.abs(V_GRID_TOT) > 5
+    const pvActive  = !isNaN(V_PV_W) && V_PV_W > 0
+    const batActive = !isNaN(V_BAT_W) && Math.abs(V_BAT_W) > 5
+    const batIn     = !isNaN(V_BAT_W) && V_BAT_W > 0
+    const netIn     = !isNaN(V_GRID_TOT) && V_GRID_TOT > 0
+    return (
+      <div>
+        {/* Obere Reihe: Solar | ↓ | Netz */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 60px 1fr', gap: 8, alignItems: 'end', marginBottom: 0 }}>
+          <div style={fcard(amberAcc)}>
+            <div style={{ fontSize: 9, color: amberAcc, letterSpacing: '0.1em', marginBottom: 4 }}>☀ SOLAR · MPPT</div>
+            <div style={{ fontSize: 22, fontWeight: 700, color: isNaN(V_PV_W) ? T.muted : amberAcc }}>
+              {isNaN(V_PV_W) ? '…' : Math.round(V_PV_W)}<span style={{ fontSize: 12, color: T.muted, fontWeight: 400 }}> W</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginTop: 5 }}>
+              <span style={{ color: T.muted }}>PV</span>
+              <span style={{ color: T.text, fontWeight: 700 }}>{isNaN(V_PV_V) ? '…' : `${V_PV_V.toFixed(0)} V`}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginTop: 2 }}>
+              <span style={{ color: T.muted }}>Status</span>
+              <span style={{ color: T.text, fontWeight: 700 }}>{isNaN(V_MPPT_STATE) ? '…' : mpptStateLabel(V_MPPT_STATE)}</span>
+            </div>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'flex-end', paddingBottom: 8 }}>
+            <FlowArrow dir="down" active={pvActive} color={amberAcc} size={48} />
+          </div>
+          <div style={fcard(netzColor)}>
+            <div style={{ fontSize: 9, color: netzColor, letterSpacing: '0.1em', marginBottom: 4 }}>⚡ NETZ</div>
+            <div style={{ fontSize: 22, fontWeight: 700, color: netzColor }}>
+              {isNaN(V_GRID_TOT) ? '…' : Math.round(Math.abs(V_GRID_TOT))}<span style={{ fontSize: 12, color: T.muted, fontWeight: 400 }}> W</span>
+            </div>
+            <div style={{ marginTop: 5 }}>
+              {[['L1', V_GRID_L1], ['L2', V_GRID_L2], ['L3', V_GRID_L3]].map(([l, v]) => (
+                <div key={String(l)} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 1 }}>
+                  <span style={{ color: T.muted }}>{l}</span>
+                  <span style={{ color: (v as number) < 0 ? T.ok : T.text, fontWeight: 700 }}>
+                    {isNaN(v as number) ? '…' : `${Math.round(v as number)} W`}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Mittlere Reihe: WR ← | Batterie | → AC-Lasten */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 60px 1.4fr 60px 1fr', gap: 8, alignItems: 'center', margin: '8px 0' }}>
+          <div style={fcard(purpleAcc)}>
+            <div style={{ fontSize: 9, color: purpleAcc, letterSpacing: '0.1em', marginBottom: 4 }}>⚙ WECHSELRICHTER</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: purpleAcc, marginBottom: 5 }}>
+              {isNaN(V_INV_MODE) ? '…' : (INVERTER_MODES.find(m => m.value === V_INV_MODE)?.label ?? `Mode ${V_INV_MODE}`)}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 2 }}>
+              <span style={{ color: T.muted }}>AC Out</span><span style={{ color: T.text, fontWeight: 700 }}>{isNaN(V_AC_W) ? '…' : `${Math.round(V_AC_W)} W`}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 2 }}>
+              <span style={{ color: T.muted }}>Spannung</span><span style={{ color: T.text, fontWeight: 700 }}>{isNaN(V_AC_V) ? '…' : `${V_AC_V.toFixed(0)} V`}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10 }}>
+              <span style={{ color: T.muted }}>Frequenz</span><span style={{ color: T.text, fontWeight: 700 }}>{isNaN(V_AC_F) ? '…' : `${V_AC_F.toFixed(1)} Hz`}</span>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'center' }}>
+            <FlowArrow dir={batIn ? 'right' : 'left'} active={batActive} color={batIn ? amberAcc : T.ok} size={60} />
+          </div>
+
+          {/* Batterie zentral – größer */}
+          <div style={{ ...fcard(socColor), background: socColor === T.ok ? '#0a1a10' : T.surf, padding: '14px 13px' }}>
+            <div style={{ fontSize: 9, color: socColor, letterSpacing: '0.1em', marginBottom: 8 }}>🔋 BATTERIE · PYLONTECH</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+              <SocRingMini soc={V_SOC} />
+              <div>
+                <div style={{ fontSize: 20, fontWeight: 700, color: socColor }}>
+                  {isNaN(V_BAT_V) ? '…' : V_BAT_V.toFixed(1)}<span style={{ fontSize: 11, color: T.muted, fontWeight: 400 }}> V</span>
+                </div>
+                <Badge color={V_BAT_STATE === 1 ? T.ok : V_BAT_STATE === 2 ? amberAcc : T.muted}>
+                  {isNaN(V_BAT_STATE) ? '…' : batStateLabel(V_BAT_STATE)}
+                </Badge>
+              </div>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 2 }}>
+              <span style={{ color: T.muted }}>Strom</span><span style={{ color: T.text, fontWeight: 700 }}>{isNaN(V_BAT_A) ? '…' : `${V_BAT_A.toFixed(1)} A`}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 2 }}>
+              <span style={{ color: T.muted }}>Leistung</span><span style={{ color: T.text, fontWeight: 700 }}>{isNaN(V_BAT_W) ? '…' : `${Math.round(V_BAT_W)} W`}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10 }}>
+              <span style={{ color: T.muted }}>Temp</span><span style={{ color: T.text, fontWeight: 700 }}>{isNaN(V_BAT_T) ? '…' : `${V_BAT_T.toFixed(1)} °C`}</span>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'center' }}>
+            <FlowArrow dir="right" active={V_CONS_TOT > 5} color={amberAcc} size={60} />
+          </div>
+
+          <div style={fcard(amberAcc)}>
+            <div style={{ fontSize: 9, color: amberAcc, letterSpacing: '0.1em', marginBottom: 4 }}>🏠 AC-LASTEN</div>
+            <div style={{ fontSize: 22, fontWeight: 700, color: amberAcc }}>
+              {V_CONS_TOT === 0 && isNaN(V_CONS_L1) ? '…' : Math.round(V_CONS_TOT)}<span style={{ fontSize: 12, color: T.muted, fontWeight: 400 }}> W</span>
+            </div>
+            <div style={{ marginTop: 5 }}>
+              {[['L1', V_CONS_L1], ['L2', V_CONS_L2], ['L3', V_CONS_L3]].map(([l, v]) => (
+                <div key={String(l)} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 1 }}>
+                  <span style={{ color: T.muted }}>{l}</span>
+                  <span style={{ color: T.text, fontWeight: 700 }}>{isNaN(v as number) ? '…' : `${Math.round(v as number)} W`}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Untere Reihe: DC-Lasten */}
+        <div style={{ display: 'grid', gridTemplateColumns: '60px 1fr', gap: 8, alignItems: 'center' }}>
+          <div style={{ display: 'flex', justifyContent: 'center' }}>
+            <FlowArrow dir="down" active={!isNaN(V_DC_SYS) && Math.abs(V_DC_SYS) > 5}
+              color={!isNaN(V_DC_SYS) && V_DC_SYS < 0 ? T.ok : T.spark.cyan} size={40} />
+          </div>
+          <div style={fcard(T.spark.cyan)}>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>
+              <div>
+                <div style={{ fontSize: 9, color: T.spark.cyan, letterSpacing: '0.1em', marginBottom: 4 }}>DC-LASTEN · SYSTEM</div>
+                <div style={{ fontSize: 22, fontWeight: 700, color: !isNaN(V_DC_SYS) && V_DC_SYS < 0 ? T.ok : T.spark.cyan }}>
+                  {isNaN(V_DC_SYS) ? '…' : Math.round(V_DC_SYS)}<span style={{ fontSize: 12, color: T.muted, fontWeight: 400 }}> W</span>
+                </div>
+              </div>
+              <div style={{ fontSize: 10, color: T.muted }}>
+                {isNaN(V_DC_SYS) ? '' : V_DC_SYS < 0 ? 'DC-System nimmt Energie auf' : 'DC-System gibt Energie ab'}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ── LAYOUT C: Horizontal (Links → Rechts) ───────────────────────────
+  const LayoutC = () => {
+    const netzColor = !isNaN(V_GRID_TOT) && V_GRID_TOT < 0 ? T.ok : T.err
+    const pvActive  = !isNaN(V_PV_W) && V_PV_W > 0
+    const netActive = !isNaN(V_GRID_TOT) && Math.abs(V_GRID_TOT) > 5
+    const batActive = !isNaN(V_BAT_W) && Math.abs(V_BAT_W) > 5
+    const batIn     = !isNaN(V_BAT_W) && V_BAT_W > 0
+    const netIn     = !isNaN(V_GRID_TOT) && V_GRID_TOT > 0
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+
+        {/* Hauptreihe: Quellen | Pfeile | Batterie | Pfeile | Verbraucher */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 48px 1.2fr 48px 1fr', gap: 8, alignItems: 'center' }}>
+
+          {/* Quellen */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+            <div style={fcard(amberAcc)}>
+              <div style={{ fontSize: 9, color: amberAcc, letterSpacing: '0.1em', marginBottom: 4 }}>☀ SOLAR · MPPT</div>
+              <div style={{ fontSize: 20, fontWeight: 700, color: isNaN(V_PV_W) ? T.muted : amberAcc }}>
+                {isNaN(V_PV_W) ? '…' : Math.round(V_PV_W)}<span style={{ fontSize: 11, color: T.muted, fontWeight: 400 }}> W</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginTop: 4 }}>
+                <span style={{ color: T.muted }}>Status</span>
+                <span style={{ color: T.text, fontWeight: 700 }}>{isNaN(V_MPPT_STATE) ? '…' : mpptStateLabel(V_MPPT_STATE)}</span>
+              </div>
+            </div>
+            <div style={fcard(netzColor)}>
+              <div style={{ fontSize: 9, color: netzColor, letterSpacing: '0.1em', marginBottom: 4 }}>⚡ NETZ</div>
+              <div style={{ fontSize: 20, fontWeight: 700, color: netzColor }}>
+                {isNaN(V_GRID_TOT) ? '…' : Math.round(Math.abs(V_GRID_TOT))}<span style={{ fontSize: 11, color: T.muted, fontWeight: 400 }}> W</span>
+              </div>
+              <div style={{ marginTop: 4 }}>
+                {[['L1', V_GRID_L1], ['L2', V_GRID_L2], ['L3', V_GRID_L3]].map(([l, v]) => (
+                  <div key={String(l)} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, marginBottom: 1 }}>
+                    <span style={{ color: T.muted }}>{l}</span>
+                    <span style={{ color: (v as number) < 0 ? T.ok : T.text, fontWeight: 700 }}>
+                      {isNaN(v as number) ? '…' : `${Math.round(v as number)} W`}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Pfeile links → Batterie */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16, alignItems: 'center', justifyContent: 'center' }}>
+            <FlowArrow dir={netIn ? 'right' : 'left'} active={netActive} color={netzColor} size={48} />
+            <FlowArrow dir="right" active={pvActive} color={amberAcc} size={48} />
+          </div>
+
+          {/* Batterie zentral */}
+          <div style={{ ...fcard(socColor), background: socColor === T.ok ? '#0a1a10' : T.surf, padding: '14px 13px' }}>
+            <div style={{ fontSize: 9, color: socColor, letterSpacing: '0.1em', marginBottom: 8 }}>🔋 BATTERIE · PYLONTECH</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+              <SocRingMini soc={V_SOC} />
+              <div>
+                <div style={{ fontSize: 20, fontWeight: 700, color: socColor }}>
+                  {isNaN(V_BAT_V) ? '…' : V_BAT_V.toFixed(1)}<span style={{ fontSize: 11, color: T.muted, fontWeight: 400 }}> V</span>
+                </div>
+                <Badge color={V_BAT_STATE === 1 ? T.ok : V_BAT_STATE === 2 ? amberAcc : T.muted}>
+                  {isNaN(V_BAT_STATE) ? '…' : batStateLabel(V_BAT_STATE)}
+                </Badge>
+              </div>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 2 }}>
+              <span style={{ color: T.muted }}>Strom</span><span style={{ color: T.text, fontWeight: 700 }}>{isNaN(V_BAT_A) ? '…' : `${V_BAT_A.toFixed(1)} A`}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 2 }}>
+              <span style={{ color: T.muted }}>Leistung</span><span style={{ color: T.text, fontWeight: 700 }}>{isNaN(V_BAT_W) ? '…' : `${Math.round(V_BAT_W)} W`}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10 }}>
+              <span style={{ color: T.muted }}>Temp</span><span style={{ color: T.text, fontWeight: 700 }}>{isNaN(V_BAT_T) ? '…' : `${V_BAT_T.toFixed(1)} °C`}</span>
+            </div>
+          </div>
+
+          {/* Pfeile Batterie → Verbraucher */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16, alignItems: 'center', justifyContent: 'center' }}>
+            <FlowArrow dir="right" active={V_CONS_TOT > 5} color={amberAcc} size={48} />
+            <FlowArrow dir="right" active={!isNaN(V_DC_SYS) && Math.abs(V_DC_SYS) > 5}
+              color={!isNaN(V_DC_SYS) && V_DC_SYS < 0 ? T.ok : T.spark.cyan} size={48} />
+          </div>
+
+          {/* Verbraucher */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+            <div style={fcard(amberAcc)}>
+              <div style={{ fontSize: 9, color: amberAcc, letterSpacing: '0.1em', marginBottom: 4 }}>🏠 AC-LASTEN</div>
+              <div style={{ fontSize: 20, fontWeight: 700, color: amberAcc }}>
+                {V_CONS_TOT === 0 && isNaN(V_CONS_L1) ? '…' : Math.round(V_CONS_TOT)}<span style={{ fontSize: 11, color: T.muted, fontWeight: 400 }}> W</span>
+              </div>
+              <div style={{ marginTop: 4 }}>
+                {[['L1', V_CONS_L1], ['L2', V_CONS_L2], ['L3', V_CONS_L3]].map(([l, v]) => (
+                  <div key={String(l)} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, marginBottom: 1 }}>
+                    <span style={{ color: T.muted }}>{l}</span>
+                    <span style={{ color: T.text, fontWeight: 700 }}>{isNaN(v as number) ? '…' : `${Math.round(v as number)} W`}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div style={fcard(T.spark.cyan)}>
+              <div style={{ fontSize: 9, color: T.spark.cyan, letterSpacing: '0.1em', marginBottom: 4 }}>DC-LASTEN</div>
+              <div style={{ fontSize: 20, fontWeight: 700, color: !isNaN(V_DC_SYS) && V_DC_SYS < 0 ? T.ok : T.spark.cyan }}>
+                {isNaN(V_DC_SYS) ? '…' : Math.round(V_DC_SYS)}<span style={{ fontSize: 11, color: T.muted, fontWeight: 400 }}> W</span>
+              </div>
+              <div style={{ fontSize: 10, color: T.muted, marginTop: 4 }}>
+                {isNaN(V_DC_SYS) ? '' : V_DC_SYS < 0 ? 'DC nimmt Energie auf' : 'DC gibt Energie ab'}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Wechselrichter-Infoleiste unten */}
+        <div style={{ ...fcard(purpleAcc), display: 'flex', alignItems: 'center', gap: 16, padding: '9px 13px' }}>
+          <div style={{ fontSize: 9, color: purpleAcc, letterSpacing: '0.1em', whiteSpace: 'nowrap' }}>⚙ WECHSELRICHTER · MULTIPLUS</div>
+          <div style={{ fontWeight: 700, color: purpleAcc, fontSize: 13 }}>
+            {isNaN(V_INV_MODE) ? '…' : (INVERTER_MODES.find(m => m.value === V_INV_MODE)?.label ?? `Mode ${V_INV_MODE}`)}
+          </div>
+          <div style={{ display: 'flex', gap: 18, marginLeft: 'auto' }}>
+            {[
+              ['AC Out', isNaN(V_AC_W) ? '…' : `${Math.round(V_AC_W)} W`],
+              ['Spannung', isNaN(V_AC_V) ? '…' : `${V_AC_V.toFixed(0)} V`],
+              ['Frequenz', isNaN(V_AC_F) ? '…' : `${V_AC_F.toFixed(1)} Hz`],
+            ].map(([l, v]) => (
+              <div key={String(l)} style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: 9, color: T.muted }}>{l}</div>
+                <div style={{ fontSize: 12, color: T.text, fontWeight: 700 }}>{v}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div style={{ minHeight: '100vh', background: T.bg, color: T.text, fontFamily: T.fontBody }}>
@@ -816,73 +1311,33 @@ function App() {
         {/* ══ TAB: VICTRON ════════════════════════════════════════════════ */}
         {activeTab === 'victron' && (
           <>
-            <FlowBanner />
-            <div className="grid-victron">
-
-              <Card accentColor={socColor}>
-                <CardLabel icon="🔋" color={socColor}>Batterie · Pylontech</CardLabel>
-                <div className="soc-wrap" style={{ marginBottom: 8 }}>
-                  <SocRing soc={V_SOC} size={54} />
-                  <div>
-                    <BigVal value={isNaN(V_BAT_V) ? '…' : V_BAT_V.toFixed(1)} unit="V" size={19} />
-                    <div style={{ marginTop: 4 }}>
-                      {!isNaN(V_BAT_STATE) && (
-                        <Badge color={V_BAT_STATE === 1 ? T.ok : V_BAT_STATE === 2 ? amberAcc : T.muted}>
-                          {batStateLabel(V_BAT_STATE)}
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                </div>
-                <Div />
-                <StatRow label="Strom"    value={isNaN(V_BAT_A) ? '…' : `${V_BAT_A.toFixed(1)} A`} />
-                <StatRow label="Leistung" value={isNaN(V_BAT_W) ? '…' : `${Math.round(V_BAT_W)} W`} />
-                <StatRow label="Temp"     value={isNaN(V_BAT_T) ? '…' : `${V_BAT_T.toFixed(1)} °C`} />
-                {!isNaN(V_SOC) && <>
-                  <Bar value={V_SOC} max={100} color={socColor} />
-                  <MinMaxRow min={minMax[VICTRON_TOPICS.soc]?.min ?? V_SOC} max={minMax[VICTRON_TOPICS.soc]?.max ?? V_SOC} unit=" %" />
-                </>}
-                {(hist[VICTRON_TOPICS.soc] ?? []).length >= 2 && <div style={{ marginTop: 4 }}><Sparkline data={hist[VICTRON_TOPICS.soc]} color={socColor} /></div>}
-              </Card>
-
-              <Card accentColor={amberAcc}>
-                <CardLabel icon="☀️" color={amberAcc}>MPPT · Solarladeregler</CardLabel>
-                <BigVal value={isNaN(V_PV_W) ? '…' : `${Math.round(V_PV_W)}`} unit="W" size={21} color={isNaN(V_PV_W) ? T.muted : amberAcc} />
-                <Sub>PV-Eingangsleistung</Sub>
-                {!isNaN(V_PV_W) && <>
-                  <Bar value={V_PV_W} max={Math.max(minMax[VICTRON_TOPICS.pvPower]?.max ?? 0, 1500)} color={amberAcc} />
-                  <MinMaxRow min={minMax[VICTRON_TOPICS.pvPower]?.min ?? V_PV_W} max={minMax[VICTRON_TOPICS.pvPower]?.max ?? V_PV_W} unit=" W" />
-                </>}
-                {(hist[VICTRON_TOPICS.pvPower] ?? []).length >= 2 && <div style={{ marginTop: 4 }}><Sparkline data={hist[VICTRON_TOPICS.pvPower]} color={amberAcc} /></div>}
-                <Div />
-                <StatRow label="PV Spannung" value={isNaN(V_PV_V) ? '…' : `${V_PV_V.toFixed(0)} V`} />
-                <StatRow label="PV Strom"    value={isNaN(V_PV_A) ? '…' : `${V_PV_A.toFixed(1)} A`} />
-                <StatRow label="Status"      value={isNaN(V_MPPT_STATE) ? '…' : mpptStateLabel(V_MPPT_STATE)} />
-              </Card>
-
-              <Card accentColor={purpleAcc}>
-                <CardLabel icon="🔌" color={purpleAcc}>Wechselrichter · MultiPlus</CardLabel>
-                <BigVal value={isNaN(V_AC_W) ? '…' : `${Math.round(V_AC_W)}`} unit="W" size={21} color={isNaN(V_AC_W) ? T.muted : purpleAcc} />
-                <Sub>AC-Ausgangsleistung</Sub>
-                {!isNaN(V_AC_W) && <>
-                  <Bar value={V_AC_W} max={Math.max(minMax[VICTRON_TOPICS.acOutPower]?.max ?? 0, 2000)} color={purpleAcc} />
-                  <MinMaxRow min={minMax[VICTRON_TOPICS.acOutPower]?.min ?? V_AC_W} max={minMax[VICTRON_TOPICS.acOutPower]?.max ?? V_AC_W} unit=" W" />
-                </>}
-                {(hist[VICTRON_TOPICS.acOutPower] ?? []).length >= 2 && <div style={{ marginTop: 4 }}><Sparkline data={hist[VICTRON_TOPICS.acOutPower]} color={purpleAcc} /></div>}
-                <Div />
-                <StatRow label="Spannung"  value={isNaN(V_AC_V) ? '…' : `${V_AC_V.toFixed(0)} V`} />
-                <StatRow label="Frequenz"  value={isNaN(V_AC_F) ? '…' : `${V_AC_F.toFixed(1)} Hz`} />
-                <StatRow label="Modus"     value={isNaN(V_INV_MODE) ? '…' : (INVERTER_MODES.find(m => m.value === V_INV_MODE)?.label ?? `Mode ${V_INV_MODE}`)} />
-                {!isNaN(V_VEBUS_STATE) && (
-                  <div style={{ marginTop: 5 }}>
-                    <Badge color={V_VEBUS_STATE === 9 ? T.ok : V_VEBUS_STATE === 2 ? T.err : amberAcc}>
-                      {V_VEBUS_STATE === 9 ? 'Inverting' : V_VEBUS_STATE === 3 ? 'Bulk' : V_VEBUS_STATE === 4 ? 'Absorption' : V_VEBUS_STATE === 5 ? 'Float' : `Status ${V_VEBUS_STATE}`}
-                    </Badge>
-                  </div>
-                )}
-              </Card>
-
+            {/* Layout-Umschalter */}
+            <div style={{ display: 'flex', gap: 5, marginBottom: 10 }}>
+              {(['A', 'B', 'C'] as VLayout[]).map(l => (
+                <button key={l} onClick={() => setVictronLayout(l)} style={{
+                  padding: '4px 14px', borderRadius: 20, fontSize: 11,
+                  fontFamily: T.fontLabel, fontWeight: 700, letterSpacing: '0.07em',
+                  cursor: 'pointer', transition: 'all 0.15s',
+                  border: victronLayout === l ? `1px solid ${tealAcc}88` : '1px solid rgba(255,255,255,0.1)',
+                  background: victronLayout === l ? tealAcc + '20' : 'transparent',
+                  color: victronLayout === l ? tealAcc : T.muted,
+                }}>
+                  {l === 'A' ? 'A — Victron-Klon' : l === 'B' ? 'B — Batterie zentral' : 'C — Links → Rechts'}
+                </button>
+              ))}
             </div>
+
+            {/* CSS-Animationen für Fluss-Pfeile */}
+            <style>{`
+              @keyframes fa-r { from{stroke-dashoffset:8} to{stroke-dashoffset:0} }
+              @keyframes fa-l { from{stroke-dashoffset:0} to{stroke-dashoffset:8} }
+              @keyframes fa-d { from{stroke-dashoffset:8} to{stroke-dashoffset:0} }
+              @keyframes fa-u { from{stroke-dashoffset:0} to{stroke-dashoffset:8} }
+            `}</style>
+
+            {victronLayout === 'A' && <LayoutA />}
+            {victronLayout === 'B' && <LayoutB />}
+            {victronLayout === 'C' && <LayoutC />}
           </>
         )}
 
