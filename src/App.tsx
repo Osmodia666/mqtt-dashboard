@@ -1,4 +1,4 @@
-a// src/App.tsx
+// src/App.tsx
 import { useEffect, useState, useRef } from 'react'
 import mqtt from 'mqtt'
 import { mqttConfig, topics, VICTRON_PORTAL_ID, ESS_MODES, INVERTER_MODES } from './config'
