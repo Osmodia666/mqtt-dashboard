@@ -29,7 +29,7 @@ const VICTRON_TOPICS = {
   acOutFreq:   V('vebus/288/Ac/Out/L1/F'),
   vebusState:  V('vebus/288/VebusStatus'),
   vebusMode:   V('vebus/288/Mode'),
-  essMode:     V('system/0/Control/EssState'),  // Venus OS 3.x: Lesewert
+  essMode:     V('settings/0/Settings/CGwacs/BatteryLife/State'),
   // Netz per Phase (für Fluss-Layouts)
   gridL1:      V('grid/30/Ac/L1/Power'),
   gridL2:      V('grid/30/Ac/L2/Power'),
@@ -300,17 +300,25 @@ function EssModal({ currentEssMode, currentInvMode, onSetEss, onSetInv, onClose 
         </div>
         <div style={{ fontFamily: T.fontLabel, fontSize: 10, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: T.muted, marginBottom: 7 }}>ESS-Betriebsmodus</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginBottom: 16 }}>
-          {ESS_MODES.map(m => (
-            <button key={m.value} className={`ess-mode-btn${currentEssMode === m.value ? ' active' : ''}`} onClick={() => onSetEss(m.value)}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <span style={{ fontFamily: T.fontMono, fontSize: 12, color: T.text, fontWeight: 700 }}>{m.label}</span>
-                  <span style={{ fontFamily: T.fontMono, fontSize: 10, color: T.muted, marginLeft: 7 }}>{m.sub}</span>
+          {ESS_MODES.map(m => {
+            // EssState liefert Unter-Zustände: 1-8 = mit BatteryLife, 10-12 = ohne BatteryLife, 9 = Keep charged, 3 = Extern
+            const isActive =
+              m.value === 1 ? (currentEssMode >= 1 && currentEssMode <= 8) :
+              m.value === 2 ? (currentEssMode >= 10 && currentEssMode <= 12) :
+              m.value === 9 ? currentEssMode === 9 :
+              m.value === 3 ? currentEssMode === 3 : false
+            return (
+              <button key={m.value} className={`ess-mode-btn${isActive ? ' active' : ''}`} onClick={() => onSetEss(m.value)}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <span style={{ fontFamily: T.fontMono, fontSize: 12, color: T.text, fontWeight: 700 }}>{m.label}</span>
+                    <span style={{ fontFamily: T.fontMono, fontSize: 10, color: T.muted, marginLeft: 7 }}>{m.sub}</span>
+                  </div>
+                  {isActive && <span style={{ color: T.accent, fontSize: 13 }}>●</span>}
                 </div>
-                {currentEssMode === m.value && <span style={{ color: T.accent, fontSize: 13 }}>●</span>}
-              </div>
-            </button>
-          ))}
+              </button>
+            )
+          })}
         </div>
         <Div />
         <div style={{ fontFamily: T.fontLabel, fontSize: 10, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: T.muted, marginBottom: 7, marginTop: 12 }}>Wechselrichter-Modus</div>
