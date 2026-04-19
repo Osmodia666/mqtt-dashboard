@@ -303,10 +303,10 @@ function EssModal({ currentEssMode, currentInvMode, onSetEss, onSetInv, onClose 
           {ESS_MODES.map(m => {
             // EssState liefert Unter-Zustände: 1-8 = mit BatteryLife, 10-12 = ohne BatteryLife, 9 = Keep charged, 3 = Extern
             const isActive =
-              m.value === 1 ? (currentEssMode >= 1 && currentEssMode <= 8) :
-              m.value === 2 ? (currentEssMode >= 10 && currentEssMode <= 12) :
-              m.value === 9 ? currentEssMode === 9 :
-              m.value === 3 ? currentEssMode === 3 : false
+              m.value === 1  ? (currentEssMode >= 1 && currentEssMode <= 8) :
+              m.value === 10 ? (currentEssMode >= 10 && currentEssMode <= 12) :
+              m.value === 9  ? currentEssMode === 9 :
+              m.value === 3  ? currentEssMode === 3 : false
             return (
               <button key={m.value} className={`ess-mode-btn${isActive ? ' active' : ''}`} onClick={() => onSetEss(m.value)}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
