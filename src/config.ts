@@ -12,9 +12,9 @@ export const VICTRON_PORTAL_ID = 'b827eb75907a'
 // ESS-Modi (Settings/CGwacs/BatteryLife/State)
 export const ESS_MODES = [
   { value: 1, label: 'Optimiert',      sub: 'mit BatteryLife' },
-  { value: 2, label: 'Optimiert',      sub: 'ohne BatteryLife' },
-  { value: 9, label: 'Batterie laden', sub: 'Keep charged' },
-  { value: 3, label: 'Extern',         sub: 'ESS External Control' },
+  { value: 10, label: 'Optimiert',     sub: 'ohne BatteryLife' },
+  { value: 9, label: 'Batterie laden', sub: 'Batterie geladen halten' },
+  { value: 3, label: 'Extern',         sub: 'ESS Externe Steuerung' },
 ] as const
 
 // Wechselrichter-Modi (vebus/.../Mode)
