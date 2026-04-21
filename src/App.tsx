@@ -74,6 +74,7 @@ const EXPLICIT_SUBSCRIBES = [
   'stat/+/POWER1',
   MINMAX_TOPIC,
   'Stromzähler/#',
+  'stats/#',
   `N/${VICTRON_PORTAL_ID}/#`,
 ]
 
@@ -338,7 +339,7 @@ function EssModal({ currentEssMode, currentInvMode, onSetEss, onSetInv, onClose 
 }
 
 // ── App ───────────────────────────────────────────────────────────────────
-type Tab = 'uebersicht' | 'energie' | 'victron' | 'steuerung'
+type Tab = 'uebersicht' | 'energie' | 'victron' | 'steuerung' | 'verlauf'
 
 function App() {
   const [values, setValues]         = useState<Record<string, string>>({})
@@ -347,6 +348,20 @@ function App() {
   const [essOpen, setEssOpen]       = useState(false)
   const [activeTab, setActiveTab]     = useState<Tab>('uebersicht')
   const [winW, setWinW]               = useState(window.innerWidth)
+  // Statistik-Daten von ioBroker stats_service
+  type StatDay = {
+    date: string; verbrauch_kwh: number|null; erzeugung_kwh: number|null
+    solar_kwh: number|null; bkw_kwh: number|null
+    soc_min: number|null; soc_max: number|null; soc_avg: number|null
+  }
+  type StatPeriod = { verbrauch_kwh: number|null; erzeugung_kwh: number|null; solar_kwh: number|null; bkw_kwh: number|null; tage: StatDay[] }
+  const [statTage,   setStatTage]   = useState<StatDay[]>([])
+  const [statHeute,  setStatHeute]  = useState<StatDay|null>(null)
+  const [statWoche,  setStatWoche]  = useState<StatPeriod|null>(null)
+  const [statMonat,  setStatMonat]  = useState<StatPeriod|null>(null)
+  const [statJahr,   setStatJahr]   = useState<StatPeriod|null>(null)
+  const [verlaufZr,  setVerlaufZr]  = useState<'heute'|'woche'|'monat'|'jahr'>('woche')
+  const [verlaufDetail, setVerlaufDetail] = useState<StatDay|null>(null)
   useEffect(() => {
     const onResize = () => setWinW(window.innerWidth)
     window.addEventListener('resize', onResize)
@@ -391,6 +406,18 @@ function App() {
       }
       if (topic.startsWith('Stromzähler/')) {
         messageQueue.current[topic] = payload; return
+      }
+      // Statistik-Topics von ioBroker stats_service
+      if (topic.startsWith('stats/')) {
+        try {
+          const parsed = JSON.parse(payload)
+          if (topic === 'stats/tage')    setStatTage(parsed)
+          if (topic === 'stats/heute')   setStatHeute(parsed)
+          if (topic === 'stats/woche')   setStatWoche(parsed)
+          if (topic === 'stats/monat')   setStatMonat(parsed)
+          if (topic === 'stats/jahr')    setStatJahr(parsed)
+        } catch {}
+        return
       }
       if (topic.startsWith(`N/${VICTRON_PORTAL_ID}/`)) {
         try {
@@ -506,6 +533,7 @@ function App() {
     { id: 'uebersicht', label: 'Übersicht',  icon: '⚡' },
     { id: 'energie',    label: 'Energie',    icon: '🌿' },
     { id: 'victron',    label: 'Victron',    icon: '🔋' },
+    { id: 'verlauf',    label: 'Verlauf',    icon: '📈' },
     { id: 'steuerung',  label: 'Steuerung',  icon: '🔌' },
   ]
 
@@ -1246,6 +1274,262 @@ function App() {
         {/* ══ TAB: VICTRON ════════════════════════════════════════════════ */}
         {activeTab === 'victron' && <LayoutA />}
 
+
+        {/* ══ TAB: VERLAUF ════════════════════════════════════════════════ */}
+        {activeTab === 'verlauf' && (() => {
+          // Aktiver Datensatz je nach Zeitraum
+          const periodData: StatDay[] = verlaufZr === 'heute'
+            ? (statHeute ? [statHeute] : [])
+            : verlaufZr === 'woche'  ? (statWoche?.tage  ?? [])
+            : verlaufZr === 'monat'  ? (statMonat?.tage  ?? [])
+            :                          (statJahr?.tage   ?? [])
+
+          const periodSum = verlaufZr === 'woche' ? statWoche
+                          : verlaufZr === 'monat' ? statMonat
+                          : verlaufZr === 'jahr'  ? statJahr : null
+
+          const hasData = periodData.length > 0
+
+          // Balken-Chart: SVG, normiert auf max-Wert
+          const maxV = Math.max(...periodData.map(d => d.verbrauch_kwh  ?? 0), 1)
+          const maxE = Math.max(...periodData.map(d => d.erzeugung_kwh ?? 0), 1)
+          const maxAll = Math.max(maxV, maxE, 1)
+
+          const barW  = verlaufZr === 'jahr' ? 8 : verlaufZr === 'monat' ? 14 : verlaufZr === 'woche' ? 28 : 60
+          const barGap = 4
+          const chartH = 120
+          const totalW = Math.max(periodData.length * (barW * 2 + barGap + 4), 300)
+
+          // SOC-Linienchart
+          const socData = periodData.filter(d => d.soc_avg !== null)
+
+          const formatDate = (s: string) => {
+            const d = new Date(s + 'T12:00:00')
+            return verlaufZr === 'jahr'
+              ? `${d.getDate()}.${d.getMonth()+1}.`
+              : verlaufZr === 'monat'
+              ? `${d.getDate()}.`
+              : verlaufZr === 'woche'
+              ? ['So','Mo','Di','Mi','Do','Fr','Sa'][d.getDay()]
+              : s
+          }
+
+          const fkwh = (v: number|null) => v === null ? '–' : `${v.toFixed(1)} kWh`
+
+          return (
+            <div>
+              {/* Zeitraum-Buttons */}
+              <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
+                {(['heute','woche','monat','jahr'] as const).map(zr => (
+                  <button key={zr} onClick={() => { setVerlaufZr(zr); setVerlaufDetail(null); }} style={{
+                    padding: '5px 16px', borderRadius: 20, fontSize: 11,
+                    fontFamily: T.fontLabel, fontWeight: 700, letterSpacing: '0.07em',
+                    cursor: 'pointer', transition: 'all 0.15s', textTransform: 'uppercase',
+                    border: verlaufZr === zr ? `1px solid ${T.ok}88` : '1px solid rgba(255,255,255,0.1)',
+                    background: verlaufZr === zr ? T.ok + '20' : 'transparent',
+                    color: verlaufZr === zr ? T.ok : T.muted,
+                  }}>
+                    {zr === 'heute' ? 'Heute' : zr === 'woche' ? '7 Tage' : zr === 'monat' ? 'Monat' : 'Jahr'}
+                  </button>
+                ))}
+              </div>
+
+              {/* Zusammenfassung-Kacheln */}
+              {periodSum && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 12 }}>
+                  <Card accentColor={T.err}>
+                    <CardLabel icon="⚡" color={T.err}>Verbrauch</CardLabel>
+                    <BigVal value={fkwh(periodSum.verbrauch_kwh)} size={18} color={T.err} />
+                  </Card>
+                  <Card accentColor={T.ok}>
+                    <CardLabel icon="🌿" color={T.ok}>Erzeugung</CardLabel>
+                    <BigVal value={fkwh(periodSum.erzeugung_kwh)} size={18} color={T.ok} />
+                    <div style={{ fontSize: 10, color: T.muted, marginTop: 3, fontFamily: T.fontMono }}>
+                      BKW: {fkwh(periodSum.bkw_kwh)} · PV: {fkwh(periodSum.solar_kwh)}
+                    </div>
+                  </Card>
+                  <Card accentColor={uebColor}>
+                    <CardLabel icon="⚖️" color={uebColor}>Bilanz</CardLabel>
+                    {(() => {
+                      const bilanz = (periodSum.erzeugung_kwh ?? 0) - (periodSum.verbrauch_kwh ?? 0)
+                      const col = bilanz >= 0 ? T.ok : T.err
+                      return <BigVal value={`${bilanz >= 0 ? '+' : ''}${bilanz.toFixed(1)} kWh`} size={18} color={col} />
+                    })()}
+                  </Card>
+                </div>
+              )}
+
+              {/* Heute: einzelne Werte */}
+              {verlaufZr === 'heute' && statHeute && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 12 }}>
+                  <Card accentColor={T.err}>
+                    <CardLabel icon="⚡" color={T.err}>Verbrauch heute</CardLabel>
+                    <BigVal value={fkwh(statHeute.verbrauch_kwh)} size={18} color={T.err} />
+                  </Card>
+                  <Card accentColor={T.ok}>
+                    <CardLabel icon="🌿" color={T.ok}>Erzeugung heute</CardLabel>
+                    <BigVal value={fkwh(statHeute.erzeugung_kwh)} size={18} color={T.ok} />
+                    <div style={{ fontSize: 10, color: T.muted, marginTop: 3, fontFamily: T.fontMono }}>
+                      BKW: {fkwh(statHeute.bkw_kwh)} · PV: {fkwh(statHeute.solar_kwh)}
+                    </div>
+                  </Card>
+                  <Card accentColor={T.spark.cyan}>
+                    <CardLabel icon="🔋" color={T.spark.cyan}>Batterie SOC</CardLabel>
+                    <div style={{ fontFamily: T.fontMono, fontSize: 13, color: T.text, marginTop: 2 }}>
+                      Min: {statHeute.soc_min ?? '–'}% · Max: {statHeute.soc_max ?? '–'}%
+                    </div>
+                    <div style={{ fontFamily: T.fontMono, fontSize: 11, color: T.muted, marginTop: 2 }}>
+                      Ø {statHeute.soc_avg ?? '–'}%
+                    </div>
+                  </Card>
+                </div>
+              )}
+
+              {!hasData && (
+                <div style={{ textAlign: 'center', padding: '40px 20px', color: T.muted, fontFamily: T.fontMono, fontSize: 13 }}>
+                  Keine Daten – ioBroker stats_service noch nicht gestartet?
+                </div>
+              )}
+
+              {/* Balken-Chart: Verbrauch vs Erzeugung */}
+              {hasData && verlaufZr !== 'heute' && (
+                <Card accentColor={T.spark.power} style={{ marginBottom: 12, padding: '12px 13px' }}>
+                  <CardLabel icon="📊" color={T.spark.power}>Verbrauch vs. Erzeugung</CardLabel>
+                  <div style={{ overflowX: 'auto', overflowY: 'hidden' }}>
+                    <svg width={Math.max(totalW, 300)} height={chartH + 40} style={{ display: 'block' }}>
+                      {periodData.map((d, i) => {
+                        const x = i * (barW * 2 + barGap + 4)
+                        const vH = d.verbrauch_kwh  ? (d.verbrauch_kwh  / maxAll) * chartH : 0
+                        const eH = d.erzeugung_kwh ? (d.erzeugung_kwh / maxAll) * chartH : 0
+                        const isSelected = verlaufDetail?.date === d.date
+                        return (
+                          <g key={d.date} onClick={() => setVerlaufDetail(verlaufDetail?.date === d.date ? null : d)}
+                             style={{ cursor: 'pointer' }}>
+                            {/* Verbrauch-Balken */}
+                            <rect x={x} y={chartH - vH} width={barW} height={vH}
+                              fill={T.err} opacity={isSelected ? 1 : 0.75} rx={2} />
+                            {/* Erzeugung-Balken */}
+                            <rect x={x + barW + 2} y={chartH - eH} width={barW} height={eH}
+                              fill={T.ok} opacity={isSelected ? 1 : 0.75} rx={2} />
+                            {/* Auswahl-Markierung */}
+                            {isSelected && <rect x={x-1} y={0} width={barW*2+4} height={chartH}
+                              fill="rgba(255,255,255,0.05)" rx={2} />}
+                            {/* X-Achse Label */}
+                            <text x={x + barW} y={chartH + 14} textAnchor="middle"
+                              fontSize={9} fill="rgba(224,234,255,0.4)" fontFamily={T.fontMono}>
+                              {formatDate(d.date)}
+                            </text>
+                          </g>
+                        )
+                      })}
+                      {/* Y-Achse Linien */}
+                      {[0.25, 0.5, 0.75, 1].map(f => (
+                        <g key={f}>
+                          <line x1={0} y1={chartH * (1-f)} x2={totalW} y2={chartH * (1-f)}
+                            stroke="rgba(255,255,255,0.06)" strokeWidth={1} />
+                          <text x={totalW - 2} y={chartH * (1-f) - 2} textAnchor="end"
+                            fontSize={8} fill="rgba(224,234,255,0.3)" fontFamily={T.fontMono}>
+                            {(maxAll * f).toFixed(1)}
+                          </text>
+                        </g>
+                      ))}
+                    </svg>
+                  </div>
+                  {/* Legende */}
+                  <div style={{ display: 'flex', gap: 16, marginTop: 6, fontSize: 10, fontFamily: T.fontMono, color: T.muted }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                      <span style={{ width: 10, height: 10, background: T.err, borderRadius: 2, display: 'inline-block' }} />
+                      Verbrauch
+                    </span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                      <span style={{ width: 10, height: 10, background: T.ok, borderRadius: 2, display: 'inline-block' }} />
+                      Erzeugung
+                    </span>
+                    <span style={{ color: T.muted, marginLeft: 'auto' }}>Balken anklicken für Details</span>
+                  </div>
+                </Card>
+              )}
+
+              {/* SOC-Verlauf */}
+              {hasData && verlaufZr !== 'heute' && socData.length >= 2 && (
+                <Card accentColor={T.spark.cyan} style={{ marginBottom: 12, padding: '12px 13px' }}>
+                  <CardLabel icon="🔋" color={T.spark.cyan}>Batterie SOC-Verlauf</CardLabel>
+                  <div style={{ overflowX: 'auto' }}>
+                    <svg width={Math.max(totalW, 300)} height={80} style={{ display: 'block' }}>
+                      {/* SOC-Min/Max Fläche */}
+                      {socData.length >= 2 && (() => {
+                        const step = Math.max(totalW, 300) / (socData.length - 1)
+                        const pts_max = socData.map((d, i) => `${i * step},${70 - (d.soc_max!/100) * 60}`).join(' ')
+                        const pts_min = socData.map((d, i) => `${i * step},${70 - (d.soc_min!/100) * 60}`).join(' ')
+                        const pts_avg = socData.map((d, i) => `${i * step},${70 - (d.soc_avg!/100) * 60}`).join(' ')
+                        const area = pts_max + ' ' + socData.map((d, i) => `${(socData.length - 1 - i) * step},${70 - (d.soc_min!/100) * 60}`).reverse().join(' ')
+                        return <>
+                          <polygon points={area} fill={T.spark.cyan} opacity={0.1} />
+                          <polyline points={pts_max} fill="none" stroke={T.spark.cyan} strokeWidth={1} opacity={0.4} strokeDasharray="3 2" />
+                          <polyline points={pts_min} fill="none" stroke={T.spark.cyan} strokeWidth={1} opacity={0.4} strokeDasharray="3 2" />
+                          <polyline points={pts_avg} fill="none" stroke={T.spark.cyan} strokeWidth={2} />
+                        </>
+                      })()}
+                      {/* Y-Labels */}
+                      {[0, 25, 50, 75, 100].map(v => (
+                        <text key={v} x={2} y={70 - (v/100)*60 + 3} fontSize={8}
+                          fill="rgba(224,234,255,0.3)" fontFamily={T.fontMono}>{v}%</text>
+                      ))}
+                    </svg>
+                  </div>
+                  <div style={{ fontSize: 10, color: T.muted, fontFamily: T.fontMono, marginTop: 4 }}>
+                    Durchschnitt (—) · Min/Max (- -)
+                  </div>
+                </Card>
+              )}
+
+              {/* Detail-Panel bei Klick auf Balken */}
+              {verlaufDetail && (
+                <Card accentColor={T.accent} style={{ marginBottom: 12 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                    <CardLabel icon="📅" color={T.accent}>{verlaufDetail.date}</CardLabel>
+                    <button onClick={() => setVerlaufDetail(null)} style={{
+                      background: 'none', border: 'none', cursor: 'pointer',
+                      color: T.muted, fontSize: 16, padding: '2px 6px',
+                    }}>✕</button>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
+                    <div>
+                      <div style={{ fontSize: 10, color: T.muted, fontFamily: T.fontMono, marginBottom: 3 }}>Verbrauch</div>
+                      <div style={{ fontSize: 20, fontWeight: 700, color: T.err, fontFamily: T.fontMono }}>{fkwh(verlaufDetail.verbrauch_kwh)}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 10, color: T.muted, fontFamily: T.fontMono, marginBottom: 3 }}>Erzeugung gesamt</div>
+                      <div style={{ fontSize: 20, fontWeight: 700, color: T.ok, fontFamily: T.fontMono }}>{fkwh(verlaufDetail.erzeugung_kwh)}</div>
+                      <div style={{ fontSize: 10, color: T.muted, fontFamily: T.fontMono, marginTop: 2 }}>
+                        BKW {fkwh(verlaufDetail.bkw_kwh)} · PV {fkwh(verlaufDetail.solar_kwh)}
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 10, color: T.muted, fontFamily: T.fontMono, marginBottom: 3 }}>Bilanz</div>
+                      {(() => {
+                        const b = (verlaufDetail.erzeugung_kwh ?? 0) - (verlaufDetail.verbrauch_kwh ?? 0)
+                        return <div style={{ fontSize: 20, fontWeight: 700, color: b >= 0 ? T.ok : T.err, fontFamily: T.fontMono }}>
+                          {b >= 0 ? '+' : ''}{b.toFixed(1)} kWh
+                        </div>
+                      })()}
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 10, color: T.muted, fontFamily: T.fontMono, marginBottom: 3 }}>Batterie SOC</div>
+                      <div style={{ fontSize: 13, color: T.spark.cyan, fontFamily: T.fontMono }}>
+                        Min {verlaufDetail.soc_min ?? '–'}% · Max {verlaufDetail.soc_max ?? '–'}%
+                      </div>
+                      <div style={{ fontSize: 11, color: T.muted, fontFamily: T.fontMono }}>
+                        Ø {verlaufDetail.soc_avg ?? '–'}%
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+              )}
+
+            </div>
+          )
+        })()}
         {/* ══ TAB: STEUERUNG ══════════════════════════════════════════════ */}
         {activeTab === 'steuerung' && (
           <div className="grid-top">
