@@ -1204,6 +1204,8 @@ function App() {
           // BKW heute/gestern aus SENSOR-Payload
           const bkwToday     = parseFloat(values['tele/Balkonkraftwerk/SENSOR.ENERGY.EnergyPToday.0'] ?? 'NaN')
           const bkwYesterday = parseFloat(values['tele/Balkonkraftwerk/SENSOR.ENERGY.EnergyPYesterday.0'] ?? 'NaN')
+          const pvToday      = parseFloat(values[V('solarcharger/288/History/Daily/0/Yield')] ?? 'NaN')
+          const pvYesterday  = parseFloat(values[V('solarcharger/288/History/Daily/1/Yield')] ?? 'NaN')
 
           return (
             <>
@@ -1272,18 +1274,26 @@ function App() {
                         )}
                       </div>
                       <Div />
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 5 }}>
                         <div>
                           <Sub>BKW heute</Sub>
                           <BigVal value={isNaN(bkwToday) ? '…' : bkwToday.toFixed(2)} unit="kWh" size={15} color={T.ok} />
                         </div>
-                        <div style={{ textAlign: 'right' }}>
+                        <div>
                           <Sub>BKW gestern</Sub>
                           <BigVal value={isNaN(bkwYesterday) ? '…' : bkwYesterday.toFixed(2)} unit="kWh" size={15} />
                         </div>
+                        <div>
+                          <Sub>Victron heute</Sub>
+                          <BigVal value={isNaN(pvToday) ? '…' : pvToday.toFixed(2)} unit="kWh" size={15} color={amberAcc} />
+                        </div>
+                        <div>
+                          <Sub>Victron gestern</Sub>
+                          <BigVal value={isNaN(pvYesterday) ? '…' : pvYesterday.toFixed(2)} unit="kWh" size={15} />
+                        </div>
                       </div>
                       <Div />
-                      <Sub>Aktuell erzeugt</Sub>
+                      <Sub>Erzeugung aktuell:</Sub>
                       <BigVal value={totalGen > 0 || !isNaN(BKW_W) ? `${Math.round(totalGen)}` : '…'} unit="W" size={18} color={genColor} />
                       <div style={{ fontSize: 10, color: T.muted, fontFamily: T.fontMono, marginTop: 2 }}>
                         PV: {isNaN(V_PV_W) ? '…' : `${Math.round(V_PV_W)} W`} · Balkon: {isNaN(BKW_W) ? '…' : `${Math.round(BKW_W)} W`}
