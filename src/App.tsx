@@ -72,6 +72,7 @@ const EXPLICIT_SUBSCRIBES = [
   'Gaszaehler/stand',
   'stat/+/POWER',
   'stat/+/POWER1',
+  'stat/+/RESULT',
   MINMAX_TOPIC,
   'Stromzähler/#',
   'stats/#',
@@ -385,11 +386,16 @@ function App() {
       client.subscribe(EXPLICIT_SUBSCRIBES, { qos: 0 })
       const sendKeepalive = () => {
         client.publish(`R/${VICTRON_PORTAL_ID}/system/0/Serial`, '')
-        // ESS-Modus extra anfordern da settings selten gepublished werden
         client.publish(`R/${VICTRON_PORTAL_ID}/settings/0/Settings/CGwacs/BatteryLife/State`, '')
         client.publish(`R/${VICTRON_PORTAL_ID}/vebus/288/Mode`, '')
       }
       sendKeepalive()
+      // Tasmota 15.x: initialen Status aller Geräte abfragen (STATE statt leerem POWER)
+      const tasmotaDevices = [
+        'Steckdose_1','Steckdose_2','Doppelsteckdose',
+        'Teichpumpe','Beleuchtung','Carport-Licht','Poolpumpe','Sidewinder_X1'
+      ]
+      tasmotaDevices.forEach(d => client.publish(`cmnd/${d}/State`, ''))
       setTimeout(() => { client.publish(REQUEST_TOPIC, JSON.stringify({ ts: Date.now() })) }, 500)
       const keepalive = setInterval(sendKeepalive, 30_000)
       ;(client as any)._keepalive = keepalive
@@ -408,8 +414,35 @@ function App() {
       // Toggle-Sperre: stat/POWER Topics 2s nach Toggle ignorieren
       if (topic.startsWith('stat/') && (topic.endsWith('/POWER') || topic.endsWith('/POWER1'))) {
         const lock = toggleLock.current[topic]
-        if (lock && Date.now() < lock) return  // ignorieren während Sperre aktiv
+        if (lock && Date.now() < lock) return
         messageQueue.current[topic] = payload; return
+      }
+      // Tasmota 15.x: stat/+/RESULT enthält {"POWER":"ON"} oder {"POWER1":"OFF"}
+      // und stat/+/STATE enthält den vollen Status-JSON
+      if (topic.startsWith('stat/') && (topic.endsWith('/RESULT') || topic.endsWith('/STATE') || topic.endsWith('/STATUS11'))) {
+        try {
+          const parsed = JSON.parse(payload)
+          // RESULT direkt: {"POWER":"ON"}
+          const device = topic.split('/')[1]
+          const statBase = `stat/${device}/`
+          if (parsed.POWER  !== undefined) {
+            const lockKey = `${statBase}POWER`
+            if (!toggleLock.current[lockKey] || Date.now() >= toggleLock.current[lockKey])
+              messageQueue.current[lockKey] = parsed.POWER
+          }
+          if (parsed.POWER1 !== undefined) {
+            const lockKey = `${statBase}POWER1`
+            if (!toggleLock.current[lockKey] || Date.now() >= toggleLock.current[lockKey])
+              messageQueue.current[lockKey] = parsed.POWER1
+          }
+          // STATUS11: {"StatusSTS":{"POWER":"OFF"}}
+          if (parsed.StatusSTS?.POWER !== undefined) {
+            const lockKey = `${statBase}POWER`
+            if (!toggleLock.current[lockKey] || Date.now() >= toggleLock.current[lockKey])
+              messageQueue.current[lockKey] = parsed.StatusSTS.POWER
+          }
+        } catch {}
+        return
       }
       if (topic.startsWith('Stromzähler/')) {
         messageQueue.current[topic] = payload; return
