@@ -352,16 +352,17 @@ function App() {
   // Statistik-Daten von ioBroker stats_service
   type StatDay = {
     date: string; verbrauch_kwh: number|null; erzeugung_kwh: number|null
-    solar_kwh: number|null; bkw_kwh: number|null
+    solar_kwh: number|null; bkw_kwh: number|null; gas_m3: number|null
     soc_min: number|null; soc_max: number|null; soc_avg: number|null
   }
-  type StatPeriod = { verbrauch_kwh: number|null; erzeugung_kwh: number|null; solar_kwh: number|null; bkw_kwh: number|null; tage: StatDay[] }
+  type StatPeriod = { verbrauch_kwh: number|null; erzeugung_kwh: number|null; solar_kwh: number|null; bkw_kwh: number|null; gas_m3: number|null; tage: StatDay[] }
   const [statTage,   setStatTage]   = useState<StatDay[]>([])
   const [statHeute,  setStatHeute]  = useState<StatDay|null>(null)
   const [statWoche,  setStatWoche]  = useState<StatPeriod|null>(null)
   const [statMonat,  setStatMonat]  = useState<StatPeriod|null>(null)
   const [statJahr,   setStatJahr]   = useState<StatPeriod|null>(null)
   const [verlaufZr,  setVerlaufZr]  = useState<'heute'|'woche'|'monat'|'jahr'|'gesamt'>('woche')
+  const [verlaufAnsicht, setVerlaufAnsicht] = useState<'strom'|'gas'>('strom')
   const [energieTab, setEnergieTab] = useState<'ueberblick'|'phasen'|'details'>('ueberblick')
   const [verlaufDetail, setVerlaufDetail] = useState<StatDay|null>(null)
   const [drillData,     setDrillData]     = useState<StatDay[]|null>(null)
@@ -1539,8 +1540,8 @@ function App() {
 
           return (
             <div>
-              {/* Zeitraum-Buttons */}
-              <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
+              {/* Navigation: Zeitraum + Ansicht */}
+              <div style={{ display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap' }}>
                 {([
                   ['heute',  'Heute'],
                   ['woche',  '7 Tage'],
@@ -1558,6 +1559,23 @@ function App() {
                   }}>{label}</button>
                 ))}
               </div>
+              {/* Ansicht-Umschalter: Strom / Gas */}
+              {verlaufZr !== 'gesamt' && (
+                <div style={{ display: 'flex', gap: 5, marginBottom: 12 }}>
+                  {([['strom', '⚡ Strom & Solar'], ['gas', '🔥 Gas']] as const).map(([a, label]) => (
+                    <button key={a} onClick={() => { setVerlaufAnsicht(a); setVerlaufDetail(null); setDrillData(null); setDrillLabel(''); }} style={{
+                      padding: '3px 13px', borderRadius: 20, fontSize: 11,
+                      fontFamily: T.fontLabel, fontWeight: 700, letterSpacing: '0.06em',
+                      cursor: 'pointer', transition: 'all 0.15s',
+                      border: verlaufAnsicht === a
+                        ? `1px solid ${a === 'gas' ? T.warn : T.spark.cyan}88`
+                        : '1px solid rgba(255,255,255,0.08)',
+                      background: verlaufAnsicht === a ? (a === 'gas' ? T.warn : T.spark.cyan) + '18' : 'transparent',
+                      color: verlaufAnsicht === a ? (a === 'gas' ? T.warn : T.spark.cyan) : T.muted,
+                    }}>{label}</button>
+                  ))}
+                </div>
+              )}
 
               {/* Zusammenfassung-Kacheln */}
               {periodSum && (() => {
@@ -1622,8 +1640,19 @@ function App() {
                       })()}
                     </Card>
                   </div>
+                  {/* Gas heute */}
+                  {verlaufAnsicht === 'gas' && statHeute?.gas_m3 != null && (
+                    <Card accentColor={T.warn} style={{ marginBottom: 8 }}>
+                      <CardLabel icon="🔥" color={T.warn}>Gas heute</CardLabel>
+                      <BigVal value={statHeute.gas_m3.toFixed(3)} unit="m³" size={21} color={T.warn} />
+                      <div style={{ fontSize: 11, color: T.muted, fontFamily: T.fontMono, marginTop: 4 }}>
+                        ≈ {(statHeute.gas_m3 * 10 * 0.11).toFixed(2)} € Kosten
+                      </div>
+                    </Card>
+                  )}
+
                   {/* SOC-Tagesverlauf aus Live-Daten */}
-                  {(hist[VICTRON_TOPICS.soc] ?? []).length >= 2 && (
+                  {verlaufAnsicht === 'strom' && (hist[VICTRON_TOPICS.soc] ?? []).length >= 2 && (
                     <Card accentColor={T.spark.cyan} style={{ marginBottom: 12, padding: '12px 13px' }}>
                       <CardLabel icon="🔋" color={T.spark.cyan}>Batterie SOC – heute</CardLabel>
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: T.muted, fontFamily: T.fontMono, marginBottom: 4 }}>
@@ -1642,6 +1671,9 @@ function App() {
                   Keine Daten – ioBroker stats_service noch nicht gestartet?
                 </div>
               )}
+
+              {/* ── STROM & SOLAR ANSICHT ── */}
+              {verlaufAnsicht === 'strom' && <>
 
               {/* Balken-Chart mit Drill-Down */}
               {hasData && verlaufZr !== 'heute' && verlaufZr !== 'gesamt' && (() => {
@@ -1859,6 +1891,121 @@ function App() {
                       Durchschnitt (—) · Min/Max (- -) · Hover für Details
                     </div>
                   </Card>
+                )
+              })()}
+
+              </> /* end verlaufAnsicht === 'strom' */}
+
+              {/* ── GAS ANSICHT ── */}
+              {verlaufAnsicht === 'gas' && verlaufZr !== 'heute' && verlaufZr !== 'gesamt' && (() => {
+                const gasData  = periodData.filter(d => d.gas_m3 !== null)
+                const gasSum   = periodSum?.gas_m3
+                const maxGas   = Math.max(...periodData.map(d => d.gas_m3 ?? 0), 0.1)
+                const gBarW    = verlaufZr === 'jahr' ? 12 : verlaufZr === 'monat' ? 18 : 32
+                const gChartH  = 120
+                const gTotalW  = Math.max(periodData.length * (gBarW + 8), 300)
+                const GAS_PREIS = 0.11  // €/kWh Gas ≈ ca. 1.1 ct/kWh × Brennwert ~10 kWh/m³
+                const gasKwhM3  = 10.0  // kWh pro m³ Gas (Richtwert, je nach Heizwert)
+                return (
+                  <>
+                    {/* Gas Zusammenfassung */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, marginBottom: 12 }}>
+                      <Card accentColor={T.warn}>
+                        <CardLabel icon="🔥" color={T.warn}>Gasverbrauch</CardLabel>
+                        <BigVal value={gasSum != null ? `${gasSum.toFixed(2)}` : '–'} unit="m³" size={21} color={T.warn} />
+                        <div style={{ fontSize: 11, color: T.muted, fontFamily: T.fontMono, marginTop: 4 }}>
+                          ≈ {gasSum != null ? (gasSum * gasKwhM3).toFixed(0) : '–'} kWh Wärme
+                        </div>
+                        <div style={{ fontSize: 11, color: T.warn, fontFamily: T.fontMono, marginTop: 2 }}>
+                          ≈ {gasSum != null ? (gasSum * gasKwhM3 * GAS_PREIS).toFixed(2) : '–'} € Kosten
+                        </div>
+                      </Card>
+                      <Card accentColor={T.muted as string}>
+                        <CardLabel icon="📊" color={T.spark.cyan}>Zählerstand</CardLabel>
+                        <BigVal value={values['Gaszaehler/stand'] ?? '…'} unit="m³" size={21} />
+                        <div style={{ fontSize: 11, color: T.muted, fontFamily: T.fontMono, marginTop: 4 }}>
+                          Gasverbrauch gesamt
+                        </div>
+                        {gasData.length > 0 && (
+                          <div style={{ fontSize: 11, color: T.muted, fontFamily: T.fontMono, marginTop: 2 }}>
+                            Ø {(gasData.reduce((s,d)=>s+(d.gas_m3??0),0)/gasData.length).toFixed(2)} m³/Tag
+                          </div>
+                        )}
+                      </Card>
+                    </div>
+
+                    {/* Gas Balkendiagramm */}
+                    {gasData.length >= 2 && (
+                      <Card accentColor={T.warn} style={{ marginBottom: 12, padding: '12px 13px' }}>
+                        <CardLabel icon="📊" color={T.warn}>Gasverbrauch täglich</CardLabel>
+                        <div style={{ overflowX: 'auto' }}>
+                          <svg width={gTotalW} height={gChartH + 40} style={{ display: 'block' }}>
+                            {periodData.map((d, i) => {
+                              const x  = i * (gBarW + 8)
+                              const h  = d.gas_m3 ? (d.gas_m3 / maxGas) * gChartH : 0
+                              const isHov = hoveredBar?.d.date === d.date
+                              const col = d.gas_m3 && d.gas_m3 > (maxGas * 0.7) ? T.err
+                                : d.gas_m3 && d.gas_m3 > (maxGas * 0.4) ? T.warn : T.ok
+                              return (
+                                <g key={d.date}
+                                  onMouseEnter={() => d.gas_m3 !== null && setHoveredBar({ d, x: x + gBarW/2, y: gChartH - h })}
+                                  onMouseLeave={() => setHoveredBar(null)}
+                                  onClick={() => setVerlaufDetail(verlaufDetail?.date === d.date ? null : d)}
+                                  style={{ cursor: 'pointer' }}>
+                                  <rect x={x} y={gChartH - h} width={gBarW} height={h}
+                                    fill={col} opacity={isHov ? 1 : 0.75} rx={2} />
+                                  <text x={x + gBarW/2} y={gChartH + 14} textAnchor="middle"
+                                    fontSize={9} fill="rgba(224,234,255,0.4)" fontFamily={T.fontMono}>
+                                    {formatDate(d.date)}
+                                  </text>
+                                </g>
+                              )
+                            })}
+                            {/* Hover-Tooltip */}
+                            {hoveredBar && periodData.some(d => d.date === hoveredBar.d.date) && (() => {
+                              const td  = hoveredBar.d
+                              const hx  = hoveredBar.x
+                              const tx  = Math.min(hx + 8, gTotalW - 145)
+                              const ty  = Math.max(50, hoveredBar.y - 10)
+                              return (
+                                <g style={{ pointerEvents: 'none' }}>
+                                  <rect x={tx-4} y={ty-52} width={148} height={56} rx={4}
+                                    fill="#0a0f1a" stroke="rgba(255,255,255,0.2)" strokeWidth={1}/>
+                                  <text x={tx} y={ty-36} fontSize={11} fill={T.text} fontFamily={T.fontMono} fontWeight={700}>
+                                    {td.date}
+                                  </text>
+                                  <text x={tx} y={ty-20} fontSize={10} fill={T.warn} fontFamily={T.fontMono}>
+                                    {(td.gas_m3 ?? 0).toFixed(3)} m³ Gas
+                                  </text>
+                                  <text x={tx} y={ty-4} fontSize={10} fill={T.muted} fontFamily={T.fontMono}>
+                                    ≈ {((td.gas_m3 ?? 0) * gasKwhM3 * GAS_PREIS).toFixed(2)} € Kosten
+                                  </text>
+                                </g>
+                              )
+                            })()}
+                            {[0.5, 1].map(f => (
+                              <g key={f}>
+                                <line x1={0} y1={gChartH*(1-f)} x2={gTotalW} y2={gChartH*(1-f)}
+                                  stroke="rgba(255,255,255,0.06)" strokeWidth={1}/>
+                                <text x={gTotalW-2} y={gChartH*(1-f)-2} textAnchor="end"
+                                  fontSize={8} fill="rgba(224,234,255,0.3)" fontFamily={T.fontMono}>
+                                  {(maxGas*f).toFixed(2)}
+                                </text>
+                              </g>
+                            ))}
+                          </svg>
+                        </div>
+                        <div style={{ fontSize: 10, color: T.muted, fontFamily: T.fontMono, marginTop: 4 }}>
+                          Hover für Details · Preis: {GAS_PREIS} €/kWh · Heizwert: {gasKwhM3} kWh/m³ (Richtwert)
+                        </div>
+                      </Card>
+                    )}
+                    {gasData.length < 2 && (
+                      <div style={{ textAlign: 'center', padding: '30px', color: T.muted, fontFamily: T.fontMono, fontSize: 12 }}>
+                        Noch keine Gas-Verlaufsdaten – history.0 für mqtt.0.Gaszaehler.stand aktivieren
+                      </div>
+                    )}
+                  </>
                 )
               })()}
 
