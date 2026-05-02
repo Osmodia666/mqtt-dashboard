@@ -220,11 +220,11 @@ function SocRing({ soc, size = 52 }: { soc: number; size?: number }) {
 
 function Div() { return <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '8px 0' }} /> }
 function Sub({ children }: { children: React.ReactNode }) {
-  return <div style={{ fontSize: 10, color: T.muted, marginBottom: 2, fontFamily: T.fontMono }}>{children}</div>
+  return <div style={{ fontSize: 11, color: T.muted, marginBottom: 3, fontFamily: T.fontMono }}>{children}</div>
 }
 function StatRow({ label, value }: { label: string; value: string }) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', fontSize: 11, marginBottom: 4, fontFamily: T.fontMono }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', fontSize: 12, marginBottom: 5, fontFamily: T.fontMono }}>
       <span style={{ color: T.muted }}>{label}</span>
       <span style={{ color: T.text, fontWeight: 700 }}>{value}</span>
     </div>
@@ -267,8 +267,8 @@ function PhasenCard({ group, values, minMax, hist }: {
         return (
           <div key={key} style={{ marginBottom: 14, paddingBottom: 14, borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
-              <span style={{ fontFamily: T.fontLabel, fontSize: 13, fontWeight: 700, letterSpacing: '0.06em', color: groupColor, minWidth: 28 }}>{label}</span>
-              <span style={{ fontFamily: T.fontMono, fontSize: 24, fontWeight: 700, fontVariantNumeric: 'tabular-nums', lineHeight: 1, color: valColor }}>
+              <span style={{ fontFamily: T.fontLabel, fontSize: 14, fontWeight: 700, letterSpacing: '0.06em', color: groupColor, minWidth: 28 }}>{label}</span>
+              <span style={{ fontFamily: T.fontMono, fontSize: 26, fontWeight: 700, fontVariantNumeric: 'tabular-nums', lineHeight: 1, color: valColor }}>
                 {isNaN(num) ? '…' : num.toFixed(dp)}
                 <span style={{ fontSize: 13, fontWeight: 400, color: T.muted, marginLeft: 3 }}>{group.unit}</span>
               </span>
@@ -599,7 +599,7 @@ function App() {
         </div>
         <div className="flow-row">
           <div className="flow-node">
-            <span style={{ fontSize: 10, color: T.muted, fontFamily: T.fontMono, marginBottom: 2 }}>PV · Victron</span>
+            <span style={{ fontSize: 11, color: T.muted, fontFamily: T.fontMono, marginBottom: 2 }}>PV · Victron</span>
             <span style={{ fontSize: 16, fontWeight: 700, fontFamily: T.fontMono, color: isNaN(V_PV_W) ? T.muted : pvColor }}>
               {isNaN(V_PV_W) ? '…' : `${Math.round(V_PV_W)} W`}
             </span>
@@ -1636,7 +1636,7 @@ function App() {
               })()}
 
               {/* SOC-Verlauf */}
-              {hasData && verlaufZr !== 'heute' && socData.length >= 2 && (
+              {hasData && verlaufZr !== 'heute' && verlaufZr !== 'gesamt' && socData.length >= 2 && (
                 <Card accentColor={T.spark.cyan} style={{ marginBottom: 12, padding: '12px 13px' }}>
                   <CardLabel icon="🔋" color={T.spark.cyan}>Batterie SOC-Verlauf</CardLabel>
                   <div style={{ overflowX: 'auto' }}>
@@ -1713,26 +1713,7 @@ function App() {
                           </div>
                         </div>
                       </Card>
-                      <Card accentColor={T.spark.cyan}>
-                        <CardLabel icon="🔋" color={T.spark.cyan}>Batterie</CardLabel>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-                          <SocRing soc={V_SOC} size={54} />
-                          <div>
-                            <BigVal value={isNaN(V_BAT_V) ? '…' : V_BAT_V.toFixed(1)} unit="V" size={19} />
-                            <div style={{ marginTop: 4 }}>
-                              {!isNaN(V_BAT_STATE) && (
-                                <Badge color={V_BAT_STATE === 1 ? T.ok : V_BAT_STATE === 2 ? amberAcc : T.muted}>
-                                  {batStateLabel(V_BAT_STATE)}
-                                </Badge>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                        <StatRow label="Kapazität" value="3.5 kWh (Pylontech US3000C)" />
-                        <StatRow label="Strom"     value={isNaN(V_BAT_A) ? '…' : `${V_BAT_A.toFixed(1)} A`} />
-                        <StatRow label="Leistung"  value={isNaN(V_BAT_W) ? '…' : `${Math.round(V_BAT_W)} W`} />
-                        <StatRow label="Temp"      value={isNaN(V_BAT_T) ? '…' : `${V_BAT_T.toFixed(1)} °C`} />
-                      </Card>
+
                     </div>
                   </div>
                 )
