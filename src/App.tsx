@@ -364,6 +364,8 @@ function App() {
   const [verlaufZr,  setVerlaufZr]  = useState<'heute'|'woche'|'monat'|'jahr'|'gesamt'>('woche')
   const [energieTab, setEnergieTab] = useState<'ueberblick'|'phasen'|'details'>('ueberblick')
   const [verlaufDetail, setVerlaufDetail] = useState<StatDay|null>(null)
+  const [drillData,     setDrillData]     = useState<StatDay[]|null>(null)
+  const [drillLabel,    setDrillLabel]    = useState<string>('')
   useEffect(() => {
     const onResize = () => setWinW(window.innerWidth)
     window.addEventListener('resize', onResize)
@@ -578,8 +580,8 @@ function App() {
     { id: 'uebersicht', label: 'Übersicht',  icon: '⚡' },
     { id: 'energie',    label: 'Energie',    icon: '🌿' },
     { id: 'victron',    label: 'Victron',    icon: '🔋' },
-    { id: 'verlauf',    label: 'Verlauf',    icon: '📈' },
     { id: 'steuerung',  label: 'Steuerung',  icon: '🔌' },
+    { id: 'verlauf',    label: 'Verlauf',    icon: '📈' },
   ]
 
   // ── Energiefluss-Banner (geteilt zwischen Übersicht + Energie) ──────────
@@ -1441,17 +1443,21 @@ function App() {
             <div>
               {/* Zeitraum-Buttons */}
               <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
-                {(['heute','woche','monat','jahr','gesamt'] as const).map(zr => (
-                  <button key={zr} onClick={() => { setVerlaufZr(zr); setVerlaufDetail(null); }} style={{
+                {([
+                  ['heute',  'Heute'],
+                  ['woche',  '7 Tage'],
+                  ['monat',  'Monat'],
+                  ['jahr',   'Jahr'],
+                  ['gesamt', 'Gesamt'],
+                ] as const).map(([zr, label]) => (
+                  <button key={zr} onClick={() => { setVerlaufZr(zr); setVerlaufDetail(null); setDrillData(null); setDrillLabel(''); }} style={{
                     padding: '5px 16px', borderRadius: 20, fontSize: 11,
                     fontFamily: T.fontLabel, fontWeight: 700, letterSpacing: '0.07em',
                     cursor: 'pointer', transition: 'all 0.15s', textTransform: 'uppercase',
                     border: verlaufZr === zr ? `1px solid ${T.ok}88` : '1px solid rgba(255,255,255,0.1)',
                     background: verlaufZr === zr ? T.ok + '20' : 'transparent',
                     color: verlaufZr === zr ? T.ok : T.muted,
-                  }}>
-                    {zr === 'heute' ? 'Heute' : zr === 'woche' ? '7 Tage' : zr === 'monat' ? 'Monat' : zr === 'jahr' ? 'Jahr' : 'Gesamt'}
-                  </button>
+                  }}>{label}</button>
                 ))}
               </div>
 
@@ -1482,28 +1488,41 @@ function App() {
 
               {/* Heute: einzelne Werte */}
               {verlaufZr === 'heute' && statHeute && (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 12 }}>
-                  <Card accentColor={T.err}>
-                    <CardLabel icon="⚡" color={T.err}>Verbrauch heute</CardLabel>
-                    <BigVal value={fkwh(statHeute.verbrauch_kwh)} size={18} color={T.err} />
-                  </Card>
-                  <Card accentColor={T.ok}>
-                    <CardLabel icon="🌿" color={T.ok}>Erzeugung heute</CardLabel>
-                    <BigVal value={fkwh(statHeute.erzeugung_kwh)} size={18} color={T.ok} />
-                    <div style={{ fontSize: 10, color: T.muted, marginTop: 3, fontFamily: T.fontMono }}>
-                      BKW: {fkwh(statHeute.bkw_kwh)} · PV: {fkwh(statHeute.solar_kwh)}
-                    </div>
-                  </Card>
-                  <Card accentColor={T.spark.cyan}>
-                    <CardLabel icon="🔋" color={T.spark.cyan}>Batterie SOC</CardLabel>
-                    <div style={{ fontFamily: T.fontMono, fontSize: 13, color: T.text, marginTop: 2 }}>
-                      Min: {statHeute.soc_min ?? '–'}% · Max: {statHeute.soc_max ?? '–'}%
-                    </div>
-                    <div style={{ fontFamily: T.fontMono, fontSize: 11, color: T.muted, marginTop: 2 }}>
-                      Ø {statHeute.soc_avg ?? '–'}%
-                    </div>
-                  </Card>
-                </div>
+                <>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 12 }}>
+                    <Card accentColor={T.err}>
+                      <CardLabel icon="⚡" color={T.err}>Verbrauch heute</CardLabel>
+                      <BigVal value={fkwh(statHeute.verbrauch_kwh)} size={18} color={T.err} />
+                    </Card>
+                    <Card accentColor={T.ok}>
+                      <CardLabel icon="🌿" color={T.ok}>Erzeugung heute</CardLabel>
+                      <BigVal value={fkwh(statHeute.erzeugung_kwh)} size={18} color={T.ok} />
+                      <div style={{ fontSize: 10, color: T.muted, marginTop: 3, fontFamily: T.fontMono }}>
+                        BKW: {fkwh(statHeute.bkw_kwh)} · PV: {fkwh(statHeute.solar_kwh)}
+                      </div>
+                    </Card>
+                    <Card accentColor={uebColor}>
+                      <CardLabel icon="⚖️" color={uebColor}>Bilanz heute</CardLabel>
+                      {(() => {
+                        const b = (statHeute.erzeugung_kwh ?? 0) - (statHeute.verbrauch_kwh ?? 0)
+                        const col = b >= 0 ? T.ok : T.err
+                        return <BigVal value={`${b >= 0 ? '+' : ''}${b.toFixed(1)} kWh`} size={18} color={col} />
+                      })()}
+                    </Card>
+                  </div>
+                  {/* SOC-Tagesverlauf aus Live-Daten */}
+                  {(hist[VICTRON_TOPICS.soc] ?? []).length >= 2 && (
+                    <Card accentColor={T.spark.cyan} style={{ marginBottom: 12, padding: '12px 13px' }}>
+                      <CardLabel icon="🔋" color={T.spark.cyan}>Batterie SOC – heute</CardLabel>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: T.muted, fontFamily: T.fontMono, marginBottom: 4 }}>
+                        <span>Min: {statHeute.soc_min ?? Math.min(...(hist[VICTRON_TOPICS.soc] ?? []).filter(v=>!isNaN(v))).toFixed(0)}%</span>
+                        <span>Ø {statHeute.soc_avg ?? Math.round((hist[VICTRON_TOPICS.soc] ?? []).reduce((a,b)=>a+b,0)/Math.max((hist[VICTRON_TOPICS.soc]??[]).length,1))}%</span>
+                        <span>Max: {statHeute.soc_max ?? Math.max(...(hist[VICTRON_TOPICS.soc] ?? []).filter(v=>!isNaN(v))).toFixed(0)}%</span>
+                      </div>
+                      <Sparkline data={hist[VICTRON_TOPICS.soc]} color={T.spark.cyan} height={50} />
+                    </Card>
+                  )}
+                </>
               )}
 
               {!hasData && (
@@ -1512,64 +1531,109 @@ function App() {
                 </div>
               )}
 
-              {/* Balken-Chart: Verbrauch vs Erzeugung */}
-              {hasData && verlaufZr !== 'heute' && (
-                <Card accentColor={T.spark.power} style={{ marginBottom: 12, padding: '12px 13px' }}>
-                  <CardLabel icon="📊" color={T.spark.power}>Verbrauch vs. Erzeugung</CardLabel>
-                  <div style={{ overflowX: 'auto', overflowY: 'hidden' }}>
-                    <svg width={Math.max(totalW, 300)} height={chartH + 40} style={{ display: 'block' }}>
-                      {periodData.map((d, i) => {
-                        const x = i * (barW * 2 + barGap + 4)
-                        const vH = d.verbrauch_kwh  ? (d.verbrauch_kwh  / maxAll) * chartH : 0
-                        const eH = d.erzeugung_kwh ? (d.erzeugung_kwh / maxAll) * chartH : 0
-                        const isSelected = verlaufDetail?.date === d.date
-                        return (
-                          <g key={d.date} onClick={() => setVerlaufDetail(verlaufDetail?.date === d.date ? null : d)}
-                             style={{ cursor: 'pointer' }}>
-                            {/* Verbrauch-Balken */}
-                            <rect x={x} y={chartH - vH} width={barW} height={vH}
-                              fill={T.err} opacity={isSelected ? 1 : 0.75} rx={2} />
-                            {/* Erzeugung-Balken */}
-                            <rect x={x + barW + 2} y={chartH - eH} width={barW} height={eH}
-                              fill={T.ok} opacity={isSelected ? 1 : 0.75} rx={2} />
-                            {/* Auswahl-Markierung */}
-                            {isSelected && <rect x={x-1} y={0} width={barW*2+4} height={chartH}
-                              fill="rgba(255,255,255,0.05)" rx={2} />}
-                            {/* X-Achse Label */}
-                            <text x={x + barW} y={chartH + 14} textAnchor="middle"
-                              fontSize={9} fill="rgba(224,234,255,0.4)" fontFamily={T.fontMono}>
-                              {formatDate(d.date)}
+              {/* Balken-Chart mit Drill-Down */}
+              {hasData && verlaufZr !== 'heute' && verlaufZr !== 'gesamt' && (() => {
+                // Drill-down: wenn drillData gesetzt, dieses anzeigen
+                const chartData = drillData ?? periodData
+                const cLabel    = drillData ? drillLabel : 'Verbrauch vs. Erzeugung'
+                const cMaxV = Math.max(...chartData.map(d => d.verbrauch_kwh  ?? 0), 1)
+                const cMaxE = Math.max(...chartData.map(d => d.erzeugung_kwh ?? 0), 1)
+                const cMaxAll = Math.max(cMaxV, cMaxE, 1)
+                const cBarW = drillData ? 28
+                  : verlaufZr === 'jahr' ? 8 : verlaufZr === 'monat' ? 14 : 28
+                const cTotalW = Math.max(chartData.length * (cBarW * 2 + barGap + 4), 300)
+
+                // Drill-down Logik: Jahr→Monat, Monat→Woche, Woche→Tag
+                const handleBarClick = (d: StatDay) => {
+                  if (drillData) {
+                    // Bereits gebohrt: Detail anzeigen
+                    setVerlaufDetail(verlaufDetail?.date === d.date ? null : d)
+                    return
+                  }
+                  if (verlaufZr === 'jahr' || verlaufZr === 'monat') {
+                    // Auf Monat/Woche drill-down
+                    const month = d.date.slice(0, 7)
+                    const filtered = statTage.filter(t => t.date.startsWith(month))
+                    if (filtered.length > 0) {
+                      setDrillData(filtered)
+                      setDrillLabel(`${month} – Tagesverlauf`)
+                      setVerlaufDetail(null)
+                    }
+                  } else {
+                    setVerlaufDetail(verlaufDetail?.date === d.date ? null : d)
+                  }
+                }
+
+                const cFormatDate = (s: string) => {
+                  if (drillData) {
+                    const d = new Date(s + 'T12:00:00')
+                    return `${d.getDate()}.`
+                  }
+                  return formatDate(s)
+                }
+
+                return (
+                  <Card accentColor={T.spark.power} style={{ marginBottom: 12, padding: '12px 13px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                      <CardLabel icon="📊" color={T.spark.power}>{cLabel}</CardLabel>
+                      {drillData && (
+                        <button onClick={() => { setDrillData(null); setDrillLabel(''); setVerlaufDetail(null); }} style={{
+                          marginLeft: 'auto', padding: '2px 10px', borderRadius: 12, fontSize: 10,
+                          fontFamily: T.fontLabel, cursor: 'pointer', border: `1px solid rgba(255,255,255,0.15)`,
+                          background: 'transparent', color: T.muted,
+                        }}>← zurück</button>
+                      )}
+                    </div>
+                    <div style={{ overflowX: 'auto', overflowY: 'hidden' }}>
+                      <svg width={Math.max(cTotalW, 300)} height={chartH + 40} style={{ display: 'block' }}>
+                        {chartData.map((d, i) => {
+                          const x = i * (cBarW * 2 + barGap + 4)
+                          const vH = d.verbrauch_kwh  ? (d.verbrauch_kwh  / cMaxAll) * chartH : 0
+                          const eH = d.erzeugung_kwh ? (d.erzeugung_kwh / cMaxAll) * chartH : 0
+                          const isSelected = verlaufDetail?.date === d.date
+                          return (
+                            <g key={d.date} onClick={() => handleBarClick(d)} style={{ cursor: 'pointer' }}>
+                              <rect x={x} y={chartH - vH} width={cBarW} height={vH}
+                                fill={T.err} opacity={isSelected ? 1 : 0.75} rx={2} />
+                              <rect x={x + cBarW + 2} y={chartH - eH} width={cBarW} height={eH}
+                                fill={T.ok} opacity={isSelected ? 1 : 0.75} rx={2} />
+                              {isSelected && <rect x={x-1} y={0} width={cBarW*2+4} height={chartH}
+                                fill="rgba(255,255,255,0.05)" rx={2} />}
+                              <text x={x + cBarW} y={chartH + 14} textAnchor="middle"
+                                fontSize={9} fill="rgba(224,234,255,0.4)" fontFamily={T.fontMono}>
+                                {cFormatDate(d.date)}
+                              </text>
+                            </g>
+                          )
+                        })}
+                        {[0.25, 0.5, 0.75, 1].map(f => (
+                          <g key={f}>
+                            <line x1={0} y1={chartH * (1-f)} x2={Math.max(cTotalW,300)} y2={chartH * (1-f)}
+                              stroke="rgba(255,255,255,0.06)" strokeWidth={1} />
+                            <text x={Math.max(cTotalW,300) - 2} y={chartH * (1-f) - 2} textAnchor="end"
+                              fontSize={8} fill="rgba(224,234,255,0.3)" fontFamily={T.fontMono}>
+                              {(cMaxAll * f).toFixed(1)}
                             </text>
                           </g>
-                        )
-                      })}
-                      {/* Y-Achse Linien */}
-                      {[0.25, 0.5, 0.75, 1].map(f => (
-                        <g key={f}>
-                          <line x1={0} y1={chartH * (1-f)} x2={totalW} y2={chartH * (1-f)}
-                            stroke="rgba(255,255,255,0.06)" strokeWidth={1} />
-                          <text x={totalW - 2} y={chartH * (1-f) - 2} textAnchor="end"
-                            fontSize={8} fill="rgba(224,234,255,0.3)" fontFamily={T.fontMono}>
-                            {(maxAll * f).toFixed(1)}
-                          </text>
-                        </g>
-                      ))}
-                    </svg>
-                  </div>
-                  {/* Legende */}
-                  <div style={{ display: 'flex', gap: 16, marginTop: 6, fontSize: 10, fontFamily: T.fontMono, color: T.muted }}>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                      <span style={{ width: 10, height: 10, background: T.err, borderRadius: 2, display: 'inline-block' }} />
-                      Verbrauch
-                    </span>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                      <span style={{ width: 10, height: 10, background: T.ok, borderRadius: 2, display: 'inline-block' }} />
-                      Erzeugung
-                    </span>
-                    <span style={{ color: T.muted, marginLeft: 'auto' }}>Balken anklicken für Details</span>
-                  </div>
-                </Card>
-              )}
+                        ))}
+                      </svg>
+                    </div>
+                    <div style={{ display: 'flex', gap: 16, marginTop: 6, fontSize: 10, fontFamily: T.fontMono, color: T.muted }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                        <span style={{ width: 10, height: 10, background: T.err, borderRadius: 2, display: 'inline-block' }} />Verbrauch
+                      </span>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                        <span style={{ width: 10, height: 10, background: T.ok, borderRadius: 2, display: 'inline-block' }} />Erzeugung
+                      </span>
+                      <span style={{ marginLeft: 'auto' }}>
+                        {!drillData && (verlaufZr === 'jahr' || verlaufZr === 'monat')
+                          ? 'Balken anklicken → Monatsdetail'
+                          : 'Balken anklicken für Details'}
+                      </span>
+                    </div>
+                  </Card>
+                )
+              })()}
 
               {/* SOC-Verlauf */}
               {hasData && verlaufZr !== 'heute' && socData.length >= 2 && (
