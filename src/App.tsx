@@ -1617,7 +1617,29 @@ function App() {
               })()}
 
               {/* Heute: einzelne Werte */}
-              {verlaufZr === 'heute' && statHeute && (
+              {/* Heute Gas */}
+              {verlaufZr === 'heute' && verlaufAnsicht === 'gas' && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, marginBottom: 12 }}>
+                  <Card accentColor={T.warn}>
+                    <CardLabel icon="🔥" color={T.warn}>Gas heute</CardLabel>
+                    {statHeute?.gas_m3 != null
+                      ? <>
+                          <BigVal value={statHeute.gas_m3.toFixed(3)} unit="m³" size={21} color={T.warn} />
+                          <div style={{ fontSize: 11, color: T.muted, fontFamily: T.fontMono, marginTop: 4 }}>
+                            ≈ {(statHeute.gas_m3 * 10 * 0.11).toFixed(2)} € Kosten
+                          </div>
+                        </>
+                      : <div style={{ fontSize: 12, color: T.muted, fontFamily: T.fontMono }}>Noch keine Gas-Daten heute</div>
+                    }
+                  </Card>
+                  <Card accentColor={T.muted as string}>
+                    <CardLabel icon="📊" color={T.spark.cyan}>Zählerstand</CardLabel>
+                    <BigVal value={values['Gaszaehler/stand'] ?? '…'} unit="m³" size={21} />
+                  </Card>
+                </div>
+              )}
+
+              {verlaufZr === 'heute' && verlaufAnsicht === 'strom' && statHeute && (
                 <>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 12 }}>
                     <Card accentColor={T.err}>
@@ -1640,17 +1662,6 @@ function App() {
                       })()}
                     </Card>
                   </div>
-                  {/* Gas heute */}
-                  {verlaufAnsicht === 'gas' && statHeute?.gas_m3 != null && (
-                    <Card accentColor={T.warn} style={{ marginBottom: 8 }}>
-                      <CardLabel icon="🔥" color={T.warn}>Gas heute</CardLabel>
-                      <BigVal value={statHeute.gas_m3.toFixed(3)} unit="m³" size={21} color={T.warn} />
-                      <div style={{ fontSize: 11, color: T.muted, fontFamily: T.fontMono, marginTop: 4 }}>
-                        ≈ {(statHeute.gas_m3 * 10 * 0.11).toFixed(2)} € Kosten
-                      </div>
-                    </Card>
-                  )}
-
                   {/* SOC-Tagesverlauf aus Live-Daten */}
                   {verlaufAnsicht === 'strom' && (hist[VICTRON_TOPICS.soc] ?? []).length >= 2 && (
                     <Card accentColor={T.spark.cyan} style={{ marginBottom: 12, padding: '12px 13px' }}>
@@ -2002,7 +2013,7 @@ function App() {
                     )}
                     {gasData.length < 2 && (
                       <div style={{ textAlign: 'center', padding: '30px', color: T.muted, fontFamily: T.fontMono, fontSize: 12 }}>
-                        Noch keine Gas-Verlaufsdaten – history.0 für mqtt.0.Gaszaehler.stand aktivieren
+                        Noch keine Gas-Verlaufsdaten – history.0 für 0_userdata.0.Gaszaehler.kWhZaehler aktivieren
                       </div>
                     )}
                   </>
