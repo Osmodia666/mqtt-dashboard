@@ -1674,46 +1674,161 @@ function App() {
                 const bkwGesamt  = !isNaN(bkwRaw) ? bkwRaw + 178.779 : NaN
                 const pvGesamt   = parseFloat(values[V('solarcharger/288/Yield/System')] ?? 'NaN')
                 const solarTotal = (!isNaN(bkwGesamt) ? bkwGesamt : 0) + (!isNaN(pvGesamt) ? pvGesamt : 0)
-                // Victron: Startdatum 2024 (Inbetriebnahme)
-                // BKW: Startdatum 27.03.2023 (laut elecpow)
+
+                // Jahres-Chart aus statTage – gruppiert nach Jahren
+                const years = Array.from(new Set(statTage.map(d => d.date.slice(0,4)))).sort()
+                const yearData = years.map(y => {
+                  const days = statTage.filter(d => d.date.startsWith(y))
+                  const vSum = days.reduce((s,d) => s + (d.verbrauch_kwh ?? 0), 0)
+                  const eSum = days.reduce((s,d) => s + (d.erzeugung_kwh ?? 0), 0)
+                  return { date: y, verbrauch_kwh: vSum > 0 ? Math.round(vSum*100)/100 : null,
+                           erzeugung_kwh: eSum > 0 ? Math.round(eSum*100)/100 : null,
+                           bkw_kwh: null, solar_kwh: null, soc_min: null, soc_max: null, soc_avg: null }
+                })
+                const maxYV = Math.max(...yearData.map(d => d.verbrauch_kwh ?? 0), 1)
+                const maxYE = Math.max(...yearData.map(d => d.erzeugung_kwh ?? 0), 1)
+                const maxYAll = Math.max(maxYV, maxYE, 1)
+                const yBarW = 40
+                const yChartH = 120
+                const yTotalW = Math.max(yearData.length * (yBarW * 2 + 8), 200)
+
                 return (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {/* Jahres-Balkendiagramm mit Drill-Down */}
+                    {yearData.length > 0 && (
+                      <Card accentColor={T.spark.power} style={{ padding: '12px 13px', marginBottom: 4 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                          <CardLabel icon="📊" color={T.spark.power}>
+                            {drillData ? drillLabel : 'Jahresübersicht – Verbrauch vs. Erzeugung'}
+                          </CardLabel>
+                          {drillData && (
+                            <button onClick={() => { setDrillData(null); setDrillLabel(''); setVerlaufDetail(null); }} style={{
+                              marginLeft: 'auto', padding: '2px 10px', borderRadius: 12, fontSize: 10,
+                              fontFamily: T.fontLabel, cursor: 'pointer',
+                              border: '1px solid rgba(255,255,255,0.15)', background: 'transparent', color: T.muted,
+                            }}>← zurück</button>
+                          )}
+                        </div>
+                        {(() => {
+                          const cData  = drillData ?? yearData
+                          const cMaxV  = Math.max(...cData.map(d => d.verbrauch_kwh ?? 0), 1)
+                          const cMaxE  = Math.max(...cData.map(d => d.erzeugung_kwh ?? 0), 1)
+                          const cMaxA  = Math.max(cMaxV, cMaxE, 1)
+                          const cBarW  = drillData ? 14 : yBarW
+                          const cW     = Math.max(cData.length * (cBarW * 2 + 8), 200)
+                          return (
+                            <div style={{ overflowX: 'auto' }}>
+                              <svg width={cW} height={yChartH + 36} style={{ display: 'block' }}>
+                                {cData.map((d, i) => {
+                                  const x  = i * (cBarW * 2 + 8)
+                                  const vH = d.verbrauch_kwh  ? (d.verbrauch_kwh  / cMaxA) * yChartH : 0
+                                  const eH = d.erzeugung_kwh ? (d.erzeugung_kwh / cMaxA) * yChartH : 0
+                                  const isSel = verlaufDetail?.date === d.date
+                                  return (
+                                    <g key={d.date} style={{ cursor: 'pointer' }} onClick={() => {
+                                      if (!drillData) {
+                                        // Jahr angeklickt → Monatsdetail
+                                        const yr = d.date
+                                        const months = Array.from(new Set(
+                                          statTage.filter(t => t.date.startsWith(yr)).map(t => t.date.slice(0,7))
+                                        )).sort()
+                                        const mData = months.map(m => {
+                                          const days = statTage.filter(t => t.date.startsWith(m))
+                                          const vS = days.reduce((s,t) => s + (t.verbrauch_kwh ?? 0), 0)
+                                          const eS = days.reduce((s,t) => s + (t.erzeugung_kwh ?? 0), 0)
+                                          return { date: m, verbrauch_kwh: vS>0?Math.round(vS*100)/100:null,
+                                                   erzeugung_kwh: eS>0?Math.round(eS*100)/100:null,
+                                                   bkw_kwh:null, solar_kwh:null, soc_min:null, soc_max:null, soc_avg:null }
+                                        })
+                                        setDrillData(mData)
+                                        setDrillLabel(`${yr} – Monatsdetail`)
+                                        setVerlaufDetail(null)
+                                      } else {
+                                        // Monat angeklickt → Tagesdetail
+                                        const days = statTage.filter(t => t.date.startsWith(d.date))
+                                        if (days.length > 0) {
+                                          setDrillData(days)
+                                          setDrillLabel(`${d.date} – Tagesverlauf`)
+                                          setVerlaufDetail(null)
+                                        }
+                                      }
+                                    }}>
+                                      <rect x={x} y={yChartH-vH} width={cBarW} height={vH} fill={T.err} opacity={0.8} rx={2} />
+                                      <rect x={x+cBarW+2} y={yChartH-eH} width={cBarW} height={eH} fill={T.ok} opacity={0.8} rx={2} />
+                                      <text x={x+cBarW} y={yChartH+14} textAnchor="middle"
+                                        fontSize={drillData ? 9 : 11} fill="rgba(224,234,255,0.5)" fontFamily={T.fontMono}>
+                                        {drillData ? (d.date.length===7 ? d.date.slice(5) : d.date.slice(5)) : d.date}
+                                      </text>
+                                    </g>
+                                  )
+                                })}
+                                {[0.5, 1].map(f => (
+                                  <g key={f}>
+                                    <line x1={0} y1={yChartH*(1-f)} x2={cW} y2={yChartH*(1-f)}
+                                      stroke="rgba(255,255,255,0.06)" strokeWidth={1} />
+                                    <text x={cW-2} y={yChartH*(1-f)-2} textAnchor="end"
+                                      fontSize={9} fill="rgba(224,234,255,0.3)" fontFamily={T.fontMono}>
+                                      {(cMaxA*f).toFixed(0)}
+                                    </text>
+                                  </g>
+                                ))}
+                              </svg>
+                            </div>
+                          )
+                        })()}
+                        <div style={{ display: 'flex', gap: 16, marginTop: 6, fontSize: 11, fontFamily: T.fontMono, color: T.muted }}>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                            <span style={{ width: 10, height: 10, background: T.err, borderRadius: 2, display: 'inline-block' }} />Verbrauch
+                          </span>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                            <span style={{ width: 10, height: 10, background: T.ok, borderRadius: 2, display: 'inline-block' }} />Erzeugung
+                          </span>
+                          <span style={{ marginLeft: 'auto' }}>
+                            {drillData ? 'Balken anklicken → Tagesdetail' : 'Jahr anklicken → Monatsdetail'}
+                          </span>
+                        </div>
+                      </Card>
+                    )}
+
+                    {/* Zählerstände */}
                     <div className="grid-groups">
                       <Card accentColor={T.ok}>
                         <CardLabel icon="🌿" color={T.ok}>Solar gesamt</CardLabel>
                         <BigVal value={solarTotal > 0 ? solarTotal.toFixed(2) : '…'} unit="kWh" size={24} color={T.ok} />
-                        <div style={{ fontSize: 10, color: T.muted, fontFamily: T.fontMono, marginTop: 4 }}>BKW + Victron kombiniert</div>
+                        <div style={{ fontSize: 11, color: T.muted, fontFamily: T.fontMono, marginTop: 4 }}>BKW + Victron kombiniert</div>
                         <Div />
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 4 }}>
                           <div>
                             <Sub>Balkonkraftwerk</Sub>
                             <BigVal value={!isNaN(bkwGesamt) ? bkwGesamt.toFixed(2) : '…'} unit="kWh" size={17} color={T.spark.cyan} />
-                            <div style={{ fontSize: 10, color: T.muted, fontFamily: T.fontMono, marginTop: 2 }}>seit 27.03.2023</div>
-                            <div style={{ fontSize: 10, color: T.muted, fontFamily: T.fontMono }}>({!isNaN(bkwRaw) ? bkwRaw.toFixed(2) : '…'} + 178.78 kWh Offset)</div>
+                            <div style={{ fontSize: 11, color: T.muted, fontFamily: T.fontMono, marginTop: 2 }}>seit 27.03.2023</div>
+                            <div style={{ fontSize: 10, color: T.muted, fontFamily: T.fontMono }}>({!isNaN(bkwRaw) ? bkwRaw.toFixed(2) : '…'} + 178.78 kWh)</div>
                           </div>
                           <div>
                             <Sub>Victron MPPT</Sub>
                             <BigVal value={!isNaN(pvGesamt) ? pvGesamt.toFixed(2) : '…'} unit="kWh" size={17} color={amberAcc} />
-                            <div style={{ fontSize: 10, color: T.muted, fontFamily: T.fontMono, marginTop: 2 }}>seit Inbetriebnahme</div>
-                          </div>
-                        </div>
-                      </Card>
-                      <Card accentColor={T.err}>
-                        <CardLabel icon="⚡" color={T.err}>Strom gesamt</CardLabel>
-                        <BigVal value={values['Stromzähler/Verbrauch_gesamt'] ?? '…'} unit="kWh" size={24} />
-                        <Div />
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 4 }}>
-                          <div>
-                            <Sub>Eingespeist gesamt</Sub>
-                            <BigVal value={values['Stromzähler/Eingespeist_gesamt'] ?? '…'} unit="kWh" size={17} color={T.ok} />
-                          </div>
-                          <div>
-                            <Sub>Gas gesamt</Sub>
-                            <BigVal value={values['Gaszaehler/stand'] ?? '…'} unit="m³" size={17} color={T.warn} />
+                            <div style={{ fontSize: 11, color: T.muted, fontFamily: T.fontMono, marginTop: 2 }}>seit Inbetriebnahme</div>
                           </div>
                         </div>
                       </Card>
 
+                      <Card accentColor={T.spark.cyan}>
+                        <CardLabel icon="📊" color={T.spark.cyan}>Zählerstände</CardLabel>
+                        {/* Strom + Gas nebeneinander */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 8 }}>
+                          <div>
+                            <Sub>Strom gesamt</Sub>
+                            <BigVal value={values['Stromzähler/Verbrauch_gesamt'] ?? '…'} unit="kWh" size={20} />
+                          </div>
+                          <div>
+                            <Sub>Gas gesamt</Sub>
+                            <BigVal value={values['Gaszaehler/stand'] ?? '…'} unit="m³" size={20} color={T.warn} />
+                          </div>
+                        </div>
+                        <Div />
+                        <Sub>Eingespeist gesamt</Sub>
+                        <BigVal value={values['Stromzähler/Eingespeist_gesamt'] ?? '…'} unit="kWh" size={17} color={T.ok} />
+                      </Card>
                     </div>
                   </div>
                 )
