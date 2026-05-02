@@ -375,11 +375,52 @@ function App() {
   const calcEuro = (verbrauch: number|null, erzeugung: number|null, days: number) => {
     const v    = verbrauch  ?? 0
     const e    = erzeugung  ?? 0
-    const gp   = GRUNDPREIS / 365 * days          // anteiliger Grundpreis
-    const cost = v * PREIS_KWH + gp               // Kosten Bezug + Grundpreis
-    const save = e * PREIS_KWH                    // gesparte Kosten durch Eigenverbrauch
+    const gp   = GRUNDPREIS / 365 * days
+    const cost = v * PREIS_KWH + gp
+    const save = e * PREIS_KWH
     return { cost, save, net: save - cost, gp }
   }
+
+  // Batterie-Lebensdauer-Schätzung (Pylontech US3000C)
+  const BAT_CAPACITY_KWH = 3.5    // nutzbare Kapazität kWh
+  const BAT_DOD          = 0.80   // Depth of Discharge laut Datenblatt
+  const BAT_CYCLES_MAX   = 6000   // Zyklen bei 80% DoD laut Pylontech-Datenblatt
+  const BAT_KWH_TOTAL    = BAT_CYCLES_MAX * BAT_CAPACITY_KWH * BAT_DOD  // ~16800 kWh Gesamtdurchsatz
+
+  const calcBatteryLife = () => {
+    // Gesamtentladung aus stats_service (kWh Verbrauch ≈ Entladung wenn keine Einspeisung)
+    // Bessere Schätzung: Summe aller erzeugten kWh die durch die Batterie geflossen sind
+    // Als Proxy: alle Tage mit verfügbaren Daten summieren
+    const totalDischarge = statTage.reduce((sum, d) => {
+      // Tagesverbrauch der Batterie ≈ erzeugung die nachts genutzt wurde
+      // Vereinfachung: wir nehmen verbrauch_kwh als Proxy für Durchsatz
+      const v = d.verbrauch_kwh ?? 0
+      const e = d.erzeugung_kwh ?? 0
+      // Batterie-Durchsatz = min(verbrauch, erzeugung) (was durch Batterie geflossen)
+      return sum + Math.min(v, e) * 0.5 // konservative Schätzung: 50% durch Batterie
+    }, 0)
+
+    const daysTracked = statTage.filter(d => d.verbrauch_kwh !== null).length
+    if (daysTracked < 3) return null // zu wenig Daten
+
+    const dailyAvg        = totalDischarge / daysTracked     // kWh/Tag Durchsatz
+    const cyclesUsed      = totalDischarge / (BAT_CAPACITY_KWH * BAT_DOD)
+    const cyclesRemaining = Math.max(0, BAT_CYCLES_MAX - cyclesUsed)
+    const daysRemaining   = dailyAvg > 0 ? cyclesRemaining * (BAT_CAPACITY_KWH * BAT_DOD) / dailyAvg : null
+    const yearsRemaining  = daysRemaining ? daysRemaining / 365 : null
+    const pctUsed         = (cyclesUsed / BAT_CYCLES_MAX) * 100
+
+    return {
+      cyclesUsed:      Math.round(cyclesUsed),
+      cyclesRemaining: Math.round(cyclesRemaining),
+      pctUsed:         Math.round(pctUsed * 10) / 10,
+      daysRemaining:   daysRemaining ? Math.round(daysRemaining) : null,
+      yearsRemaining:  yearsRemaining ? Math.round(yearsRemaining * 10) / 10 : null,
+      dailyAvgKwh:     Math.round(dailyAvg * 100) / 100,
+      daysTracked,
+    }
+  }
+  const batLife = calcBatteryLife()
   useEffect(() => {
     const onResize = () => setWinW(window.innerWidth)
     window.addEventListener('resize', onResize)
@@ -1021,9 +1062,27 @@ function App() {
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 2 }}>
                     <span style={{ color: T.muted }}>Leistung</span><span style={{ color: T.text, fontWeight: 700 }}>{fr(V_BAT_W)} W</span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 2 }}>
                     <span style={{ color: T.muted }}>Temp</span><span style={{ color: T.text, fontWeight: 700 }}>{fw(V_BAT_T, 1)} °C</span>
                   </div>
+                  {batLife && <>
+                    <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', marginTop: 5, paddingTop: 5 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 2 }}>
+                        <span style={{ color: T.muted }}>Zyklen (est.)</span>
+                        <span style={{ color: T.text, fontWeight: 700 }}>{batLife.cyclesUsed} / {BAT_CYCLES_MAX}</span>
+                      </div>
+                      <div style={{ height: 3, background: 'rgba(255,255,255,0.06)', borderRadius: 2, margin: '3px 0' }}>
+                        <div style={{ width: `${Math.min(batLife.pctUsed, 100)}%`, height: '100%', borderRadius: 2,
+                          background: batLife.pctUsed < 50 ? T.ok : batLife.pctUsed < 80 ? T.warn : T.err }} />
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10 }}>
+                        <span style={{ color: T.muted }}>Restlaufzeit (est.)</span>
+                        <span style={{ color: batLife.pctUsed < 50 ? T.ok : T.warn, fontWeight: 700 }}>
+                          ~{batLife.yearsRemaining} Jahre
+                        </span>
+                      </div>
+                    </div>
+                  </>}
                 </>}
 
                 {key === 'dcLast' && <>
@@ -1169,6 +1228,31 @@ function App() {
                   </div>
                 )}
               </Card>
+
+              {/* Batterie-Lebensdauer */}
+              {batLife && (
+                <Card accentColor={batLife.pctUsed < 50 ? T.ok : batLife.pctUsed < 80 ? T.warn : T.err}>
+                  <CardLabel icon="⏳" color={batLife.pctUsed < 50 ? T.ok : batLife.pctUsed < 80 ? T.warn : T.err}>Batterie · Lebensdauer</CardLabel>
+                  <div style={{ marginBottom: 6 }}>
+                    <Sub>Restlaufzeit (geschätzt)</Sub>
+                    <div style={{ fontSize: 21, fontWeight: 700, fontFamily: T.fontMono,
+                      color: batLife.pctUsed < 50 ? T.ok : batLife.pctUsed < 80 ? T.warn : T.err }}>
+                      ~{batLife.yearsRemaining} <span style={{ fontSize: 12, fontWeight: 400, color: T.muted }}>Jahre</span>
+                    </div>
+                  </div>
+                  <div style={{ height: 4, background: 'rgba(255,255,255,0.06)', borderRadius: 2, marginBottom: 6 }}>
+                    <div style={{ width: `${Math.min(batLife.pctUsed, 100)}%`, height: '100%', borderRadius: 2, transition: 'width 0.5s',
+                      background: batLife.pctUsed < 50 ? T.ok : batLife.pctUsed < 80 ? T.warn : T.err }} />
+                  </div>
+                  <StatRow label="Zyklen (est.)"   value={`${batLife.cyclesUsed} / ${BAT_CYCLES_MAX}`} />
+                  <StatRow label="Verbrauch"       value={`${batLife.pctUsed}%`} />
+                  <StatRow label="Ø Durchsatz/Tag" value={`${batLife.dailyAvgKwh} kWh`} />
+                  <div style={{ fontSize: 10, color: T.muted, fontFamily: T.fontMono, marginTop: 5, lineHeight: 1.5 }}>
+                    Pylontech US3000C · {BAT_CYCLES_MAX} Zyklen bei {BAT_DOD*100}% DoD<br/>
+                    Basis: {batLife.daysTracked} Tage Messdaten (wird genauer mit der Zeit)
+                  </div>
+                </Card>
+              )}
 
               {/* MPPT Kurzform */}
               <Card accentColor={amberAcc}>
@@ -1697,38 +1781,86 @@ function App() {
                 )
               })()}
 
-              {/* SOC-Verlauf */}
-              {hasData && verlaufZr !== 'heute' && verlaufZr !== 'gesamt' && socData.length >= 2 && (
-                <Card accentColor={T.spark.cyan} style={{ marginBottom: 12, padding: '12px 13px' }}>
-                  <CardLabel icon="🔋" color={T.spark.cyan}>Batterie SOC-Verlauf</CardLabel>
-                  <div style={{ overflowX: 'auto' }}>
-                    <svg width={Math.max(totalW, 300)} height={80} style={{ display: 'block' }}>
-                      {/* SOC-Min/Max Fläche */}
-                      {socData.length >= 2 && (() => {
-                        const step = Math.max(totalW, 300) / (socData.length - 1)
-                        const pts_max = socData.map((d, i) => `${i * step},${70 - (d.soc_max!/100) * 60}`).join(' ')
-                        const pts_min = socData.map((d, i) => `${i * step},${70 - (d.soc_min!/100) * 60}`).join(' ')
-                        const pts_avg = socData.map((d, i) => `${i * step},${70 - (d.soc_avg!/100) * 60}`).join(' ')
-                        const area = pts_max + ' ' + socData.map((d, i) => `${(socData.length - 1 - i) * step},${70 - (d.soc_min!/100) * 60}`).reverse().join(' ')
-                        return <>
-                          <polygon points={area} fill={T.spark.cyan} opacity={0.1} />
-                          <polyline points={pts_max} fill="none" stroke={T.spark.cyan} strokeWidth={1} opacity={0.4} strokeDasharray="3 2" />
-                          <polyline points={pts_min} fill="none" stroke={T.spark.cyan} strokeWidth={1} opacity={0.4} strokeDasharray="3 2" />
-                          <polyline points={pts_avg} fill="none" stroke={T.spark.cyan} strokeWidth={2} />
-                        </>
-                      })()}
-                      {/* Y-Labels */}
-                      {[0, 25, 50, 75, 100].map(v => (
-                        <text key={v} x={2} y={70 - (v/100)*60 + 3} fontSize={8}
-                          fill="rgba(224,234,255,0.3)" fontFamily={T.fontMono}>{v}%</text>
-                      ))}
-                    </svg>
-                  </div>
-                  <div style={{ fontSize: 10, color: T.muted, fontFamily: T.fontMono, marginTop: 4 }}>
-                    Durchschnitt (—) · Min/Max (- -)
-                  </div>
-                </Card>
-              )}
+              {/* SOC-Verlauf mit Hover */}
+              {hasData && verlaufZr !== 'heute' && verlaufZr !== 'gesamt' && socData.length >= 2 && (() => {
+                const svgW   = Math.max(totalW, 300)
+                const svgH   = 90
+                const padL   = 26, padB = 20
+                const cW     = svgW - padL
+                const cH     = svgH - padB
+                const step   = cW / (socData.length - 1)
+                const toX    = (i: number) => padL + i * step
+                const toY    = (v: number) => cH - (v / 100) * (cH - 4)
+                const pts_max = socData.map((d, i) => `${toX(i)},${toY(d.soc_max!)}`).join(' ')
+                const pts_min = socData.map((d, i) => `${toX(i)},${toY(d.soc_min!)}`).join(' ')
+                const pts_avg = socData.map((d, i) => `${toX(i)},${toY(d.soc_avg!)}`).join(' ')
+                const area    = pts_max + ' ' + [...socData].reverse().map((d, i) => `${toX(socData.length-1-i)},${toY(d.soc_min!)}`).join(' ')
+                return (
+                  <Card accentColor={T.spark.cyan} style={{ marginBottom: 12, padding: '12px 13px' }}>
+                    <CardLabel icon="🔋" color={T.spark.cyan}>Batterie SOC-Verlauf</CardLabel>
+                    <div style={{ overflowX: 'auto' }}>
+                      <svg width={svgW} height={svgH} style={{ display: 'block' }}
+                        onMouseMove={e => {
+                          const rect = (e.currentTarget as SVGSVGElement).getBoundingClientRect()
+                          const mx   = (e.clientX - rect.left) * (svgW / rect.width)
+                          const idx  = Math.round((mx - padL) / step)
+                          if (idx >= 0 && idx < socData.length) {
+                            setHoveredBar({ d: socData[idx], x: toX(idx), y: toY(socData[idx].soc_avg ?? 50) })
+                          }
+                        }}
+                        onMouseLeave={() => setHoveredBar(null)}>
+                        {/* Min/Max Fläche */}
+                        <polygon points={area} fill={T.spark.cyan} opacity={0.08} />
+                        <polyline points={pts_max} fill="none" stroke={T.spark.cyan} strokeWidth={1} opacity={0.35} strokeDasharray="3 2" />
+                        <polyline points={pts_min} fill="none" stroke={T.spark.cyan} strokeWidth={1} opacity={0.35} strokeDasharray="3 2" />
+                        <polyline points={pts_avg} fill="none" stroke={T.spark.cyan} strokeWidth={2} />
+                        {/* Y-Labels */}
+                        {[0, 25, 50, 75, 100].map(v => (
+                          <g key={v}>
+                            <line x1={padL} y1={toY(v)} x2={svgW} y2={toY(v)}
+                              stroke="rgba(255,255,255,0.04)" strokeWidth={1} />
+                            <text x={padL - 3} y={toY(v) + 3} fontSize={8} textAnchor="end"
+                              fill="rgba(224,234,255,0.3)" fontFamily={T.fontMono}>{v}%</text>
+                          </g>
+                        ))}
+                        {/* Hover-Punkt + Tooltip */}
+                        {hoveredBar && socData.some(d => d.date === hoveredBar.d.date) && (() => {
+                          const hd  = hoveredBar.d
+                          const hx  = hoveredBar.x
+                          const hy  = toY(hd.soc_avg ?? 50)
+                          const tw  = 150
+                          const tx  = Math.min(hx + 8, svgW - tw - 4)
+                          const ty  = Math.max(12, hy - 46)
+                          const col = (hd.soc_avg ?? 50) >= 60 ? T.ok : (hd.soc_avg ?? 50) >= 30 ? T.warn : T.err
+                          return (
+                            <g style={{ pointerEvents: 'none' }}>
+                              {/* Vertikale Linie */}
+                              <line x1={hx} y1={4} x2={hx} y2={cH}
+                                stroke="rgba(56,189,248,0.3)" strokeWidth={1} strokeDasharray="3 2" />
+                              {/* Punkt auf avg-Linie */}
+                              <circle cx={hx} cy={hy} r={4} fill={T.spark.cyan} stroke="#080d14" strokeWidth={1.5} />
+                              {/* Tooltip */}
+                              <rect x={tx} y={ty} width={tw} height={48} rx={4}
+                                fill="#0a0f1a" stroke="rgba(255,255,255,0.2)" strokeWidth={1} />
+                              <text x={tx+8} y={ty+14} fontSize={10} fill={T.text}
+                                fontFamily={T.fontMono} fontWeight={700}>{hd.date}</text>
+                              <text x={tx+8} y={ty+28} fontSize={10} fill={col} fontFamily={T.fontMono}>
+                                {'Ø ' + (hd.soc_avg ?? '–') + '%'}
+                              </text>
+                              <text x={tx+70} y={ty+28} fontSize={9} fill="rgba(56,189,248,0.6)" fontFamily={T.fontMono}>
+                                {(hd.soc_min ?? '–') + '–' + (hd.soc_max ?? '–') + '%'}
+                              </text>
+                            </g>
+                          )
+                        })()}
+                      </svg>
+                    </div>
+                    <div style={{ fontSize: 10, color: T.muted, fontFamily: T.fontMono, marginTop: 2 }}>
+                      Durchschnitt (—) · Min/Max (- -) · Hover für Details
+                    </div>
+                  </Card>
+                )
+              })()}
 
               {/* ── GESAMT-ANSICHT ── */}
               {verlaufZr === 'gesamt' && (() => {
