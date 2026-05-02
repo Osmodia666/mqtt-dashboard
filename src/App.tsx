@@ -361,7 +361,7 @@ function App() {
   const [statWoche,  setStatWoche]  = useState<StatPeriod|null>(null)
   const [statMonat,  setStatMonat]  = useState<StatPeriod|null>(null)
   const [statJahr,   setStatJahr]   = useState<StatPeriod|null>(null)
-  const [verlaufZr,  setVerlaufZr]  = useState<'heute'|'woche'|'monat'|'jahr'>('woche')
+  const [verlaufZr,  setVerlaufZr]  = useState<'heute'|'woche'|'monat'|'jahr'|'gesamt'>('woche')
   const [energieTab, setEnergieTab] = useState<'ueberblick'|'phasen'|'details'>('ueberblick')
   const [verlaufDetail, setVerlaufDetail] = useState<StatDay|null>(null)
   useEffect(() => {
@@ -1293,7 +1293,7 @@ function App() {
                         </div>
                       </div>
                       <Div />
-                      <Sub>Erzeugung aktuell:</Sub>
+                      <Sub>Aktuell erzeugt</Sub>
                       <BigVal value={totalGen > 0 || !isNaN(BKW_W) ? `${Math.round(totalGen)}` : '…'} unit="W" size={18} color={genColor} />
                       <div style={{ fontSize: 10, color: T.muted, fontFamily: T.fontMono, marginTop: 2 }}>
                         PV: {isNaN(V_PV_W) ? '…' : `${Math.round(V_PV_W)} W`} · Balkon: {isNaN(BKW_W) ? '…' : `${Math.round(BKW_W)} W`}
@@ -1441,7 +1441,7 @@ function App() {
             <div>
               {/* Zeitraum-Buttons */}
               <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
-                {(['heute','woche','monat','jahr'] as const).map(zr => (
+                {(['heute','woche','monat','jahr','gesamt'] as const).map(zr => (
                   <button key={zr} onClick={() => { setVerlaufZr(zr); setVerlaufDetail(null); }} style={{
                     padding: '5px 16px', borderRadius: 20, fontSize: 11,
                     fontFamily: T.fontLabel, fontWeight: 700, letterSpacing: '0.07em',
@@ -1450,7 +1450,7 @@ function App() {
                     background: verlaufZr === zr ? T.ok + '20' : 'transparent',
                     color: verlaufZr === zr ? T.ok : T.muted,
                   }}>
-                    {zr === 'heute' ? 'Heute' : zr === 'woche' ? '7 Tage' : zr === 'monat' ? 'Monat' : 'Jahr'}
+                    {zr === 'heute' ? 'Heute' : zr === 'woche' ? '7 Tage' : zr === 'monat' ? 'Monat' : zr === 'jahr' ? 'Jahr' : 'Gesamt'}
                   </button>
                 ))}
               </div>
@@ -1603,6 +1603,76 @@ function App() {
                   </div>
                 </Card>
               )}
+
+              {/* ── GESAMT-ANSICHT ── */}
+              {verlaufZr === 'gesamt' && (() => {
+                const bkwRaw     = parseFloat(values['tele/Balkonkraftwerk/SENSOR.ENERGY.EnergyPTotal.0'] ?? 'NaN')
+                const bkwGesamt  = !isNaN(bkwRaw) ? bkwRaw + 178.779 : NaN
+                const pvGesamt   = parseFloat(values[V('solarcharger/288/Yield/System')] ?? 'NaN')
+                const solarTotal = (!isNaN(bkwGesamt) ? bkwGesamt : 0) + (!isNaN(pvGesamt) ? pvGesamt : 0)
+                // Victron: Startdatum 2024 (Inbetriebnahme)
+                // BKW: Startdatum 27.03.2023 (laut elecpow)
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <div className="grid-groups">
+                      <Card accentColor={T.ok}>
+                        <CardLabel icon="🌿" color={T.ok}>Solar gesamt</CardLabel>
+                        <BigVal value={solarTotal > 0 ? solarTotal.toFixed(2) : '…'} unit="kWh" size={24} color={T.ok} />
+                        <div style={{ fontSize: 10, color: T.muted, fontFamily: T.fontMono, marginTop: 4 }}>BKW + Victron kombiniert</div>
+                        <Div />
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 4 }}>
+                          <div>
+                            <Sub>Balkonkraftwerk</Sub>
+                            <BigVal value={!isNaN(bkwGesamt) ? bkwGesamt.toFixed(2) : '…'} unit="kWh" size={17} color={T.spark.cyan} />
+                            <div style={{ fontSize: 10, color: T.muted, fontFamily: T.fontMono, marginTop: 2 }}>seit 27.03.2023</div>
+                            <div style={{ fontSize: 10, color: T.muted, fontFamily: T.fontMono }}>({!isNaN(bkwRaw) ? bkwRaw.toFixed(2) : '…'} + 178.78 kWh Offset)</div>
+                          </div>
+                          <div>
+                            <Sub>Victron MPPT</Sub>
+                            <BigVal value={!isNaN(pvGesamt) ? pvGesamt.toFixed(2) : '…'} unit="kWh" size={17} color={amberAcc} />
+                            <div style={{ fontSize: 10, color: T.muted, fontFamily: T.fontMono, marginTop: 2 }}>seit Inbetriebnahme</div>
+                          </div>
+                        </div>
+                      </Card>
+                      <Card accentColor={T.err}>
+                        <CardLabel icon="⚡" color={T.err}>Strom gesamt</CardLabel>
+                        <BigVal value={values['Stromzähler/Verbrauch_gesamt'] ?? '…'} unit="kWh" size={24} />
+                        <Div />
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 4 }}>
+                          <div>
+                            <Sub>Eingespeist gesamt</Sub>
+                            <BigVal value={values['Stromzähler/Eingespeist_gesamt'] ?? '…'} unit="kWh" size={17} color={T.ok} />
+                          </div>
+                          <div>
+                            <Sub>Gas gesamt</Sub>
+                            <BigVal value={values['Gaszaehler/stand'] ?? '…'} unit="m³" size={17} color={T.warn} />
+                          </div>
+                        </div>
+                      </Card>
+                      <Card accentColor={T.spark.cyan}>
+                        <CardLabel icon="🔋" color={T.spark.cyan}>Batterie</CardLabel>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                          <SocRing soc={V_SOC} size={54} />
+                          <div>
+                            <BigVal value={isNaN(V_BAT_V) ? '…' : V_BAT_V.toFixed(1)} unit="V" size={19} />
+                            <div style={{ marginTop: 4 }}>
+                              {!isNaN(V_BAT_STATE) && (
+                                <Badge color={V_BAT_STATE === 1 ? T.ok : V_BAT_STATE === 2 ? amberAcc : T.muted}>
+                                  {batStateLabel(V_BAT_STATE)}
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <StatRow label="Kapazität" value="3.5 kWh (Pylontech US3000C)" />
+                        <StatRow label="Strom"     value={isNaN(V_BAT_A) ? '…' : `${V_BAT_A.toFixed(1)} A`} />
+                        <StatRow label="Leistung"  value={isNaN(V_BAT_W) ? '…' : `${Math.round(V_BAT_W)} W`} />
+                        <StatRow label="Temp"      value={isNaN(V_BAT_T) ? '…' : `${V_BAT_T.toFixed(1)} °C`} />
+                      </Card>
+                    </div>
+                  </div>
+                )
+              })()}
 
               {/* Detail-Panel bei Klick auf Balken */}
               {verlaufDetail && (
