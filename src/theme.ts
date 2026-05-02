@@ -1,4 +1,4 @@
-// src/theme.ts  ──  Option B: dunklerer BG, Pill-Labels, farbige Card-Border
+// src/theme.ts – größere Schrift, bessere Lesbarkeit
 
 export const T = {
   bg:      '#080d14',
@@ -6,7 +6,7 @@ export const T = {
   border:  'rgba(255,255,255,0.07)',
 
   text:    '#e0eaff',
-  muted:   'rgba(224,234,255,0.35)',
+  muted:   'rgba(224,234,255,0.55)',   // war 0.35 – deutlich besser lesbar
 
   accent:  '#818cf8',
 
@@ -27,7 +27,7 @@ export const T = {
   fontLabel: '"Share Tech Mono", monospace',
   fontMono:  '"Share Tech Mono", monospace',
 
-  labelSize: '11px',
+  labelSize: '12px',   // war 11px
   radius:    7,
   btnRadius: '3px',
 } as const
