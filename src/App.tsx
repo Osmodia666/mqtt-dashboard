@@ -366,6 +366,20 @@ function App() {
   const [verlaufDetail, setVerlaufDetail] = useState<StatDay|null>(null)
   const [drillData,     setDrillData]     = useState<StatDay[]|null>(null)
   const [drillLabel,    setDrillLabel]    = useState<string>('')
+  const [hoveredBar,    setHoveredBar]    = useState<{d: StatDay; x: number; y: number}|null>(null)
+
+  // Strompreise
+  const PREIS_KWH    = 0.3110  // €/kWh Bezug
+  const GRUNDPREIS   = 165.00  // €/Jahr
+  const fEur = (v: number) => v >= 0 ? `+${v.toFixed(2)} €` : `${v.toFixed(2)} €`
+  const calcEuro = (verbrauch: number|null, erzeugung: number|null, days: number) => {
+    const v    = verbrauch  ?? 0
+    const e    = erzeugung  ?? 0
+    const gp   = GRUNDPREIS / 365 * days          // anteiliger Grundpreis
+    const cost = v * PREIS_KWH + gp               // Kosten Bezug + Grundpreis
+    const save = e * PREIS_KWH                    // gesparte Kosten durch Eigenverbrauch
+    return { cost, save, net: save - cost, gp }
+  }
   useEffect(() => {
     const onResize = () => setWinW(window.innerWidth)
     window.addEventListener('resize', onResize)
@@ -1462,29 +1476,43 @@ function App() {
               </div>
 
               {/* Zusammenfassung-Kacheln */}
-              {periodSum && (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 12 }}>
-                  <Card accentColor={T.err}>
-                    <CardLabel icon="⚡" color={T.err}>Verbrauch</CardLabel>
-                    <BigVal value={fkwh(periodSum.verbrauch_kwh)} size={18} color={T.err} />
-                  </Card>
-                  <Card accentColor={T.ok}>
-                    <CardLabel icon="🌿" color={T.ok}>Erzeugung</CardLabel>
-                    <BigVal value={fkwh(periodSum.erzeugung_kwh)} size={18} color={T.ok} />
-                    <div style={{ fontSize: 10, color: T.muted, marginTop: 3, fontFamily: T.fontMono }}>
-                      BKW: {fkwh(periodSum.bkw_kwh)} · PV: {fkwh(periodSum.solar_kwh)}
-                    </div>
-                  </Card>
-                  <Card accentColor={uebColor}>
-                    <CardLabel icon="⚖️" color={uebColor}>Bilanz</CardLabel>
-                    {(() => {
-                      const bilanz = (periodSum.erzeugung_kwh ?? 0) - (periodSum.verbrauch_kwh ?? 0)
-                      const col = bilanz >= 0 ? T.ok : T.err
-                      return <BigVal value={`${bilanz >= 0 ? '+' : ''}${bilanz.toFixed(1)} kWh`} size={18} color={col} />
-                    })()}
-                  </Card>
-                </div>
-              )}
+              {periodSum && (() => {
+                const days = verlaufZr === 'woche' ? 7 : verlaufZr === 'monat' ? 30 : 365
+                const euro = calcEuro(periodSum.verbrauch_kwh, periodSum.erzeugung_kwh, days)
+                const bilanz = (periodSum.erzeugung_kwh ?? 0) - (periodSum.verbrauch_kwh ?? 0)
+                const bilCol = bilanz >= 0 ? T.ok : T.err
+                return (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 12 }}>
+                    <Card accentColor={T.err}>
+                      <CardLabel icon="⚡" color={T.err}>Verbrauch</CardLabel>
+                      <BigVal value={fkwh(periodSum.verbrauch_kwh)} size={18} color={T.err} />
+                      <div style={{ fontSize: 11, color: T.muted, fontFamily: T.fontMono, marginTop: 4 }}>
+                        Kosten: {euro.cost.toFixed(2)} €
+                      </div>
+                      <div style={{ fontSize: 10, color: T.muted, fontFamily: T.fontMono }}>
+                        inkl. {euro.gp.toFixed(2)} € Grundpreis
+                      </div>
+                    </Card>
+                    <Card accentColor={T.ok}>
+                      <CardLabel icon="🌿" color={T.ok}>Erzeugung</CardLabel>
+                      <BigVal value={fkwh(periodSum.erzeugung_kwh)} size={18} color={T.ok} />
+                      <div style={{ fontSize: 11, color: T.ok, fontFamily: T.fontMono, marginTop: 4 }}>
+                        Ersparnis: {euro.save.toFixed(2)} €
+                      </div>
+                      <div style={{ fontSize: 10, color: T.muted, fontFamily: T.fontMono }}>
+                        BKW: {fkwh(periodSum.bkw_kwh)} · PV: {fkwh(periodSum.solar_kwh)}
+                      </div>
+                    </Card>
+                    <Card accentColor={bilCol}>
+                      <CardLabel icon="⚖️" color={bilCol}>Bilanz</CardLabel>
+                      <BigVal value={`${bilanz >= 0 ? '+' : ''}${bilanz.toFixed(1)} kWh`} size={18} color={bilCol} />
+                      <div style={{ fontSize: 12, color: euro.net >= 0 ? T.ok : T.err, fontFamily: T.fontMono, marginTop: 4, fontWeight: 700 }}>
+                        {euro.net >= 0 ? `Gespart: +${euro.net.toFixed(2)} €` : `Kosten: ${euro.net.toFixed(2)} €`}
+                      </div>
+                    </Card>
+                  </div>
+                )
+              })()}
 
               {/* Heute: einzelne Werte */}
               {verlaufZr === 'heute' && statHeute && (
@@ -1591,14 +1619,19 @@ function App() {
                           const vH = d.verbrauch_kwh  ? (d.verbrauch_kwh  / cMaxAll) * chartH : 0
                           const eH = d.erzeugung_kwh ? (d.erzeugung_kwh / cMaxAll) * chartH : 0
                           const isSelected = verlaufDetail?.date === d.date
+                          const isHov = hoveredBar?.d.date === d.date
                           return (
-                            <g key={d.date} onClick={() => handleBarClick(d)} style={{ cursor: 'pointer' }}>
+                            <g key={d.date}
+                              onClick={() => handleBarClick(d)}
+                              onMouseEnter={() => setHoveredBar({ d, x: x + cBarW, y: Math.min(chartH - vH, chartH - eH) })}
+                              onMouseLeave={() => setHoveredBar(null)}
+                              style={{ cursor: 'pointer' }}>
                               <rect x={x} y={chartH - vH} width={cBarW} height={vH}
-                                fill={T.err} opacity={isSelected ? 1 : 0.75} rx={2} />
+                                fill={T.err} opacity={isSelected || isHov ? 1 : 0.75} rx={2} />
                               <rect x={x + cBarW + 2} y={chartH - eH} width={cBarW} height={eH}
-                                fill={T.ok} opacity={isSelected ? 1 : 0.75} rx={2} />
-                              {isSelected && <rect x={x-1} y={0} width={cBarW*2+4} height={chartH}
-                                fill="rgba(255,255,255,0.05)" rx={2} />}
+                                fill={T.ok} opacity={isSelected || isHov ? 1 : 0.75} rx={2} />
+                              {(isSelected || isHov) && <rect x={x-1} y={0} width={cBarW*2+4} height={chartH}
+                                fill="rgba(255,255,255,0.04)" rx={2} />}
                               <text x={x + cBarW} y={chartH + 14} textAnchor="middle"
                                 fontSize={9} fill="rgba(224,234,255,0.4)" fontFamily={T.fontMono}>
                                 {cFormatDate(d.date)}
@@ -1606,6 +1639,35 @@ function App() {
                             </g>
                           )
                         })}
+                        {/* Hover-Tooltip */}
+                        {hoveredBar && (() => {
+                          const td   = hoveredBar.d
+                          const tw   = 160
+                          const tx   = Math.min(hoveredBar.x, Math.max(cTotalW,300) - tw - 5)
+                          const ty   = Math.max(55, (hoveredBar.y ?? 20))
+                          const days = verlaufZr === 'woche' ? 1 : verlaufZr === 'monat' ? 1 : verlaufZr === 'jahr' ? 30 : 1
+                          const euro = calcEuro(td.verbrauch_kwh, td.erzeugung_kwh, days)
+                          const netCol = euro.net >= 0 ? '#34d399' : '#f87171'
+                          return (
+                            <g style={{ pointerEvents: 'none' }}>
+                              <rect x={tx - 4} y={ty - 60} width={tw + 8} height={64} rx={5}
+                                fill="#0a0f1a" stroke="rgba(255,255,255,0.2)" strokeWidth={1} />
+                              <text x={tx} y={ty - 44} fontSize={11} fill={T.text} fontFamily={T.fontMono} fontWeight={700}>
+                                {td.date}
+                              </text>
+                              <text x={tx} y={ty - 28} fontSize={10} fill={T.err} fontFamily={T.fontMono}>
+                                {'▼ ' + (td.verbrauch_kwh != null ? td.verbrauch_kwh.toFixed(2) : '–') + ' kWh'}
+                              </text>
+                              <text x={tx + tw/2} y={ty - 28} fontSize={10} fill={T.ok} fontFamily={T.fontMono}>
+                                {'▲ ' + (td.erzeugung_kwh != null ? td.erzeugung_kwh.toFixed(2) : '–') + ' kWh'}
+                              </text>
+                              <text x={tx} y={ty - 12} fontSize={10} fill={netCol} fontFamily={T.fontMono} fontWeight={700}>
+                                {euro.net >= 0 ? 'Gespart: ' : 'Kosten:  '}
+                                {Math.abs(euro.net).toFixed(2)} €
+                              </text>
+                            </g>
+                          )
+                        })()}
                         {[0.25, 0.5, 0.75, 1].map(f => (
                           <g key={f}>
                             <line x1={0} y1={chartH * (1-f)} x2={Math.max(cTotalW,300)} y2={chartH * (1-f)}
@@ -1720,48 +1782,87 @@ function App() {
                             <div style={{ overflowX: 'auto' }}>
                               <svg width={cW} height={yChartH + 36} style={{ display: 'block' }}>
                                 {cData.map((d, i) => {
-                                  const x  = i * (cBarW * 2 + 8)
-                                  const vH = d.verbrauch_kwh  ? (d.verbrauch_kwh  / cMaxA) * yChartH : 0
-                                  const eH = d.erzeugung_kwh ? (d.erzeugung_kwh / cMaxA) * yChartH : 0
+                                  const x    = i * (cBarW * 2 + 8)
+                                  const vH   = d.verbrauch_kwh  ? (d.verbrauch_kwh  / cMaxA) * yChartH : 0
+                                  const eH   = d.erzeugung_kwh ? (d.erzeugung_kwh / cMaxA) * yChartH : 0
                                   const isSel = verlaufDetail?.date === d.date
+                                  const isHov = hoveredBar?.d.date === d.date
+                                  // Drill-Tiefe: 0=Jahr, 1=Monat, 2=Tag
+                                  const drillDepth = !drillData ? 0 : (drillData[0]?.date.length === 7 ? 1 : 2)
                                   return (
-                                    <g key={d.date} style={{ cursor: 'pointer' }} onClick={() => {
-                                      if (!drillData) {
-                                        // Jahr angeklickt → Monatsdetail
-                                        const yr = d.date
-                                        const months = Array.from(new Set(
-                                          statTage.filter(t => t.date.startsWith(yr)).map(t => t.date.slice(0,7))
-                                        )).sort()
-                                        const mData = months.map(m => {
-                                          const days = statTage.filter(t => t.date.startsWith(m))
-                                          const vS = days.reduce((s,t) => s + (t.verbrauch_kwh ?? 0), 0)
-                                          const eS = days.reduce((s,t) => s + (t.erzeugung_kwh ?? 0), 0)
-                                          return { date: m, verbrauch_kwh: vS>0?Math.round(vS*100)/100:null,
-                                                   erzeugung_kwh: eS>0?Math.round(eS*100)/100:null,
-                                                   bkw_kwh:null, solar_kwh:null, soc_min:null, soc_max:null, soc_avg:null }
-                                        })
-                                        setDrillData(mData)
-                                        setDrillLabel(`${yr} – Monatsdetail`)
-                                        setVerlaufDetail(null)
-                                      } else {
-                                        // Monat angeklickt → Tagesdetail
-                                        const days = statTage.filter(t => t.date.startsWith(d.date))
-                                        if (days.length > 0) {
-                                          setDrillData(days)
-                                          setDrillLabel(`${d.date} – Tagesverlauf`)
-                                          setVerlaufDetail(null)
+                                    <g key={d.date} style={{ cursor: 'pointer' }}
+                                      onMouseEnter={() => setHoveredBar({ d, x: x + cBarW, y: Math.min(yChartH - vH, yChartH - eH) })}
+                                      onMouseLeave={() => setHoveredBar(null)}
+                                      onClick={() => {
+                                        if (drillDepth === 0) {
+                                          // Jahr → Monate
+                                          const months = Array.from(new Set(
+                                            statTage.filter(t => t.date.startsWith(d.date)).map(t => t.date.slice(0,7))
+                                          )).sort()
+                                          const mData = months.map(m => {
+                                            const days = statTage.filter(t => t.date.startsWith(m))
+                                            const vS = days.reduce((s,t) => s + (t.verbrauch_kwh ?? 0), 0)
+                                            const eS = days.reduce((s,t) => s + (t.erzeugung_kwh ?? 0), 0)
+                                            return { date: m, verbrauch_kwh: vS>0?Math.round(vS*100)/100:null,
+                                                     erzeugung_kwh: eS>0?Math.round(eS*100)/100:null,
+                                                     bkw_kwh:null, solar_kwh:null, soc_min:null, soc_max:null, soc_avg:null }
+                                          })
+                                          if (mData.length > 0) { setDrillData(mData); setDrillLabel(`${d.date} – Monate`); setVerlaufDetail(null) }
+                                        } else if (drillDepth === 1) {
+                                          // Monat → Tage
+                                          const days = statTage.filter(t => t.date.startsWith(d.date))
+                                          if (days.length > 0) { setDrillData(days); setDrillLabel(`${d.date} – Tage`); setVerlaufDetail(null) }
+                                        } else {
+                                          // Tag → Detail-Panel
+                                          setVerlaufDetail(verlaufDetail?.date === d.date ? null : d)
                                         }
-                                      }
                                     }}>
-                                      <rect x={x} y={yChartH-vH} width={cBarW} height={vH} fill={T.err} opacity={0.8} rx={2} />
-                                      <rect x={x+cBarW+2} y={yChartH-eH} width={cBarW} height={eH} fill={T.ok} opacity={0.8} rx={2} />
+                                      <rect x={x} y={yChartH-vH} width={cBarW} height={vH}
+                                        fill={T.err} opacity={isHov||isSel ? 1 : 0.8} rx={2} />
+                                      <rect x={x+cBarW+2} y={yChartH-eH} width={cBarW} height={eH}
+                                        fill={T.ok} opacity={isHov||isSel ? 1 : 0.8} rx={2} />
+                                      {(isHov||isSel) && <rect x={x-1} y={0} width={cBarW*2+4} height={yChartH}
+                                        fill="rgba(255,255,255,0.04)" rx={2} />}
                                       <text x={x+cBarW} y={yChartH+14} textAnchor="middle"
-                                        fontSize={drillData ? 9 : 11} fill="rgba(224,234,255,0.5)" fontFamily={T.fontMono}>
-                                        {drillData ? (d.date.length===7 ? d.date.slice(5) : d.date.slice(5)) : d.date}
+                                        fontSize={drillDepth === 2 ? 8 : 10} fill="rgba(224,234,255,0.5)" fontFamily={T.fontMono}>
+                                        {drillDepth === 0 ? d.date : d.date.length === 7 ? d.date.slice(5) : d.date.slice(8)}
                                       </text>
                                     </g>
                                   )
                                 })}
+                                {/* Hover-Tooltip Gesamt-Chart */}
+                                {hoveredBar && (() => {
+                                  const td  = hoveredBar.d
+                                  const tw  = 165
+                                  const tx  = Math.min(hoveredBar.x, cW - tw - 5)
+                                  const ty  = Math.max(60, hoveredBar.y ?? 20)
+                                  const dys = td.date.length === 10
+                                    ? 1
+                                    : td.date.length === 7
+                                    ? statTage.filter(t => t.date.startsWith(td.date)).length
+                                    : statTage.filter(t => t.date.startsWith(td.date)).length
+                                  const euro = calcEuro(td.verbrauch_kwh, td.erzeugung_kwh, dys)
+                                  const netCol = euro.net >= 0 ? '#34d399' : '#f87171'
+                                  return (
+                                    <g style={{ pointerEvents: 'none' }}>
+                                      <rect x={tx-4} y={ty-62} width={tw+8} height={66} rx={5}
+                                        fill="#0a0f1a" stroke="rgba(255,255,255,0.2)" strokeWidth={1}/>
+                                      <text x={tx} y={ty-46} fontSize={11} fill={T.text} fontFamily={T.fontMono} fontWeight={700}>
+                                        {td.date}
+                                      </text>
+                                      <text x={tx} y={ty-30} fontSize={10} fill={T.err} fontFamily={T.fontMono}>
+                                        {'▼ '+(td.verbrauch_kwh!=null?td.verbrauch_kwh.toFixed(2):'–')+' kWh'}
+                                      </text>
+                                      <text x={tx+tw/2} y={ty-30} fontSize={10} fill={T.ok} fontFamily={T.fontMono}>
+                                        {'▲ '+(td.erzeugung_kwh!=null?td.erzeugung_kwh.toFixed(2):'–')+' kWh'}
+                                      </text>
+                                      <text x={tx} y={ty-14} fontSize={10} fill={netCol} fontFamily={T.fontMono} fontWeight={700}>
+                                        {euro.net>=0 ? 'Gespart:  ' : 'Kosten:   '}
+                                        {Math.abs(euro.net).toFixed(2)+' €'}
+                                      </text>
+                                    </g>
+                                  )
+                                })()}
                                 {[0.5, 1].map(f => (
                                   <g key={f}>
                                     <line x1={0} y1={yChartH*(1-f)} x2={cW} y2={yChartH*(1-f)}
@@ -1784,7 +1885,9 @@ function App() {
                             <span style={{ width: 10, height: 10, background: T.ok, borderRadius: 2, display: 'inline-block' }} />Erzeugung
                           </span>
                           <span style={{ marginLeft: 'auto' }}>
-                            {drillData ? 'Balken anklicken → Tagesdetail' : 'Jahr anklicken → Monatsdetail'}
+                            {!drillData ? 'Jahr anklicken → Monate'
+                              : drillData[0]?.date.length === 7 ? 'Monat anklicken → Tage'
+                              : 'Tag anklicken → Details · Hover für Werte'}
                           </span>
                         </div>
                       </Card>
@@ -1859,10 +1962,17 @@ function App() {
                     <div>
                       <div style={{ fontSize: 10, color: T.muted, fontFamily: T.fontMono, marginBottom: 3 }}>Bilanz</div>
                       {(() => {
-                        const b = (verlaufDetail.erzeugung_kwh ?? 0) - (verlaufDetail.verbrauch_kwh ?? 0)
-                        return <div style={{ fontSize: 20, fontWeight: 700, color: b >= 0 ? T.ok : T.err, fontFamily: T.fontMono }}>
-                          {b >= 0 ? '+' : ''}{b.toFixed(1)} kWh
-                        </div>
+                        const b    = (verlaufDetail.erzeugung_kwh ?? 0) - (verlaufDetail.verbrauch_kwh ?? 0)
+                        const euro = calcEuro(verlaufDetail.verbrauch_kwh, verlaufDetail.erzeugung_kwh, 1)
+                        const col  = b >= 0 ? T.ok : T.err
+                        return <>
+                          <div style={{ fontSize: 20, fontWeight: 700, color: col, fontFamily: T.fontMono }}>
+                            {b >= 0 ? '+' : ''}{b.toFixed(1)} kWh
+                          </div>
+                          <div style={{ fontSize: 12, color: euro.net >= 0 ? T.ok : T.err, fontFamily: T.fontMono, marginTop: 3, fontWeight: 700 }}>
+                            {euro.net >= 0 ? `Gespart: +${euro.net.toFixed(2)} €` : `Kosten: ${euro.net.toFixed(2)} €`}
+                          </div>
+                        </>
                       })()}
                     </div>
                     <div>
