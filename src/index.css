@@ -25,7 +25,7 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 @media (max-width: 600px) {
@@ -40,8 +40,8 @@ body {
 
 /* ── Card-Label-Schrift ── */
 .card-label-text { }
-@media (min-width: 900px)  { .card-label-text { font-size: 12px !important; } }
-@media (min-width: 1400px) { .card-label-text { font-size: 13px !important; } }
+@media (min-width: 900px)  { .card-label-text { font-size: 13px !important; } }
+@media (min-width: 1400px) { .card-label-text { font-size: 14px !important; } }
 
 /* ── Top grid: 6 → 3 → 2 → 1 Spalten ── */
 .grid-top {
@@ -166,10 +166,10 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.08em;
-  padding: 3px 9px;
+  letter-spacing: 0.07em;
+  padding: 3px 10px;
   border-radius: 3px;
   margin-bottom: 9px;
   text-transform: uppercase;
@@ -177,7 +177,7 @@ body {
 
 /* ── MinMax kompakt ── */
 .minmax-compact {
-  font-size: 10px;
+  font-size: 11px;
   color: rgba(224,234,255,0.3);
   margin-top: 3px;
   font-family: 'Share Tech Mono', monospace;
