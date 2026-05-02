@@ -1577,8 +1577,8 @@ function App() {
                 </div>
               )}
 
-              {/* Zusammenfassung-Kacheln */}
-              {periodSum && (() => {
+              {/* Zusammenfassung-Kacheln – nur Strom */}
+              {verlaufAnsicht === 'strom' && periodSum && (() => {
                 const days = verlaufZr === 'woche' ? 7 : verlaufZr === 'monat' ? 30 : 365
                 const euro = calcEuro(periodSum.verbrauch_kwh, periodSum.erzeugung_kwh, days)
                 const bilanz = (periodSum.erzeugung_kwh ?? 0) - (periodSum.verbrauch_kwh ?? 0)
