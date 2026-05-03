@@ -1910,7 +1910,10 @@ function App() {
               {/* ── GAS ANSICHT ── */}
               {verlaufAnsicht === 'gas' && verlaufZr !== 'heute' && verlaufZr !== 'gesamt' && (() => {
                 const gasData  = periodData.filter(d => d.gas_m3 !== null)
-                const gasSum   = periodSum?.gas_m3
+                // Summe direkt aus periodData berechnen (periodSum.gas_m3 kann null sein wenn nur wenige Tage Daten)
+                const gasSum   = gasData.length > 0
+                  ? Math.round(gasData.reduce((s,d) => s + (d.gas_m3 ?? 0), 0) * 1000) / 1000
+                  : null
                 const maxGas   = Math.max(...periodData.map(d => d.gas_m3 ?? 0), 0.1)
                 const gBarW    = verlaufZr === 'jahr' ? 12 : verlaufZr === 'monat' ? 18 : 32
                 const gChartH  = 120
@@ -2011,9 +2014,14 @@ function App() {
                         </div>
                       </Card>
                     )}
-                    {gasData.length < 2 && (
+                    {gasData.length === 0 && (
                       <div style={{ textAlign: 'center', padding: '30px', color: T.muted, fontFamily: T.fontMono, fontSize: 12 }}>
                         Noch keine Gas-Verlaufsdaten – history.0 für 0_userdata.0.Gaszaehler.kWhZaehler aktivieren
+                      </div>
+                    )}
+                    {gasData.length === 1 && (
+                      <div style={{ textAlign: 'center', padding: '16px', color: T.muted, fontFamily: T.fontMono, fontSize: 11 }}>
+                        Erst 1 Tag Daten – Balkendiagramm ab 2 Tagen verfügbar
                       </div>
                     )}
                   </>
