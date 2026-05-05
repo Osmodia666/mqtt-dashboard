@@ -1909,17 +1909,35 @@ function App() {
 
               {/* ── GAS ANSICHT ── */}
               {verlaufAnsicht === 'gas' && verlaufZr !== 'heute' && verlaufZr !== 'gesamt' && (() => {
-                const gasData  = periodData.filter(d => d.gas_m3 !== null)
-                // Summe direkt aus periodData berechnen (periodSum.gas_m3 kann null sein wenn nur wenige Tage Daten)
+                const GAS_PREIS = 0.11
+                const gasKwhM3  = 10.0
+                const gChartH   = 120
+                // Für Jahr: nach Monat aggregieren
+                const gasBarData = verlaufZr === 'jahr'
+                  ? (() => {
+                      const months = Array.from(new Set(periodData.map(d => d.date.slice(0,7)))).sort()
+                      return months.map(m => {
+                        const days = periodData.filter(d => d.date.startsWith(m) && d.gas_m3 !== null)
+                        const sum  = days.reduce((s,d) => s + (d.gas_m3 ?? 0), 0)
+                        return { date: m, gas_m3: days.length > 0 ? Math.round(sum*1000)/1000 : null } as StatDay
+                      })
+                    })()
+                  : periodData
+                const gasData  = gasBarData.filter(d => d.gas_m3 !== null)
                 const gasSum   = gasData.length > 0
                   ? Math.round(gasData.reduce((s,d) => s + (d.gas_m3 ?? 0), 0) * 1000) / 1000
                   : null
-                const maxGas   = Math.max(...periodData.map(d => d.gas_m3 ?? 0), 0.1)
-                const gBarW    = verlaufZr === 'jahr' ? 12 : verlaufZr === 'monat' ? 18 : 32
-                const gChartH  = 120
-                const gTotalW  = Math.max(periodData.length * (gBarW + 8), 300)
-                const GAS_PREIS = 0.11  // €/kWh Gas ≈ ca. 1.1 ct/kWh × Brennwert ~10 kWh/m³
-                const gasKwhM3  = 10.0  // kWh pro m³ Gas (Richtwert, je nach Heizwert)
+                const maxGas   = Math.max(...gasBarData.map(d => d.gas_m3 ?? 0), 0.1)
+                const gBarW    = verlaufZr === 'jahr' ? 28 : verlaufZr === 'monat' ? 18 : 32
+                const gTotalW  = Math.max(gasBarData.length * (gBarW + 8), 300)
+                const chartLabel = verlaufZr === 'jahr' ? 'Gasverbrauch monatlich'
+                  : verlaufZr === 'monat' ? 'Gasverbrauch täglich (Monat)'
+                  : 'Gasverbrauch täglich (7 Tage)'
+                const fmtGasDate = (s: string) => {
+                  if (s.length === 7) return s.slice(5)
+                  const d = new Date(s + 'T12:00:00')
+                  return verlaufZr === 'monat' ? `${d.getDate()}.` : ['So','Mo','Di','Mi','Do','Fr','Sa'][d.getDay()]
+                }
                 return (
                   <>
                     {/* Gas Zusammenfassung */}
@@ -1949,12 +1967,12 @@ function App() {
                     </div>
 
                     {/* Gas Balkendiagramm */}
-                    {gasData.length >= 2 && (
+                    {gasData.length >= 1 && (
                       <Card accentColor={T.warn} style={{ marginBottom: 12, padding: '12px 13px' }}>
-                        <CardLabel icon="📊" color={T.warn}>Gasverbrauch täglich</CardLabel>
+                        <CardLabel icon="📊" color={T.warn}>{chartLabel}</CardLabel>
                         <div style={{ overflowX: 'auto' }}>
                           <svg width={gTotalW} height={gChartH + 40} style={{ display: 'block' }}>
-                            {periodData.map((d, i) => {
+                            {gasBarData.map((d, i) => {
                               const x  = i * (gBarW + 8)
                               const h  = d.gas_m3 ? (d.gas_m3 / maxGas) * gChartH : 0
                               const isHov = hoveredBar?.d.date === d.date
@@ -1962,15 +1980,20 @@ function App() {
                                 : d.gas_m3 && d.gas_m3 > (maxGas * 0.4) ? T.warn : T.ok
                               return (
                                 <g key={d.date}
-                                  onMouseEnter={() => d.gas_m3 !== null && setHoveredBar({ d, x: x + gBarW/2, y: gChartH - h })}
+                                  onMouseEnter={() => d.gas_m3 !== null && setHoveredBar({ d: {...d, verbrauch_kwh:null, erzeugung_kwh:null, bkw_kwh:null, solar_kwh:null, soc_min:null, soc_max:null, soc_avg:null}, x: x + gBarW/2, y: gChartH - h })}
                                   onMouseLeave={() => setHoveredBar(null)}
-                                  onClick={() => setVerlaufDetail(verlaufDetail?.date === d.date ? null : d)}
+                                  onClick={() => {
+                                    if (verlaufZr === 'jahr' && d.date.length === 7) {
+                                      const days = periodData.filter(t => t.date.startsWith(d.date) && t.gas_m3 !== null)
+                                      if (days.length > 0) { setDrillData(days); setDrillLabel(`${d.date} – Tage`); }
+                                    }
+                                  }}
                                   style={{ cursor: 'pointer' }}>
                                   <rect x={x} y={gChartH - h} width={gBarW} height={h}
                                     fill={col} opacity={isHov ? 1 : 0.75} rx={2} />
                                   <text x={x + gBarW/2} y={gChartH + 14} textAnchor="middle"
                                     fontSize={9} fill="rgba(224,234,255,0.4)" fontFamily={T.fontMono}>
-                                    {formatDate(d.date)}
+                                    {fmtGasDate(d.date)}
                                   </text>
                                 </g>
                               )
@@ -2019,7 +2042,7 @@ function App() {
                         Noch keine Gas-Verlaufsdaten – history.0 für 0_userdata.0.Gaszaehler.kWhZaehler aktivieren
                       </div>
                     )}
-                    {gasData.length === 1 && (
+                    {false && /* einzelner Tag reicht jetzt für Chart */ (
                       <div style={{ textAlign: 'center', padding: '16px', color: T.muted, fontFamily: T.fontMono, fontSize: 11 }}>
                         Erst 1 Tag Daten – Balkendiagramm ab 2 Tagen verfügbar
                       </div>
@@ -2059,7 +2082,7 @@ function App() {
                       <Card accentColor={T.spark.power} style={{ padding: '12px 13px', marginBottom: 4 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
                           <CardLabel icon="📊" color={T.spark.power}>
-                            {drillData ? drillLabel : 'Jahresübersicht – Verbrauch vs. Erzeugung'}
+                            {drillData ? drillLabel : 'Gesamt – Jahre im Vergleich'}
                           </CardLabel>
                           {drillData && (
                             <button onClick={() => { setDrillData(null); setDrillLabel(''); setVerlaufDetail(null); }} style={{
