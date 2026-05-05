@@ -1930,9 +1930,9 @@ function App() {
                 const maxGas   = Math.max(...gasBarData.map(d => d.gas_m3 ?? 0), 0.1)
                 const gBarW    = verlaufZr === 'jahr' ? 28 : verlaufZr === 'monat' ? 18 : 32
                 const gTotalW  = Math.max(gasBarData.length * (gBarW + 8), 300)
-                const chartLabel = verlaufZr === 'jahr' ? 'Gasverbrauch monatlich'
-                  : verlaufZr === 'monat' ? 'Gasverbrauch täglich (Monat)'
-                  : 'Gasverbrauch täglich (7 Tage)'
+                const chartLabel = verlaufZr === 'jahr' ? 'Gasverbrauch · nach Monat'
+                  : verlaufZr === 'monat' ? 'Gasverbrauch · täglich'
+                  : 'Gasverbrauch · täglich'
                 const fmtGasDate = (s: string) => {
                   if (s.length === 7) return s.slice(5)
                   const d = new Date(s + 'T12:00:00')
