@@ -1943,13 +1943,18 @@ function App() {
                     {/* Gas Zusammenfassung */}
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, marginBottom: 12 }}>
                       <Card accentColor={T.warn}>
-                        <CardLabel icon="🔥" color={T.warn}>Gasverbrauch</CardLabel>
-                        <BigVal value={gasSum != null ? `${gasSum.toFixed(2)}` : '–'} unit="m³" size={21} color={T.warn} />
+                        <CardLabel icon="🔥" color={T.warn}>
+                          {verlaufZr === 'woche' ? 'Gas · 7 Tage' : verlaufZr === 'monat' ? 'Gas · Monat' : 'Gas · Jahr'}
+                        </CardLabel>
+                        <BigVal value={gasSum != null ? `${gasSum.toFixed(3)}` : '–'} unit="m³" size={21} color={T.warn} />
                         <div style={{ fontSize: 11, color: T.muted, fontFamily: T.fontMono, marginTop: 4 }}>
                           ≈ {gasSum != null ? (gasSum * gasKwhM3).toFixed(0) : '–'} kWh Wärme
                         </div>
                         <div style={{ fontSize: 11, color: T.warn, fontFamily: T.fontMono, marginTop: 2 }}>
                           ≈ {gasSum != null ? (gasSum * gasKwhM3 * GAS_PREIS).toFixed(2) : '–'} € Kosten
+                        </div>
+                        <div style={{ fontSize: 10, color: T.muted, fontFamily: T.fontMono, marginTop: 4 }}>
+                          {gasData.length} von {periodData.length} Tagen mit Daten
                         </div>
                       </Card>
                       <Card accentColor={T.muted as string}>
