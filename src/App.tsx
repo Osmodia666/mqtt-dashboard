@@ -2234,9 +2234,9 @@ function App() {
                             <div style={{ fontSize: 10, color: T.muted, fontFamily: T.fontMono }}>({!isNaN(bkwRaw) ? bkwRaw.toFixed(2) : '…'} + 178.78 kWh)</div>
                           </div>
                           <div>
-                            <Sub>Victron MPPT</Sub>
+                            <Sub>Victron Multiplus II</Sub>
                             <BigVal value={!isNaN(pvGesamt) ? pvGesamt.toFixed(2) : '…'} unit="kWh" size={17} color={amberAcc} />
-                            <div style={{ fontSize: 11, color: T.muted, fontFamily: T.fontMono, marginTop: 2 }}>seit Inbetriebnahme 13.04.2026</div>
+                            <div style={{ fontSize: 11, color: T.muted, fontFamily: T.fontMono, marginTop: 2 }}>seit 13.04.2026</div>
                           </div>
                         </div>
                       </Card>
