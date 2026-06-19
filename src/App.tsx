@@ -2231,8 +2231,7 @@ function App() {
                             <Sub>Balkonkraftwerk</Sub>
                             <BigVal value={!isNaN(bkwGesamt) ? bkwGesamt.toFixed(2) : '…'} unit="kWh" size={17} color={T.spark.cyan} />
                             <div style={{ fontSize: 11, color: T.muted, fontFamily: T.fontMono, marginTop: 2 }}>seit 27.03.2023</div>
-                            <div style={{ fontSize: 10, color: T.muted, fontFamily: T.fontMono }}>({!isNaN(bkwRaw) ? bkwRaw.toFixed(2) : '…'} + 178.78 kWh)</div>
-                          </div>
+                           </div>
                           <div>
                             <Sub>Victron Multiplus II</Sub>
                             <BigVal value={!isNaN(pvGesamt) ? pvGesamt.toFixed(2) : '…'} unit="kWh" size={17} color={amberAcc} />
