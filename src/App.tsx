@@ -68,7 +68,7 @@ const batStateLabel = (s: number) => {
 const EXPLICIT_SUBSCRIBES = [
   'tele/Stromzähler/SENSOR',
   'tele/Balkonkraftwerk/SENSOR',
-  'Pool_temp/temperatur',
+  'pool/temperatur',
   'Gaszaehler/stand',
   'stat/+/POWER',
   'stat/+/POWER1',
@@ -1179,7 +1179,7 @@ function App() {
                 <CardLabel icon="🏊" color={T.spark.energy}>Pool</CardLabel>
                 {(() => {
                   const pumpe   = topics.find(x => x.label === 'Poolpumpe')
-                  const tempKey = 'Pool_temp/temperatur'
+                  const tempKey = 'pool/temperatur'
                   const raw     = values[tempKey]
                   const val     = raw !== undefined ? parseFloat(raw) : NaN
                   const range   = minMax[tempKey] ?? { min: val, max: val }
