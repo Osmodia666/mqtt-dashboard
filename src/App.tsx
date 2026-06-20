@@ -1,4 +1,4 @@
-// src/App.tsx
+ // src/App.tsx
 import { useEffect, useState, useRef } from 'react'
 import mqtt from 'mqtt'
 import { mqttConfig, topics, VICTRON_PORTAL_ID, ESS_MODES, INVERTER_MODES } from './config'
@@ -466,7 +466,7 @@ function App() {
       if (topic === MINMAX_TOPIC) {
         try { const d = JSON.parse(payload); setMinMax(d); saveCachedMinMax(d) } catch {} ; return
       }
-      if (topic === 'Pool_temp/temperatur' || topic === 'Gaszaehler/stand') {
+      if (topic === 'pool/temperatur' || topic === 'Gaszaehler/stand') {
         messageQueue.current[topic] = payload; return
       }
       // Toggle-Sperre: stat/POWER Topics 2s nach Toggle ignorieren
