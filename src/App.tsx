@@ -1184,7 +1184,12 @@ function App() {
                   const val     = raw !== undefined ? parseFloat(raw) : NaN
                   const range   = minMax[tempKey] ?? { min: val, max: val }
                   const h       = hist[tempKey] ?? []
-                  const col     = val > 23 ? T.ok : val > 17 ? T.warn : T.spark.cyan
+                  const col =
+                  val >= 26 ? T.err :
+                  val >= 25 ? T.warn :
+                  val > 23  ? T.ok :
+                  val > 17  ? '#facc15' :   // gelb
+                       T.spark.cyan  // blau
                   return <>
                     <SwitchRow label="Pumpe" on={isOn(values[pumpe?.statusTopic ?? ''])}
                       onClick={() => pumpe && toggle(pumpe.publishTopic!, values[pumpe.statusTopic])} />
