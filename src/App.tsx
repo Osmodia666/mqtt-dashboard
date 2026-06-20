@@ -1265,30 +1265,45 @@ function App() {
                 <StatRow label="Status" value={isNaN(V_MPPT_STATE) ? '…' : mpptStateLabel(V_MPPT_STATE)} />
               </Card>
 
-              {/* Steckdosen 1 */}
-              <Card accentColor={T.spark.power}>
-                <CardLabel icon="🔌" color={T.spark.power}>Steckdosen 1</CardLabel>
-                {['Steckdose 1', 'Steckdose 2'].map(label => {
-                  const t = topics.find(x => x.label === label)
-                  if (!t) return null
-                  return <SwitchRow key={label} label={label} on={isOn(values[t.statusTopic])} onClick={() => toggle(t.publishTopic!, values[t.statusTopic])} />
-                })}
-                <SwitchRow label="Doppelsteckdose"
-                  on={isOn(values['stat/Doppelsteckdose/POWER'])}
-                  onClick={() => toggle('cmnd/Doppelsteckdose/POWER', values['stat/Doppelsteckdose/POWER'])} />
-              </Card>
+             <Card accentColor={T.spark.power}>
+  <CardLabel icon="🔌" color={T.spark.power}>
+    Steckdosen & Beleuchtung
+  </CardLabel>
 
-              {/* Beleuchtung */}
-              <Card accentColor={T.spark.purple}>
-                <CardLabel icon="💡" color={T.spark.purple}>Steckdosen + Beleuchtung</CardLabel>
-                {[
-                  { label: 'Teichpumpe',    pub: 'cmnd/Teichpumpe/POWER',    stat: 'stat/Teichpumpe/POWER' },
-                  { label: 'Beleuchtung',   pub: 'cmnd/Beleuchtung/POWER',   stat: 'stat/Beleuchtung/POWER' },
-                  { label: 'Carport-Licht', pub: 'cmnd/Carport-Licht/POWER', stat: 'stat/Carport-Licht/POWER' },
-                ].map(({ label, pub, stat }) => (
-                  <SwitchRow key={label} label={label} on={isOn(values[stat])} onClick={() => toggle(pub, values[stat])} />
-                ))}
-              </Card>
+  {['Steckdose 1', 'Steckdose 2'].map(label => {
+    const t = topics.find(x => x.label === label)
+    if (!t) return null
+    return (
+      <SwitchRow
+        key={label}
+        label={label}
+        on={isOn(values[t.statusTopic])}
+        onClick={() => toggle(t.publishTopic!, values[t.statusTopic])}
+      />
+    )
+  })}
+
+  <SwitchRow
+    label="Doppelsteckdose"
+    on={isOn(values['stat/Doppelsteckdose/POWER'])}
+    onClick={() => toggle('cmnd/Doppelsteckdose/POWER', values['stat/Doppelsteckdose/POWER'])}
+  />
+
+  <Div />
+
+  {[
+    { label: 'Teichpumpe',    pub: 'cmnd/Teichpumpe/POWER',    stat: 'stat/Teichpumpe/POWER' },
+    { label: 'Beleuchtung',   pub: 'cmnd/Beleuchtung/POWER',   stat: 'stat/Beleuchtung/POWER' },
+    { label: 'Carport-Licht', pub: 'cmnd/Carport-Licht/POWER', stat: 'stat/Carport-Licht/POWER' },
+  ].map(({ label, pub, stat }) => (
+    <SwitchRow
+      key={label}
+      label={label}
+      on={isOn(values[stat])}
+      onClick={() => toggle(pub, values[stat])}
+    />
+  ))}
+</Card>
 
             </div>
           </>
