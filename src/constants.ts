@@ -52,43 +52,28 @@ export const EXPLICIT_SUBSCRIBES = [
 ]
 
 export const mpptStateLabel = (s: number): string => {
-  switch (s) {
-    case 0:
-      return 'Aus'
-    case 2:
-      return 'Fehler'
-    case 3:
-      return 'Bulk'
-    case 4:
-      return 'Absorption'
-    case 5:
-      return 'Float'
-    case 7:
-      return 'Manuell'
-    case 11:
-      return 'Laden'
-    case 245:
-      return 'Starten'
-    case 247:
-      return 'Laden'
-    case 252:
-      return 'Ext. Steuerung'
-    default:
-      return `Status ${s}`
+  const labels: Record<number, string> = {
+    0: 'Aus',
+    2: 'Fehler',
+    3: 'Bulk',
+    4: 'Absorption',
+    5: 'Float',
+    7: 'Manuell',
+    11: 'Laden',
+    245: 'Starten',
+    247: 'Laden',
+    252: 'Ext. Steuerung',
   }
+  return labels[s] ?? `Status ${s}`
 }
 
 export const batStateLabel = (s: number): string => {
-  switch (s) {
-    case 0:
-      return 'Bereit'
-    case 1:
-      return 'Laden'
-    case 2:
-      return 'Entladen'
-    default:
-      return `Status ${s}`
+  const labels: Record<number, string> = {
+    0: 'Bereit',
+    1: 'Laden',
+    2: 'Entladen',
   }
+  return labels[s] ?? `Status ${s}`
 }
 
 export const leistungColor = (w: number): string => {
@@ -113,6 +98,8 @@ export const PREIS_KWH = 0.311
 export const GRUNDPREIS = 165.0
 export const GAS_PREIS = 0.11
 export const GAS_KWH_M3 = 10.0
+
+export type Tab = 'uebersicht' | 'energie' | 'victron' | 'steuerung' | 'verlauf'
 
 export const TABS: { id: Tab; label: string; icon: string }[] = [
   { id: 'uebersicht', label: 'Übersicht', icon: '⚡' },
