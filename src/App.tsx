@@ -1686,7 +1686,7 @@ function App() {
                   {verlaufAnsicht === 'strom' && (hist[VICTRON_TOPICS.soc] ?? []).length >= 2 && (
                     <Card accentColor={T.spark.cyan} style={{ marginBottom: 12, padding: '12px 13px' }}>
                       <CardLabel icon="🔋" color={T.spark.cyan}>Batterie SOC – heute</CardLabel>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: T.muted, fontFamily: T.fontMono, marginBottom: 4 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: T.muted, fontFamily: T.fontMono, marginBottom: 4 }}>
                         <span>Min: {statHeute.soc_min ?? Math.min(...(hist[VICTRON_TOPICS.soc] ?? []).filter(v=>!isNaN(v))).toFixed(0)}%</span>
                         <span>Ø {statHeute.soc_avg ?? Math.round((hist[VICTRON_TOPICS.soc] ?? []).reduce((a,b)=>a+b,0)/Math.max((hist[VICTRON_TOPICS.soc]??[]).length,1))}%</span>
                         <span>Max: {statHeute.soc_max ?? Math.max(...(hist[VICTRON_TOPICS.soc] ?? []).filter(v=>!isNaN(v))).toFixed(0)}%</span>
