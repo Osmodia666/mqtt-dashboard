@@ -68,7 +68,7 @@ const batStateLabel = (s: number) => {
 const EXPLICIT_SUBSCRIBES = [
   'tele/Stromzähler/SENSOR',
   'tele/Balkonkraftwerk/SENSOR',
-  'Pool_temp/temperatur',
+  'Pool/temperatur',
   'Gaszaehler/stand',
   'stat/+/POWER',
   'stat/+/POWER1',
