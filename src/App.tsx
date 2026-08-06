@@ -474,7 +474,7 @@ function App() {
       if (topic === MINMAX_TOPIC) {
         try { const d = JSON.parse(payload); setMinMax(d); saveCachedMinMax(d) } catch {} ; return
       }
-      if (topic === 'Pool_temp/temperatur' || topic === 'Gaszaehler/stand') {
+      if (topic === 'Pool/temperatur' || topic === 'Gaszaehler/stand') {
         messageQueue.current[topic] = payload; return
       }
       // Toggle-Sperre: stat/POWER Topics 2s nach Toggle ignorieren
@@ -1235,7 +1235,7 @@ function App() {
                 <CardLabel icon="🏊" color={T.spark.energy}>Pool</CardLabel>
                 {(() => {
                   const pumpe   = topics.find(x => x.label === 'Poolpumpe')
-                  const tempKey = 'Pool_temp/temperatur'
+                  const tempKey = 'Pool/temperatur'
                   const raw     = values[tempKey]
                   const val     = raw !== undefined ? parseFloat(raw) : NaN
                   const range   = minMax[tempKey] ?? { min: val, max: val }
