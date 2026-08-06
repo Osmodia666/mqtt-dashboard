@@ -459,7 +459,7 @@ function App() {
       // Tasmota 15.x: initialen Status aller Geräte abfragen (STATE statt leerem POWER)
       const tasmotaDevices = [
         'Steckdose_1','Steckdose_2','Doppelsteckdose',
-        'Teichpumpe','Beleuchtung','Carport-Licht','poolpumpe','Sidewinder_X1'
+        'Teichpumpe','Beleuchtung','Carport-Licht','Poolpumpe','Sidewinder_X1'
       ]
       tasmotaDevices.forEach(d => client.publish(`cmnd/${d}/State`, ''))
       setTimeout(() => { client.publish(REQUEST_TOPIC, JSON.stringify({ ts: Date.now() })) }, 500)
@@ -1232,9 +1232,9 @@ function App() {
 
               {/* pool */}
               <Card accentColor={T.spark.energy}>
-                <CardLabel icon="🏊" color={T.spark.energy}>pool</CardLabel>
+                <CardLabel icon="🏊" color={T.spark.energy}>Pool</CardLabel>
                 {(() => {
-                  const pumpe   = topics.find(x => x.label === 'poolpumpe')
+                  const pumpe   = topics.find(x => x.label === 'Poolpumpe')
                   const tempKey = 'pool/temperatur'
                   const raw     = values[tempKey]
                   const val     = raw !== undefined ? parseFloat(raw) : NaN
@@ -2362,7 +2362,7 @@ function App() {
             </Card>
 
             <Card accentColor={T.spark.energy}>
-              <CardLabel icon="🏊" color={T.spark.energy}>pool</CardLabel>
+              <CardLabel icon="🏊" color={T.spark.energy}>Pool</CardLabel>
               {(() => {
                 const pumpe = topics.find(x => x.label === 'poolpumpe')
                 return <SwitchRow label="Pumpe" on={isOn(values[pumpe?.statusTopic ?? ''])}
