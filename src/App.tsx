@@ -68,7 +68,7 @@ const batStateLabel = (s: number) => {
 const EXPLICIT_SUBSCRIBES = [
   'tele/Stromzähler/SENSOR',
   'tele/Balkonkraftwerk/SENSOR',
-  'Pool/temperatur',
+  'pool/temperatur',
   'Gaszaehler/stand',
   'stat/+/POWER',
   'stat/+/POWER1',
@@ -459,7 +459,7 @@ function App() {
       // Tasmota 15.x: initialen Status aller Geräte abfragen (STATE statt leerem POWER)
       const tasmotaDevices = [
         'Steckdose_1','Steckdose_2','Doppelsteckdose',
-        'Teichpumpe','Beleuchtung','Carport-Licht','Poolpumpe','Sidewinder_X1'
+        'Teichpumpe','Beleuchtung','Carport-Licht','poolpumpe','Sidewinder_X1'
       ]
       tasmotaDevices.forEach(d => client.publish(`cmnd/${d}/State`, ''))
       setTimeout(() => { client.publish(REQUEST_TOPIC, JSON.stringify({ ts: Date.now() })) }, 500)
@@ -474,7 +474,7 @@ function App() {
       if (topic === MINMAX_TOPIC) {
         try { const d = JSON.parse(payload); setMinMax(d); saveCachedMinMax(d) } catch {} ; return
       }
-      if (topic === 'Pool/temperatur' || topic === 'Gaszaehler/stand') {
+      if (topic === 'pool/temperatur' || topic === 'Gaszaehler/stand') {
         messageQueue.current[topic] = payload; return
       }
       // Toggle-Sperre: stat/POWER Topics 2s nach Toggle ignorieren
@@ -1230,12 +1230,12 @@ function App() {
 
             <div className="grid-top" style={{ marginBottom: 8 }}>
 
-              {/* Pool */}
+              {/* pool */}
               <Card accentColor={T.spark.energy}>
-                <CardLabel icon="🏊" color={T.spark.energy}>Pool</CardLabel>
+                <CardLabel icon="🏊" color={T.spark.energy}>pool</CardLabel>
                 {(() => {
-                  const pumpe   = topics.find(x => x.label === 'Poolpumpe')
-                  const tempKey = 'Pool/temperatur'
+                  const pumpe   = topics.find(x => x.label === 'poolpumpe')
+                  const tempKey = 'pool/temperatur'
                   const raw     = values[tempKey]
                   const val     = raw !== undefined ? parseFloat(raw) : NaN
                   const range   = minMax[tempKey] ?? { min: val, max: val }
@@ -2362,9 +2362,9 @@ function App() {
             </Card>
 
             <Card accentColor={T.spark.energy}>
-              <CardLabel icon="🏊" color={T.spark.energy}>Pool</CardLabel>
+              <CardLabel icon="🏊" color={T.spark.energy}>pool</CardLabel>
               {(() => {
-                const pumpe = topics.find(x => x.label === 'Poolpumpe')
+                const pumpe = topics.find(x => x.label === 'poolpumpe')
                 return <SwitchRow label="Pumpe" on={isOn(values[pumpe?.statusTopic ?? ''])}
                   onClick={() => pumpe && toggle(pumpe.publishTopic!, values[pumpe.statusTopic])} />
               })()}
