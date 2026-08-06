@@ -68,7 +68,7 @@ const batStateLabel = (s: number) => {
 const EXPLICIT_SUBSCRIBES = [
   'tele/Stromzähler/SENSOR',
   'tele/Balkonkraftwerk/SENSOR',
-  'pool/temperatur',
+  'Pool_temp/temperatur',
   'Gaszaehler/stand',
   'stat/+/POWER',
   'stat/+/POWER1',
@@ -474,7 +474,7 @@ function App() {
       if (topic === MINMAX_TOPIC) {
         try { const d = JSON.parse(payload); setMinMax(d); saveCachedMinMax(d) } catch {} ; return
       }
-      if (topic === 'pool/temperatur' || topic === 'Gaszaehler/stand') {
+      if (topic === 'Pool_temp/temperatur' || topic === 'Gaszaehler/stand') {
         messageQueue.current[topic] = payload; return
       }
       // Toggle-Sperre: stat/POWER Topics 2s nach Toggle ignorieren
@@ -1158,25 +1158,28 @@ function App() {
             {/* Victron-Panel: Batterie + MPPT + Lebensdauer als kompakte Zeile */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 8 }}>
 
-              {/* Batterie */}
+              {/* Batterie – kompakt */}
               <Card accentColor={socColor}>
                 <CardLabel icon="🔋" color={socColor}>Batterie · Pylontech</CardLabel>
-                <div className="soc-wrap" style={{ marginBottom: 6 }}>
-                  <SocRing soc={V_SOC} size={50} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                  <SocRing soc={V_SOC} size={40} />
                   <div>
-                    <BigVal value={isNaN(V_BAT_V) ? '…' : V_BAT_V.toFixed(1)} unit="V" size={18} />
-                    <div style={{ marginTop: 3 }}>
-                      {!isNaN(V_BAT_STATE) && (
-                        <Badge color={V_BAT_STATE === 1 ? T.ok : V_BAT_STATE === 2 ? amberAcc : T.muted}>
-                          {batStateLabel(V_BAT_STATE)}
-                        </Badge>
-                      )}
-                    </div>
+                    <BigVal value={isNaN(V_BAT_V) ? '…' : V_BAT_V.toFixed(1)} unit="V" size={15} />
+                    {!isNaN(V_BAT_STATE) && (
+                      <Badge color={V_BAT_STATE === 1 ? T.ok : V_BAT_STATE === 2 ? amberAcc : T.muted}>
+                        {batStateLabel(V_BAT_STATE)}
+                      </Badge>
+                    )}
                   </div>
                 </div>
-                <StatRow label="Temp"     value={isNaN(V_BAT_T) ? '…' : `${V_BAT_T.toFixed(1)} °C`} />
-                <StatRow label="Strom"    value={isNaN(V_BAT_A) ? '…' : `${V_BAT_A.toFixed(1)} A`} />
-                <StatRow label="Leistung" value={isNaN(V_BAT_W) ? '…' : `${Math.round(V_BAT_W)} W`} />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 8px' }}>
+                  <div style={{ fontSize: 11, color: T.muted, fontFamily: T.fontMono }}>Temp</div>
+                  <div style={{ fontSize: 11, color: T.text, fontFamily: T.fontMono, fontWeight: 700, textAlign: 'right' }}>{isNaN(V_BAT_T) ? '…' : `${V_BAT_T.toFixed(1)} °C`}</div>
+                  <div style={{ fontSize: 11, color: T.muted, fontFamily: T.fontMono }}>Strom</div>
+                  <div style={{ fontSize: 11, color: T.text, fontFamily: T.fontMono, fontWeight: 700, textAlign: 'right' }}>{isNaN(V_BAT_A) ? '…' : `${V_BAT_A.toFixed(1)} A`}</div>
+                  <div style={{ fontSize: 11, color: T.muted, fontFamily: T.fontMono }}>Leistung</div>
+                  <div style={{ fontSize: 11, color: T.text, fontFamily: T.fontMono, fontWeight: 700, textAlign: 'right' }}>{isNaN(V_BAT_W) ? '…' : `${Math.round(V_BAT_W)} W`}</div>
+                </div>
               </Card>
 
               {/* MPPT Solar */}
@@ -1232,7 +1235,7 @@ function App() {
                 <CardLabel icon="🏊" color={T.spark.energy}>Pool</CardLabel>
                 {(() => {
                   const pumpe   = topics.find(x => x.label === 'Poolpumpe')
-                  const tempKey = 'pool/temperatur'
+                  const tempKey = 'Pool_temp/temperatur'
                   const raw     = values[tempKey]
                   const val     = raw !== undefined ? parseFloat(raw) : NaN
                   const range   = minMax[tempKey] ?? { min: val, max: val }
@@ -1283,9 +1286,9 @@ function App() {
                 )}
               </Card>
 
-              {/* Steckdosen 1 */}
+              {/* Steckdosen + Beleuchtung – kombiniert */}
               <Card accentColor={T.spark.power}>
-                <CardLabel icon="🔌" color={T.spark.power}>Steckdosen 1</CardLabel>
+                <CardLabel icon="🔌" color={T.spark.power}>Steckdosen</CardLabel>
                 {['Steckdose 1', 'Steckdose 2'].map(label => {
                   const t = topics.find(x => x.label === label)
                   if (!t) return null
@@ -1294,11 +1297,8 @@ function App() {
                 <SwitchRow label="Doppelsteckdose"
                   on={isOn(values['stat/Doppelsteckdose/POWER'])}
                   onClick={() => toggle('cmnd/Doppelsteckdose/POWER', values['stat/Doppelsteckdose/POWER'])} />
-              </Card>
-
-              {/* Beleuchtung */}
-              <Card accentColor={T.spark.purple}>
-                <CardLabel icon="💡" color={T.spark.purple}>Steckdosen + Beleuchtung</CardLabel>
+                <Div />
+                <CardLabel icon="💡" color={T.spark.purple}>Beleuchtung</CardLabel>
                 {[
                   { label: 'Teichpumpe',    pub: 'cmnd/Teichpumpe/POWER',    stat: 'stat/Teichpumpe/POWER' },
                   { label: 'Beleuchtung',   pub: 'cmnd/Beleuchtung/POWER',   stat: 'stat/Beleuchtung/POWER' },
@@ -1518,15 +1518,28 @@ function App() {
         {/* ══ TAB: VERLAUF ════════════════════════════════════════════════ */}
         {activeTab === 'verlauf' && (() => {
           // Aktiver Datensatz je nach Zeitraum
+          // Jahr: direkt aus statTage filtern (365 Tage) statt statJahr.tage (war nur 30 Tage)
+          const thisYear = new Date().getFullYear().toString()
+          const thisMonth = `${thisYear}-${String(new Date().getMonth()+1).padStart(2,'0')}`
           const periodData: StatDay[] = verlaufZr === 'heute'
             ? (statHeute ? [statHeute] : [])
             : verlaufZr === 'woche'  ? (statWoche?.tage  ?? [])
-            : verlaufZr === 'monat'  ? (statMonat?.tage  ?? [])
-            :                          (statJahr?.tage   ?? [])
+            : verlaufZr === 'monat'  ? statTage.filter(d => d.date.startsWith(thisMonth))
+            : verlaufZr === 'jahr'   ? statTage.filter(d => d.date.startsWith(thisYear))
+            :                          []
 
+          // Summe für Monat/Jahr direkt berechnen
+          const sumFromDays = (days: StatDay[]) => ({
+            verbrauch_kwh: days.reduce((s,d) => s+(d.verbrauch_kwh??0),0) || null,
+            erzeugung_kwh: days.reduce((s,d) => s+(d.erzeugung_kwh??0),0) || null,
+            solar_kwh:     days.reduce((s,d) => s+(d.solar_kwh??0),0) || null,
+            bkw_kwh:       days.reduce((s,d) => s+(d.bkw_kwh??0),0) || null,
+            gas_m3:        days.reduce((s,d) => s+(d.gas_m3??0),0) || null,
+            tage: days,
+          })
           const periodSum = verlaufZr === 'woche' ? statWoche
-                          : verlaufZr === 'monat' ? statMonat
-                          : verlaufZr === 'jahr'  ? statJahr : null
+                          : verlaufZr === 'monat' ? sumFromDays(periodData)
+                          : verlaufZr === 'jahr'  ? sumFromDays(periodData) : null
 
           const hasData = periodData.length > 0
 
@@ -2249,11 +2262,12 @@ function App() {
                             <Sub>Balkonkraftwerk</Sub>
                             <BigVal value={!isNaN(bkwGesamt) ? bkwGesamt.toFixed(2) : '…'} unit="kWh" size={17} color={T.spark.cyan} />
                             <div style={{ fontSize: 11, color: T.muted, fontFamily: T.fontMono, marginTop: 2 }}>seit 27.03.2023</div>
+                            <div style={{ fontSize: 10, color: T.muted, fontFamily: T.fontMono }}>({!isNaN(bkwRaw) ? bkwRaw.toFixed(2) : '…'} + 178.78 kWh)</div>
                           </div>
                           <div>
                             <Sub>Victron MPPT</Sub>
                             <BigVal value={!isNaN(pvGesamt) ? pvGesamt.toFixed(2) : '…'} unit="kWh" size={17} color={amberAcc} />
-                            <div style={{ fontSize: 11, color: T.muted, fontFamily: T.fontMono, marginTop: 2 }}>seit 13.04.2026</div>
+                            <div style={{ fontSize: 11, color: T.muted, fontFamily: T.fontMono, marginTop: 2 }}>seit Inbetriebnahme</div>
                           </div>
                         </div>
                       </Card>
