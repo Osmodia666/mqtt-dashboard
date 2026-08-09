@@ -1718,7 +1718,7 @@ function App() {
                 </>
               )}
 
-              {!hasData && (
+              {!hasData && verlaufZr !== 'gesamt' && (
                 <div style={{ textAlign: 'center', padding: '40px 20px', color: T.muted, fontFamily: T.fontMono, fontSize: 13 }}>
                   Keine Daten – ioBroker stats_service noch nicht gestartet?
                 </div>
