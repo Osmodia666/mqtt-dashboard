@@ -361,7 +361,7 @@ function App() {
   const [statWoche,  setStatWoche]  = useState<StatPeriod|null>(null)
   const [statMonat,  setStatMonat]  = useState<StatPeriod|null>(null)
   const [statJahr,   setStatJahr]   = useState<StatPeriod|null>(null)
-  const [verlaufZr,  setVerlaufZr]  = useState<'heute'|'woche'|'monat'|'jahr'|'gesamt'>('woche')
+  const [verlaufZr,  setVerlaufZr]  = useState<'heute'|'woche'|'monat'|'jahr'|'gesamt'>('heute')
   const [verlaufAnsicht, setVerlaufAnsicht] = useState<'strom'|'gas'>('strom')
   const [energieTab, setEnergieTab] = useState<'ueberblick'|'phasen'|'details'>('ueberblick')
   const [verlaufDetail, setVerlaufDetail] = useState<StatDay|null>(null)
@@ -389,35 +389,39 @@ function App() {
   const BAT_KWH_TOTAL    = BAT_CYCLES_MAX * BAT_CAPACITY_KWH * BAT_DOD  // ~16800 kWh Gesamtdurchsatz
 
   const calcBatteryLife = () => {
-    // Gesamtentladung aus stats_service (kWh Verbrauch ≈ Entladung wenn keine Einspeisung)
-    // Bessere Schätzung: Summe aller erzeugten kWh die durch die Batterie geflossen sind
-    // Als Proxy: alle Tage mit verfügbaren Daten summieren
-    const totalDischarge = statTage.reduce((sum, d) => {
-      // Tagesverbrauch der Batterie ≈ erzeugung die nachts genutzt wurde
-      // Vereinfachung: wir nehmen verbrauch_kwh als Proxy für Durchsatz
-      const v = d.verbrauch_kwh ?? 0
-      const e = d.erzeugung_kwh ?? 0
-      // Batterie-Durchsatz = min(verbrauch, erzeugung) (was durch Batterie geflossen)
-      return sum + Math.min(v, e) * 0.5 // konservative Schätzung: 50% durch Batterie
-    }, 0)
-
-    const daysTracked = statTage.filter(d => d.verbrauch_kwh !== null).length
+    // Methode: täglicher Energie-Durchsatz = SOC-Hub (max-min) * Kapazität
+    // Ein Vollzyklus = DoD * Kapazität = 0.8 * 3.5 = 2.8 kWh Durchsatz
+    const daysWithSoc = statTage.filter(d =>
+      d.soc_min !== null && d.soc_max !== null && d.soc_min >= 0 && d.soc_max <= 100
+    )
+    const daysTracked = daysWithSoc.length
     if (daysTracked < 3) return null // zu wenig Daten
 
-    const dailyAvg        = totalDischarge / daysTracked     // kWh/Tag Durchsatz
-    const cyclesUsed      = totalDischarge / (BAT_CAPACITY_KWH * BAT_DOD)
+    const totalThroughputKwh = daysWithSoc.reduce((sum, d) => {
+      const deltaSOC = (d.soc_max! - d.soc_min!) / 100  // 0–1
+      return sum + deltaSOC * BAT_CAPACITY_KWH
+    }, 0)
+
+    const dailyThroughputKwh = totalThroughputKwh / daysTracked
+    const kwhPerCycle    = BAT_CAPACITY_KWH * BAT_DOD        // 2.8 kWh
+    const totalCycles    = totalThroughputKwh / kwhPerCycle
+    const dailyCycles    = dailyThroughputKwh / kwhPerCycle
+    const cyclesPerYear  = dailyCycles * 365
+
+    const cyclesUsed      = totalCycles
     const cyclesRemaining = Math.max(0, BAT_CYCLES_MAX - cyclesUsed)
-    const daysRemaining   = dailyAvg > 0 ? cyclesRemaining * (BAT_CAPACITY_KWH * BAT_DOD) / dailyAvg : null
-    const yearsRemaining  = daysRemaining ? daysRemaining / 365 : null
-    const pctUsed         = (cyclesUsed / BAT_CYCLES_MAX) * 100
+    const yearsRemaining  = dailyCycles > 0 ? cyclesRemaining / cyclesPerYear : null
+    const pctUsed          = (cyclesUsed / BAT_CYCLES_MAX) * 100
 
     return {
-      cyclesUsed:      Math.round(cyclesUsed),
-      cyclesRemaining: Math.round(cyclesRemaining),
-      pctUsed:         Math.round(pctUsed * 10) / 10,
-      daysRemaining:   daysRemaining ? Math.round(daysRemaining) : null,
-      yearsRemaining:  yearsRemaining ? Math.round(yearsRemaining * 10) / 10 : null,
-      dailyAvgKwh:     Math.round(dailyAvg * 100) / 100,
+      cyclesUsed:          Math.round(cyclesUsed * 10) / 10,
+      cyclesRemaining:     Math.round(cyclesRemaining),
+      pctUsed:             Math.round(pctUsed * 100) / 100,
+      dailyCycles:         Math.round(dailyCycles * 1000) / 1000,
+      dailyThroughputKwh:  Math.round(dailyThroughputKwh * 100) / 100,
+      cyclesPerYear:       Math.round(cyclesPerYear * 10) / 10,
+      yearsRemaining:      yearsRemaining ? Math.round(yearsRemaining * 10) / 10 : null,
+      dailyAvgKwh:         Math.round(dailyThroughputKwh * 100) / 100, // Kompatibilität mit altem Feldnamen
       daysTracked,
     }
   }
