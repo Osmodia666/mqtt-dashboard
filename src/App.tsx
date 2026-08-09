@@ -1,4 +1,4 @@
-// src/App.tsx
+ // src/App.tsx
 import { useEffect, useState, useRef } from 'react'
 import mqtt from 'mqtt'
 import { mqttConfig, topics, VICTRON_PORTAL_ID, ESS_MODES, INVERTER_MODES } from './config'
@@ -361,7 +361,7 @@ function App() {
   const [statWoche,  setStatWoche]  = useState<StatPeriod|null>(null)
   const [statMonat,  setStatMonat]  = useState<StatPeriod|null>(null)
   const [statJahr,   setStatJahr]   = useState<StatPeriod|null>(null)
-  const [verlaufZr,  setVerlaufZr]  = useState<'heute'|'woche'|'monat'|'jahr'|'gesamt'>('heute')
+  const [verlaufZr,  setVerlaufZr]  = useState<'heute'|'woche'|'monat'|'jahr'|'gesamt'>('woche')
   const [verlaufAnsicht, setVerlaufAnsicht] = useState<'strom'|'gas'>('strom')
   const [energieTab, setEnergieTab] = useState<'ueberblick'|'phasen'|'details'>('ueberblick')
   const [verlaufDetail, setVerlaufDetail] = useState<StatDay|null>(null)
@@ -386,46 +386,38 @@ function App() {
   const BAT_CAPACITY_KWH = 3.5    // nutzbare Kapazität kWh
   const BAT_DOD          = 0.80   // Depth of Discharge laut Datenblatt
   const BAT_CYCLES_MAX   = 6000   // Zyklen bei 80% DoD laut Pylontech-Datenblatt
+  const BAT_KWH_TOTAL    = BAT_CYCLES_MAX * BAT_CAPACITY_KWH * BAT_DOD  // ~16800 kWh Gesamtdurchsatz
 
   const calcBatteryLife = () => {
-    // Methode: Energie-Durchsatz aus SOC-Delta pro Tag
-    // Täglicher Durchsatz = SOC-Hub * Kapazität (kWh)
-    // Zyklus = 1x volle Entladung (DoD=80% = 2.8 kWh)
-    const daysWithSoc = statTage.filter(d =>
-      d.soc_min !== null && d.soc_max !== null && d.soc_min >= 0 && d.soc_max <= 100
-    )
-    const daysTracked = daysWithSoc.length
-    if (daysTracked < 3) return null
-
-    // Täglichen Energie-Durchsatz berechnen (kWh durch Batterie)
-    // SOC-Delta * Kapazität = kWh entladen/geladen pro Tag
-    const totalThroughputKwh = daysWithSoc.reduce((sum, d) => {
-      const deltaSOC = (d.soc_max! - d.soc_min!) / 100  // 0-1
-      return sum + deltaSOC * BAT_CAPACITY_KWH
+    // Gesamtentladung aus stats_service (kWh Verbrauch ≈ Entladung wenn keine Einspeisung)
+    // Bessere Schätzung: Summe aller erzeugten kWh die durch die Batterie geflossen sind
+    // Als Proxy: alle Tage mit verfügbaren Daten summieren
+    const totalDischarge = statTage.reduce((sum, d) => {
+      // Tagesverbrauch der Batterie ≈ erzeugung die nachts genutzt wurde
+      // Vereinfachung: wir nehmen verbrauch_kwh als Proxy für Durchsatz
+      const v = d.verbrauch_kwh ?? 0
+      const e = d.erzeugung_kwh ?? 0
+      // Batterie-Durchsatz = min(verbrauch, erzeugung) (was durch Batterie geflossen)
+      return sum + Math.min(v, e) * 0.5 // konservative Schätzung: 50% durch Batterie
     }, 0)
 
-    const dailyThroughputKwh = totalThroughputKwh / daysTracked
-    // Ein Zyklus = DoD * Kapazität = 0.8 * 3.5 = 2.8 kWh Durchsatz
-    const kwhPerCycle   = BAT_CAPACITY_KWH * BAT_DOD        // 2.8 kWh
-    const totalCycles   = totalThroughputKwh / kwhPerCycle
-    const dailyCycles   = dailyThroughputKwh / kwhPerCycle
-    const cyclesPerYear = dailyCycles * 365
+    const daysTracked = statTage.filter(d => d.verbrauch_kwh !== null).length
+    if (daysTracked < 3) return null // zu wenig Daten
 
-    // Verbleibende Zyklen & Jahre – Batterie ist neu, also noch fast alle Zyklen verfügbar
-    // cyclesUsed ≈ sehr klein (Messung seit wenigen Wochen)
-    const cyclesUsed     = totalCycles
+    const dailyAvg        = totalDischarge / daysTracked     // kWh/Tag Durchsatz
+    const cyclesUsed      = totalDischarge / (BAT_CAPACITY_KWH * BAT_DOD)
     const cyclesRemaining = Math.max(0, BAT_CYCLES_MAX - cyclesUsed)
-    const yearsRemaining  = dailyCycles > 0 ? cyclesRemaining / cyclesPerYear : null
+    const daysRemaining   = dailyAvg > 0 ? cyclesRemaining * (BAT_CAPACITY_KWH * BAT_DOD) / dailyAvg : null
+    const yearsRemaining  = daysRemaining ? daysRemaining / 365 : null
     const pctUsed         = (cyclesUsed / BAT_CYCLES_MAX) * 100
 
     return {
-      cyclesUsed:          Math.round(cyclesUsed * 10) / 10,
-      cyclesRemaining:     Math.round(cyclesRemaining),
-      pctUsed:             Math.round(pctUsed * 100) / 100,
-      dailyCycles:         Math.round(dailyCycles * 1000) / 1000,
-      dailyThroughputKwh:  Math.round(dailyThroughputKwh * 100) / 100,
-      cyclesPerYear:       Math.round(cyclesPerYear * 10) / 10,
-      yearsRemaining:      yearsRemaining ? Math.round(yearsRemaining * 10) / 10 : null,
+      cyclesUsed:      Math.round(cyclesUsed),
+      cyclesRemaining: Math.round(cyclesRemaining),
+      pctUsed:         Math.round(pctUsed * 10) / 10,
+      daysRemaining:   daysRemaining ? Math.round(daysRemaining) : null,
+      yearsRemaining:  yearsRemaining ? Math.round(yearsRemaining * 10) / 10 : null,
+      dailyAvgKwh:     Math.round(dailyAvg * 100) / 100,
       daysTracked,
     }
   }
@@ -1080,9 +1072,15 @@ function App() {
                         <span style={{ color: T.muted }}>Zyklen (est.)</span>
                         <span style={{ color: T.text, fontWeight: 700 }}>{batLife.cyclesUsed} / {BAT_CYCLES_MAX}</span>
                       </div>
+                      <div style={{ height: 3, background: 'rgba(255,255,255,0.06)', borderRadius: 2, margin: '3px 0' }}>
+                        <div style={{ width: `${Math.min(batLife.pctUsed, 100)}%`, height: '100%', borderRadius: 2,
+                          background: batLife.pctUsed < 50 ? T.ok : batLife.pctUsed < 80 ? T.warn : T.err }} />
+                      </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10 }}>
                         <span style={{ color: T.muted }}>Restlaufzeit (est.)</span>
-                        <span style={{ color: T.ok, fontWeight: 700 }}>~{batLife.yearsRemaining} J.</span>
+                        <span style={{ color: batLife.pctUsed < 50 ? T.ok : T.warn, fontWeight: 700 }}>
+                          ~{batLife.yearsRemaining} Jahre
+                        </span>
                       </div>
                     </div>
                   </>}
@@ -1155,8 +1153,7 @@ function App() {
         {activeTab === 'uebersicht' && (
           <>
             <FlowBanner />
-            {/* Victron-Panel: Batterie + MPPT + Lebensdauer als kompakte Zeile */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 8 }}>
+            <div className="grid-top" style={{ marginBottom: 8 }}>
 
               {/* Batterie – kompakt */}
               <Card accentColor={socColor}>
@@ -1182,55 +1179,7 @@ function App() {
                 </div>
               </Card>
 
-              {/* MPPT Solar */}
-              <Card accentColor={amberAcc}>
-                <CardLabel icon="☀️" color={amberAcc}>MPPT · SmartSolar</CardLabel>
-                <BigVal value={isNaN(V_PV_W) ? '…' : `${Math.round(V_PV_W)}`} unit="W" size={21} color={isNaN(V_PV_W) ? T.muted : amberAcc} />
-                <Sub>PV-Eingangsleistung</Sub>
-                {!isNaN(V_PV_W) && <>
-                  <Bar value={V_PV_W} max={Math.max(minMax[VICTRON_TOPICS.pvPower]?.max ?? 0, 1500)} color={amberAcc} />
-                  <MinMaxRow min={minMax[VICTRON_TOPICS.pvPower]?.min ?? V_PV_W} max={minMax[VICTRON_TOPICS.pvPower]?.max ?? V_PV_W} unit=" W" />
-                </>}
-                {(hist[VICTRON_TOPICS.pvPower] ?? []).length >= 2 && <div style={{ marginTop: 4 }}><Sparkline data={hist[VICTRON_TOPICS.pvPower]} color={amberAcc} /></div>}
-                <Div />
-                <StatRow label="PV Spannung" value={isNaN(V_PV_V) ? '…' : `${V_PV_V.toFixed(0)} V`} />
-                <StatRow label="Status"      value={isNaN(V_MPPT_STATE) ? '…' : mpptStateLabel(V_MPPT_STATE)} />
-              </Card>
-
-              {/* Lebensdauer */}
-              {batLife
-                ? <Card accentColor={batLife.pctUsed < 2 ? T.ok : batLife.pctUsed < 10 ? T.warn : T.err}>
-                    <CardLabel icon="⏳" color={batLife.pctUsed < 2 ? T.ok : batLife.pctUsed < 10 ? T.warn : T.err}>Batterie · Lebensdauer</CardLabel>
-                    <div style={{ fontSize: 22, fontWeight: 700, fontFamily: T.fontMono, marginBottom: 4,
-                      color: batLife.pctUsed < 2 ? T.ok : batLife.pctUsed < 10 ? T.warn : T.err }}>
-                      ~{batLife.yearsRemaining ?? '?'} <span style={{ fontSize: 12, color: T.muted, fontWeight: 400 }}>Jahre</span>
-                    </div>
-                    <div style={{ height: 4, background: 'rgba(255,255,255,0.06)', borderRadius: 2, marginBottom: 6 }}>
-                      <div style={{ width: `${Math.min(batLife.pctUsed * 10, 100)}%`, height: '100%', borderRadius: 2,
-                        background: batLife.pctUsed < 2 ? T.ok : batLife.pctUsed < 10 ? T.warn : T.err }} />
-                    </div>
-                    <StatRow label="Zyklen (est.)"  value={`${batLife.cyclesUsed.toFixed(1)} / ${BAT_CYCLES_MAX}`} />
-                    <StatRow label="Ø Durchsatz"    value={`${batLife.dailyThroughputKwh} kWh/Tag`} />
-                    <StatRow label="Ø Zyklen/Tag"   value={`${batLife.dailyCycles}`} />
-                    <StatRow label="~/Jahr"         value={`${batLife.cyclesPerYear}`} />
-                    <div style={{ fontSize: 10, color: T.muted, fontFamily: T.fontMono, marginTop: 5, lineHeight: 1.5 }}>
-                      Pylontech US3000C · {BAT_CYCLES_MAX} Zyklen@{BAT_DOD*100}% DoD<br/>
-                      Basis: {batLife.daysTracked} Tage · Genauigkeit steigt mit der Zeit
-                    </div>
-                  </Card>
-                : <Card accentColor={T.muted as string}>
-                    <CardLabel icon="⏳" color={T.muted as string}>Batterie · Lebensdauer</CardLabel>
-                    <div style={{ fontSize: 12, color: T.muted, fontFamily: T.fontMono, marginTop: 8 }}>
-                      Noch zu wenig SOC-Daten (min. 3 Tage)
-                    </div>
-                  </Card>
-              }
-
-            </div>
-
-            <div className="grid-top" style={{ marginBottom: 8 }}>
-
-              {/* pool */}
+              {/* Pool */}
               <Card accentColor={T.spark.energy}>
                 <CardLabel icon="🏊" color={T.spark.energy}>Pool</CardLabel>
                 {(() => {
@@ -1240,7 +1189,12 @@ function App() {
                   const val     = raw !== undefined ? parseFloat(raw) : NaN
                   const range   = minMax[tempKey] ?? { min: val, max: val }
                   const h       = hist[tempKey] ?? []
-                  const col     = val > 23 ? T.ok : val > 17 ? T.warn : T.spark.cyan
+                  const col =
+                  val >= 26 ? T.err :
+                  val >= 25 ? T.warn :
+                  val > 23  ? T.ok :
+                  val > 17  ? '#facc15' :   // gelb
+                       T.spark.cyan  // blau
                   return <>
                     <SwitchRow label="Pumpe" on={isOn(values[pumpe?.statusTopic ?? ''])}
                       onClick={() => pumpe && toggle(pumpe.publishTopic!, values[pumpe.statusTopic])} />
@@ -1286,27 +1240,80 @@ function App() {
                 )}
               </Card>
 
-              {/* Steckdosen + Beleuchtung – kombiniert */}
-              <Card accentColor={T.spark.power}>
-                <CardLabel icon="🔌" color={T.spark.power}>Steckdosen</CardLabel>
-                {['Steckdose 1', 'Steckdose 2'].map(label => {
-                  const t = topics.find(x => x.label === label)
-                  if (!t) return null
-                  return <SwitchRow key={label} label={label} on={isOn(values[t.statusTopic])} onClick={() => toggle(t.publishTopic!, values[t.statusTopic])} />
-                })}
-                <SwitchRow label="Doppelsteckdose"
-                  on={isOn(values['stat/Doppelsteckdose/POWER'])}
-                  onClick={() => toggle('cmnd/Doppelsteckdose/POWER', values['stat/Doppelsteckdose/POWER'])} />
+              {/* Batterie-Lebensdauer */}
+              {batLife && (
+                <Card accentColor={batLife.pctUsed < 50 ? T.ok : batLife.pctUsed < 80 ? T.warn : T.err}>
+                  <CardLabel icon="⏳" color={batLife.pctUsed < 50 ? T.ok : batLife.pctUsed < 80 ? T.warn : T.err}>Batterie · Lebensdauer</CardLabel>
+                  <div style={{ marginBottom: 6 }}>
+                    <Sub>Restlaufzeit (geschätzt)</Sub>
+                    <div style={{ fontSize: 21, fontWeight: 700, fontFamily: T.fontMono,
+                      color: batLife.pctUsed < 50 ? T.ok : batLife.pctUsed < 80 ? T.warn : T.err }}>
+                      ~{batLife.yearsRemaining} <span style={{ fontSize: 12, fontWeight: 400, color: T.muted }}>Jahre</span>
+                    </div>
+                  </div>
+                  <div style={{ height: 4, background: 'rgba(255,255,255,0.06)', borderRadius: 2, marginBottom: 6 }}>
+                    <div style={{ width: `${Math.min(batLife.pctUsed, 100)}%`, height: '100%', borderRadius: 2, transition: 'width 0.5s',
+                      background: batLife.pctUsed < 50 ? T.ok : batLife.pctUsed < 80 ? T.warn : T.err }} />
+                  </div>
+                  <StatRow label="Zyklen (est.)"   value={`${batLife.cyclesUsed} / ${BAT_CYCLES_MAX}`} />
+                  <StatRow label="Verbrauch"       value={`${batLife.pctUsed}%`} />
+                  <StatRow label="Ø Durchsatz/Tag" value={`${batLife.dailyAvgKwh} kWh`} />
+                  <div style={{ fontSize: 10, color: T.muted, fontFamily: T.fontMono, marginTop: 5, lineHeight: 1.5 }}>
+                    Pylontech US3000C · {BAT_CYCLES_MAX} Zyklen bei {BAT_DOD*100}% DoD<br/>
+                    Basis: {batLife.daysTracked} Tage Messdaten (wird genauer mit der Zeit)
+                  </div>
+                </Card>
+              )}
+
+              {/* MPPT Kurzform */}
+              <Card accentColor={amberAcc}>
+                <CardLabel icon="☀️" color={amberAcc}>MPPT · SmartSolar</CardLabel>
+                <BigVal value={isNaN(V_PV_W) ? '…' : `${Math.round(V_PV_W)}`} unit="W" size={21} color={isNaN(V_PV_W) ? T.muted : amberAcc} />
+                <Sub>PV-Eingangsleistung</Sub>
                 <Div />
-                <CardLabel icon="💡" color={T.spark.purple}>Beleuchtung</CardLabel>
-                {[
-                  { label: 'Teichpumpe',    pub: 'cmnd/Teichpumpe/POWER',    stat: 'stat/Teichpumpe/POWER' },
-                  { label: 'Beleuchtung',   pub: 'cmnd/Beleuchtung/POWER',   stat: 'stat/Beleuchtung/POWER' },
-                  { label: 'Carport-Licht', pub: 'cmnd/Carport-Licht/POWER', stat: 'stat/Carport-Licht/POWER' },
-                ].map(({ label, pub, stat }) => (
-                  <SwitchRow key={label} label={label} on={isOn(values[stat])} onClick={() => toggle(pub, values[stat])} />
-                ))}
+                <StatRow label="PV Spannung" value={isNaN(V_PV_V) ? '…' : `${V_PV_V.toFixed(0)} V`} />
+                <StatRow label="Status" value={isNaN(V_MPPT_STATE) ? '…' : mpptStateLabel(V_MPPT_STATE)} />
               </Card>
+
+             <Card accentColor={T.spark.power}>
+  <CardLabel icon="🔌" color={T.spark.power}>
+    Steckdosen & Beleuchtung
+  </CardLabel>
+
+  {['Steckdose 1', 'Steckdose 2'].map(label => {
+    const t = topics.find(x => x.label === label)
+    if (!t) return null
+    return (
+      <SwitchRow
+        key={label}
+        label={label}
+        on={isOn(values[t.statusTopic])}
+        onClick={() => toggle(t.publishTopic!, values[t.statusTopic])}
+      />
+    )
+  })}
+
+  <SwitchRow
+    label="Doppelsteckdose"
+    on={isOn(values['stat/Doppelsteckdose/POWER'])}
+    onClick={() => toggle('cmnd/Doppelsteckdose/POWER', values['stat/Doppelsteckdose/POWER'])}
+  />
+
+  <Div />
+
+  {[
+    { label: 'Teichpumpe',    pub: 'cmnd/Teichpumpe/POWER',    stat: 'stat/Teichpumpe/POWER' },
+    { label: 'Beleuchtung',   pub: 'cmnd/Beleuchtung/POWER',   stat: 'stat/Beleuchtung/POWER' },
+    { label: 'Carport-Licht', pub: 'cmnd/Carport-Licht/POWER', stat: 'stat/Carport-Licht/POWER' },
+  ].map(({ label, pub, stat }) => (
+    <SwitchRow
+      key={label}
+      label={label}
+      on={isOn(values[stat])}
+      onClick={() => toggle(pub, values[stat])}
+    />
+  ))}
+</Card>
 
             </div>
           </>
@@ -1518,7 +1525,7 @@ function App() {
         {/* ══ TAB: VERLAUF ════════════════════════════════════════════════ */}
         {activeTab === 'verlauf' && (() => {
           // Aktiver Datensatz je nach Zeitraum
-          // Jahr: direkt aus statTage filtern (365 Tage) statt statJahr.tage (war nur 30 Tage)
+          // Jahr/Monat: direkt aus statTage filtern (365 Tage) statt statJahr/statMonat.tage (waren nur 30 Tage)
           const thisYear = new Date().getFullYear().toString()
           const thisMonth = `${thisYear}-${String(new Date().getMonth()+1).padStart(2,'0')}`
           const periodData: StatDay[] = verlaufZr === 'heute'
@@ -1528,7 +1535,6 @@ function App() {
             : verlaufZr === 'jahr'   ? statTage.filter(d => d.date.startsWith(thisYear))
             :                          []
 
-          // Summe für Monat/Jahr direkt berechnen
           const sumFromDays = (days: StatDay[]) => ({
             verbrauch_kwh: days.reduce((s,d) => s+(d.verbrauch_kwh??0),0) || null,
             erzeugung_kwh: days.reduce((s,d) => s+(d.erzeugung_kwh??0),0) || null,
@@ -1697,7 +1703,7 @@ function App() {
                   {verlaufAnsicht === 'strom' && (hist[VICTRON_TOPICS.soc] ?? []).length >= 2 && (
                     <Card accentColor={T.spark.cyan} style={{ marginBottom: 12, padding: '12px 13px' }}>
                       <CardLabel icon="🔋" color={T.spark.cyan}>Batterie SOC – heute</CardLabel>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: T.muted, fontFamily: T.fontMono, marginBottom: 4 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: T.muted, fontFamily: T.fontMono, marginBottom: 4 }}>
                         <span>Min: {statHeute.soc_min ?? Math.min(...(hist[VICTRON_TOPICS.soc] ?? []).filter(v=>!isNaN(v))).toFixed(0)}%</span>
                         <span>Ø {statHeute.soc_avg ?? Math.round((hist[VICTRON_TOPICS.soc] ?? []).reduce((a,b)=>a+b,0)/Math.max((hist[VICTRON_TOPICS.soc]??[]).length,1))}%</span>
                         <span>Max: {statHeute.soc_max ?? Math.max(...(hist[VICTRON_TOPICS.soc] ?? []).filter(v=>!isNaN(v))).toFixed(0)}%</span>
@@ -2262,12 +2268,11 @@ function App() {
                             <Sub>Balkonkraftwerk</Sub>
                             <BigVal value={!isNaN(bkwGesamt) ? bkwGesamt.toFixed(2) : '…'} unit="kWh" size={17} color={T.spark.cyan} />
                             <div style={{ fontSize: 11, color: T.muted, fontFamily: T.fontMono, marginTop: 2 }}>seit 27.03.2023</div>
-                            <div style={{ fontSize: 10, color: T.muted, fontFamily: T.fontMono }}>({!isNaN(bkwRaw) ? bkwRaw.toFixed(2) : '…'} + 178.78 kWh)</div>
-                          </div>
+                           </div>
                           <div>
-                            <Sub>Victron MPPT</Sub>
+                            <Sub>Victron Multiplus II</Sub>
                             <BigVal value={!isNaN(pvGesamt) ? pvGesamt.toFixed(2) : '…'} unit="kWh" size={17} color={amberAcc} />
-                            <div style={{ fontSize: 11, color: T.muted, fontFamily: T.fontMono, marginTop: 2 }}>seit Inbetriebnahme</div>
+                            <div style={{ fontSize: 11, color: T.muted, fontFamily: T.fontMono, marginTop: 2 }}>seit 13.04.2026</div>
                           </div>
                         </div>
                       </Card>
@@ -2364,7 +2369,7 @@ function App() {
             <Card accentColor={T.spark.energy}>
               <CardLabel icon="🏊" color={T.spark.energy}>Pool</CardLabel>
               {(() => {
-                const pumpe = topics.find(x => x.label === 'poolpumpe')
+                const pumpe = topics.find(x => x.label === 'Poolpumpe')
                 return <SwitchRow label="Pumpe" on={isOn(values[pumpe?.statusTopic ?? ''])}
                   onClick={() => pumpe && toggle(pumpe.publishTopic!, values[pumpe.statusTopic])} />
               })()}
