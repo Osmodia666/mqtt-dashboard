@@ -355,7 +355,7 @@ function App() {
     solar_kwh: number|null; bkw_kwh: number|null; gas_m3: number|null
     soc_min: number|null; soc_max: number|null; soc_avg: number|null
   }
-  type StatPeriod = { verbrauch_kwh: number|null; erzeugung_kwh: number|null; solar_kwh: number|null; bkw_kwh: number|null; gas_m3: number|null; tage: StatDay[] }
+  type StatPeriod = { verbrauch_kwh: number|null; erzeugung_kwh: number|null; solar_kwh: number|null; bkw_kwh: number|null; gas_m3: number|null; via_zaehler?: boolean; tage: StatDay[] }
   const [statTage,   setStatTage]   = useState<StatDay[]>([])
   const [statHeute,  setStatHeute]  = useState<StatDay|null>(null)
   const [statWoche,  setStatWoche]  = useState<StatPeriod|null>(null)
@@ -1557,10 +1557,19 @@ function App() {
           const bkwMeterKwh   = !isNaN(bkwMeterRaw) ? bkwMeterRaw + 178.779 : null
           const netzMeterRaw  = parseFloat(values['Stromzähler/Verbrauch_gesamt'] ?? 'NaN')
           const netzMeterKwh  = !isNaN(netzMeterRaw) ? netzMeterRaw : null
+          // Datenabdeckung: frühestes Datum mit Tageswerten (zeigt, wie weit die History reicht)
+          const bkwDatenAb = statTage.find(d => d.bkw_kwh != null)?.date ?? null
+          const pvDatenAb  = statTage.find(d => d.solar_kwh != null)?.date ?? null
           const periodSum = verlaufZr === 'woche' ? statWoche
                           : verlaufZr === 'monat' ? sumFromDays(periodData)
                           : verlaufZr === 'jahr'  ? (() => {
                               const base = sumFromDays(periodData)
+                              // stats_service liefert korrigierte Jahreswerte per
+                              // Zählerdifferenz über den Jahreswechsel (via_zaehler-Flag)
+                              if (statJahr && statJahr.via_zaehler) {
+                                return { ...statJahr, tage: base.tage }
+                              }
+                              // Fallback: Live-Zählerstände (Victron + BKW inkl. Offset)
                               const erzeugung = (pvMeterKwh ?? 0) + (bkwMeterKwh ?? 0)
                               return {
                                 ...base,
@@ -1669,6 +1678,12 @@ function App() {
                       <div style={{ fontSize: 10, color: T.muted, fontFamily: T.fontMono }}>
                         BKW: {fkwh(periodSum.bkw_kwh)} · PV: {fkwh(periodSum.solar_kwh)}
                       </div>
+                      {verlaufZr === 'jahr' && (bkwDatenAb || pvDatenAb) && (
+                        <div style={{ fontSize: 9, color: T.muted, fontFamily: T.fontMono, marginTop: 4, lineHeight: 1.5, opacity: 0.85 }}>
+                          BKW-Tageswerte ab: {bkwDatenAb ?? '–'}<br/>
+                          PV-Tageswerte ab: {pvDatenAb ?? '–'}
+                        </div>
+                      )}
                     </Card>
                     <Card accentColor={bilCol}>
                       <CardLabel icon="⚖️" color={bilCol}>Bilanz</CardLabel>
