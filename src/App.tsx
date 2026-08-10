@@ -1547,22 +1547,30 @@ function App() {
             gas_m3:        days.reduce((s,d) => s+(d.gas_m3??0),0) || null,
             tage: days,
           })
-          // Live-Zählerstand Victron ist maßgeblich: Die Venus-OS-Tages-History reicht
-          // nur ~30 Tage zurück, daher fehlen der Jahressumme alle Tage vor ~30 Tagen
-          // (z.B. 13.04.–08.07.2026). Der Zählerstand seit Inbetriebnahme ist korrekt.
-          const pvMeterRaw  = parseFloat(values[V('solarcharger/288/Yield/System')] ?? 'NaN')
-          const pvMeterKwh  = !isNaN(pvMeterRaw) ? pvMeterRaw : null
+          // Live-Zählerstände sind maßgeblich: Die Venus-OS-Tages-History reicht nur
+          // ~30 Tage zurück und die BKW-Tageswerte sind ebenfalls lückenhaft. Daher
+          // werden Jahres-/Gesamtwerte direkt aus den Zählerständen gebildet:
+          // Victron = Yield/System, BKW = EnergyPTotal + Offset (muss immer addiert werden).
+          const pvMeterRaw    = parseFloat(values[V('solarcharger/288/Yield/System')] ?? 'NaN')
+          const pvMeterKwh    = !isNaN(pvMeterRaw) ? pvMeterRaw : null
+          const bkwMeterRaw   = parseFloat(values['tele/Balkonkraftwerk/SENSOR.ENERGY.EnergyPTotal.0'] ?? 'NaN')
+          const bkwMeterKwh   = !isNaN(bkwMeterRaw) ? bkwMeterRaw + 178.779 : null
+          const netzMeterRaw  = parseFloat(values['Stromzähler/Verbrauch_gesamt'] ?? 'NaN')
+          const netzMeterKwh  = !isNaN(netzMeterRaw) ? netzMeterRaw : null
           const periodSum = verlaufZr === 'woche' ? statWoche
                           : verlaufZr === 'monat' ? sumFromDays(periodData)
                           : verlaufZr === 'jahr'  ? (() => {
                               const base = sumFromDays(periodData)
-                              if (pvMeterKwh === null) return base
-                              // Victron-Zählerstand + BKW-Tageswerte (BKW-History ist lückenlos)
-                              const erzeugung = pvMeterKwh + (base.bkw_kwh ?? 0)
+                              const erzeugung = (pvMeterKwh ?? 0) + (bkwMeterKwh ?? 0)
                               return {
                                 ...base,
-                                erzeugung_kwh: erzeugung > 0 ? Math.round(erzeugung * 100) / 100 : base.erzeugung_kwh,
-                                solar_kwh:     pvMeterKwh,
+                                erzeugung_kwh: (pvMeterKwh !== null || bkwMeterKwh !== null) && erzeugung > 0
+                                  ? Math.round(erzeugung * 100) / 100 : base.erzeugung_kwh,
+                                solar_kwh:     pvMeterKwh ?? base.solar_kwh,
+                                bkw_kwh:       bkwMeterKwh ?? base.bkw_kwh,
+                                // Verbrauch: Tageswerte bevorzugen (Lebenszeit-Zähler wäre
+                                // für ein Jahr zu hoch); Zählerstand nur als Notnagel.
+                                verbrauch_kwh: base.verbrauch_kwh ?? netzMeterKwh ?? null,
                               }
                             })()
                           : null
@@ -1754,6 +1762,8 @@ function App() {
                 const cBarW = drillData ? 28
                   : verlaufZr === 'jahr' ? 8 : verlaufZr === 'monat' ? 14 : 28
                 const cTotalW = Math.max(chartData.length * (cBarW * 2 + barGap + 4), 300)
+                // Datenabdeckung: Tage mit mindestens einem Wert (Verbrauch oder Erzeugung)
+                const daysWithData = chartData.filter(d => d.verbrauch_kwh != null || d.erzeugung_kwh != null).length
 
                 // Drill-down Logik: Jahr→Monat, Monat→Woche, Woche→Tag
                 const handleBarClick = (d: StatDay) => {
@@ -1800,8 +1810,11 @@ function App() {
                       <svg width={Math.max(cTotalW, 300)} height={chartH + 40} style={{ display: 'block' }}>
                         {chartData.map((d, i) => {
                           const x = i * (cBarW * 2 + barGap + 4)
-                          const vH = d.verbrauch_kwh  ? (d.verbrauch_kwh  / cMaxAll) * chartH : 0
-                          const eH = d.erzeugung_kwh ? (d.erzeugung_kwh / cMaxAll) * chartH : 0
+                          const hasV = d.verbrauch_kwh != null
+                          const hasE = d.erzeugung_kwh != null
+                          const hasAny = hasV || hasE
+                          const vH = hasV ? (d.verbrauch_kwh! / cMaxAll) * chartH : 0
+                          const eH = hasE ? (d.erzeugung_kwh! / cMaxAll) * chartH : 0
                           const isSelected = verlaufDetail?.date === d.date
                           const isHov = hoveredBar?.d.date === d.date
                           return (
@@ -1809,12 +1822,16 @@ function App() {
                               onClick={() => handleBarClick(d)}
                               onMouseEnter={() => setHoveredBar({ d, x: x + cBarW, y: Math.min(chartH - vH, chartH - eH) })}
                               onMouseLeave={() => setHoveredBar(null)}
-                              style={{ cursor: 'pointer' }}>
+                              style={{ cursor: hasAny ? 'pointer' : 'default' }}>
+                              {!hasAny && (
+                                <rect x={x} y={chartH - 6} width={cBarW * 2 + 2} height={6}
+                                  fill="rgba(255,255,255,0.08)" rx={2} />
+                              )}
                               <rect x={x} y={chartH - vH} width={cBarW} height={vH}
                                 fill={T.err} opacity={isSelected || isHov ? 1 : 0.75} rx={2} />
                               <rect x={x + cBarW + 2} y={chartH - eH} width={cBarW} height={eH}
                                 fill={T.ok} opacity={isSelected || isHov ? 1 : 0.75} rx={2} />
-                              {(isSelected || isHov) && <rect x={x-1} y={0} width={cBarW*2+4} height={chartH}
+                              {(isSelected || isHov) && hasAny && <rect x={x-1} y={0} width={cBarW*2+4} height={chartH}
                                 fill="rgba(255,255,255,0.04)" rx={2} />}
                               <text x={x + cBarW} y={chartH + 14} textAnchor="middle"
                                 fontSize={9} fill="rgba(224,234,255,0.4)" fontFamily={T.fontMono}>
@@ -1864,13 +1881,19 @@ function App() {
                         ))}
                       </svg>
                     </div>
-                    <div style={{ display: 'flex', gap: 16, marginTop: 6, fontSize: 10, fontFamily: T.fontMono, color: T.muted }}>
+                    <div style={{ display: 'flex', gap: 16, marginTop: 6, fontSize: 10, fontFamily: T.fontMono, color: T.muted, flexWrap: 'wrap' }}>
                       <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                         <span style={{ width: 10, height: 10, background: T.err, borderRadius: 2, display: 'inline-block' }} />Verbrauch
                       </span>
                       <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                         <span style={{ width: 10, height: 10, background: T.ok, borderRadius: 2, display: 'inline-block' }} />Erzeugung
                       </span>
+                      {daysWithData < chartData.length && (
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                          <span style={{ width: 10, height: 10, background: 'rgba(255,255,255,0.08)', borderRadius: 2, display: 'inline-block' }} />
+                          {daysWithData} von {chartData.length} Tagen mit Daten
+                        </span>
+                      )}
                       <span style={{ marginLeft: 'auto' }}>
                         {!drillData && (verlaufZr === 'jahr' || verlaufZr === 'monat')
                           ? 'Balken anklicken → Monatsdetail'
@@ -2121,7 +2144,7 @@ function App() {
                 const solarTotal = (!isNaN(bkwGesamt) ? bkwGesamt : 0) + (!isNaN(pvGesamt) ? pvGesamt : 0)
 
                 // Jahres-Chart aus statTage – gruppiert nach Jahren
-                // Aktuelles Jahr: lückenhafte Tages-Summe durch Live-Zählerstand Victron ersetzen
+                // Aktuelles Jahr: lückenhafte Tages-Summe durch Live-Zählerstände ersetzen
                 const thisYearFull = new Date().getFullYear().toString()
                 const years = Array.from(new Set(statTage.map(d => d.date.slice(0,4)))).sort()
                 const yearData = years.map(y => {
@@ -2129,8 +2152,8 @@ function App() {
                   const vSum = days.reduce((s,d) => s + (d.verbrauch_kwh ?? 0), 0)
                   const eSum = days.reduce((s,d) => s + (d.erzeugung_kwh ?? 0), 0)
                   const bkwSum = days.reduce((s,d) => s + (d.bkw_kwh ?? 0), 0)
-                  const eFinal = y === thisYearFull && pvMeterKwh !== null && pvMeterKwh > 0
-                    ? pvMeterKwh + bkwSum
+                  const eFinal = y === thisYearFull && (pvMeterKwh !== null || bkwMeterKwh !== null)
+                    ? (pvMeterKwh ?? 0) + (bkwMeterKwh ?? 0)
                     : eSum
                   return { date: y, verbrauch_kwh: vSum > 0 ? Math.round(vSum*100)/100 : null,
                            erzeugung_kwh: eFinal > 0 ? Math.round(eFinal*100)/100 : null,
