@@ -355,7 +355,7 @@ function App() {
     solar_kwh: number|null; bkw_kwh: number|null; gas_m3: number|null
     soc_min: number|null; soc_max: number|null; soc_avg: number|null
   }
-  type StatPeriod = { verbrauch_kwh: number|null; erzeugung_kwh: number|null; solar_kwh: number|null; bkw_kwh: number|null; gas_m3: number|null; via_zaehler?: boolean; tage: StatDay[] }
+  type StatPeriod = { verbrauch_kwh: number|null; erzeugung_kwh: number|null; solar_kwh: number|null; bkw_kwh: number|null; gas_m3: number|null; via_zaehler?: boolean; bkw_src?: string|null; verbrauch_src?: string|null; tage: StatDay[] }
   const [statTage,   setStatTage]   = useState<StatDay[]>([])
   const [statHeute,  setStatHeute]  = useState<StatDay|null>(null)
   const [statWoche,  setStatWoche]  = useState<StatPeriod|null>(null)
@@ -1681,7 +1681,8 @@ function App() {
                       {verlaufZr === 'jahr' && (bkwDatenAb || pvDatenAb) && (
                         <div style={{ fontSize: 9, color: T.muted, fontFamily: T.fontMono, marginTop: 4, lineHeight: 1.5, opacity: 0.85 }}>
                           BKW-Tageswerte ab: {bkwDatenAb ?? '–'}<br/>
-                          PV-Tageswerte ab: {pvDatenAb ?? '–'}
+                          PV-Tageswerte ab: {pvDatenAb ?? '–'}<br/>
+                          BKW-Wert via: {statJahr?.bkw_src ?? 'Tageswerte (lückenhaft)'}
                         </div>
                       )}
                     </Card>
