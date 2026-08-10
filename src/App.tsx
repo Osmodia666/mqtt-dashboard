@@ -1547,9 +1547,25 @@ function App() {
             gas_m3:        days.reduce((s,d) => s+(d.gas_m3??0),0) || null,
             tage: days,
           })
+          // Live-Zählerstand Victron ist maßgeblich: Die Venus-OS-Tages-History reicht
+          // nur ~30 Tage zurück, daher fehlen der Jahressumme alle Tage vor ~30 Tagen
+          // (z.B. 13.04.–08.07.2026). Der Zählerstand seit Inbetriebnahme ist korrekt.
+          const pvMeterRaw  = parseFloat(values[V('solarcharger/288/Yield/System')] ?? 'NaN')
+          const pvMeterKwh  = !isNaN(pvMeterRaw) ? pvMeterRaw : null
           const periodSum = verlaufZr === 'woche' ? statWoche
                           : verlaufZr === 'monat' ? sumFromDays(periodData)
-                          : verlaufZr === 'jahr'  ? sumFromDays(periodData) : null
+                          : verlaufZr === 'jahr'  ? (() => {
+                              const base = sumFromDays(periodData)
+                              if (pvMeterKwh === null) return base
+                              // Victron-Zählerstand + BKW-Tageswerte (BKW-History ist lückenlos)
+                              const erzeugung = pvMeterKwh + (base.bkw_kwh ?? 0)
+                              return {
+                                ...base,
+                                erzeugung_kwh: erzeugung > 0 ? Math.round(erzeugung * 100) / 100 : base.erzeugung_kwh,
+                                solar_kwh:     pvMeterKwh,
+                              }
+                            })()
+                          : null
 
           const hasData = periodData.length > 0
 
@@ -2105,13 +2121,19 @@ function App() {
                 const solarTotal = (!isNaN(bkwGesamt) ? bkwGesamt : 0) + (!isNaN(pvGesamt) ? pvGesamt : 0)
 
                 // Jahres-Chart aus statTage – gruppiert nach Jahren
+                // Aktuelles Jahr: lückenhafte Tages-Summe durch Live-Zählerstand Victron ersetzen
+                const thisYearFull = new Date().getFullYear().toString()
                 const years = Array.from(new Set(statTage.map(d => d.date.slice(0,4)))).sort()
                 const yearData = years.map(y => {
                   const days = statTage.filter(d => d.date.startsWith(y))
                   const vSum = days.reduce((s,d) => s + (d.verbrauch_kwh ?? 0), 0)
                   const eSum = days.reduce((s,d) => s + (d.erzeugung_kwh ?? 0), 0)
+                  const bkwSum = days.reduce((s,d) => s + (d.bkw_kwh ?? 0), 0)
+                  const eFinal = y === thisYearFull && pvMeterKwh !== null && pvMeterKwh > 0
+                    ? pvMeterKwh + bkwSum
+                    : eSum
                   return { date: y, verbrauch_kwh: vSum > 0 ? Math.round(vSum*100)/100 : null,
-                           erzeugung_kwh: eSum > 0 ? Math.round(eSum*100)/100 : null,
+                           erzeugung_kwh: eFinal > 0 ? Math.round(eFinal*100)/100 : null,
                            bkw_kwh: null, solar_kwh: null, soc_min: null, soc_max: null, soc_avg: null }
                 })
                 const maxYV = Math.max(...yearData.map(d => d.verbrauch_kwh ?? 0), 1)
