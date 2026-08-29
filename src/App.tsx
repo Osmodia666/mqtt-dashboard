@@ -355,7 +355,7 @@ function App() {
     solar_kwh: number|null; bkw_kwh: number|null; gas_m3: number|null
     soc_min: number|null; soc_max: number|null; soc_avg: number|null
   }
-  type StatPeriod = { verbrauch_kwh: number|null; erzeugung_kwh: number|null; solar_kwh: number|null; bkw_kwh: number|null; gas_m3: number|null; via_zaehler?: boolean; bkw_src?: string|null; verbrauch_src?: string|null; tage: StatDay[] }
+  type StatPeriod = { verbrauch_kwh: number|null; erzeugung_kwh: number|null; solar_kwh: number|null; bkw_kwh: number|null; gas_m3: number|null; tage: StatDay[] }
   const [statTage,   setStatTage]   = useState<StatDay[]>([])
   const [statHeute,  setStatHeute]  = useState<StatDay|null>(null)
   const [statWoche,  setStatWoche]  = useState<StatPeriod|null>(null)
@@ -1531,13 +1531,6 @@ function App() {
           // Aktiver Datensatz je nach Zeitraum
           // Jahr/Monat: direkt aus statTage filtern (365 Tage) statt statJahr/statMonat.tage (waren nur 30 Tage)
           const thisYear = new Date().getFullYear().toString()
-          const thisMonth = `${thisYear}-${String(new Date().getMonth()+1).padStart(2,'0')}`
-          const periodData: StatDay[] = verlaufZr === 'heute'
-            ? (statHeute ? [statHeute] : [])
-            : verlaufZr === 'woche'  ? (statWoche?.tage  ?? [])
-            : verlaufZr === 'monat'  ? statTage.filter(d => d.date.startsWith(thisMonth))
-            : verlaufZr === 'jahr'   ? statTage.filter(d => d.date.startsWith(thisYear))
-            :                          []
 
           const sumFromDays = (days: StatDay[]) => ({
             verbrauch_kwh: days.reduce((s,d) => s+(d.verbrauch_kwh??0),0) || null,
@@ -1547,42 +1540,30 @@ function App() {
             gas_m3:        days.reduce((s,d) => s+(d.gas_m3??0),0) || null,
             tage: days,
           })
-          // Live-Zählerstände sind maßgeblich: Die Venus-OS-Tages-History reicht nur
-          // ~30 Tage zurück und die BKW-Tageswerte sind ebenfalls lückenhaft. Daher
-          // werden Jahres-/Gesamtwerte direkt aus den Zählerständen gebildet:
-          // Victron = Yield/System, BKW = EnergyPTotal + Offset (muss immer addiert werden).
-          const pvMeterRaw    = parseFloat(values[V('solarcharger/288/Yield/System')] ?? 'NaN')
-          const pvMeterKwh    = !isNaN(pvMeterRaw) ? pvMeterRaw : null
-          const bkwMeterRaw   = parseFloat(values['tele/Balkonkraftwerk/SENSOR.ENERGY.EnergyPTotal.0'] ?? 'NaN')
-          const bkwMeterKwh   = !isNaN(bkwMeterRaw) ? bkwMeterRaw + 178.779 : null
-          const netzMeterRaw  = parseFloat(values['Stromzähler/Verbrauch_gesamt'] ?? 'NaN')
-          const netzMeterKwh  = !isNaN(netzMeterRaw) ? netzMeterRaw : null
-          // Datenabdeckung: frühestes Datum mit Tageswerten (zeigt, wie weit die History reicht)
-          const bkwDatenAb = statTage.find(d => d.bkw_kwh != null)?.date ?? null
-          const pvDatenAb  = statTage.find(d => d.solar_kwh != null)?.date ?? null
+
+          // "Monat": ein Balken pro Kalendermonat (alle bisher erfassten Monate),
+          // nicht die Tage des aktuellen Monats. Klick auf einen Monat → Tagesdetail.
+          const monthAgg = (): StatDay[] => {
+            const months = Array.from(new Set(statTage.map(d => d.date.slice(0,7)))).sort()
+            return months.map(m => {
+              const days = statTage.filter(d => d.date.startsWith(m))
+              const agg = sumFromDays(days)
+              return { date: m, verbrauch_kwh: agg.verbrauch_kwh, erzeugung_kwh: agg.erzeugung_kwh,
+                       solar_kwh: agg.solar_kwh, bkw_kwh: agg.bkw_kwh, gas_m3: agg.gas_m3,
+                       soc_min: null, soc_max: null, soc_avg: null }
+            })
+          }
+
+          const periodData: StatDay[] = verlaufZr === 'heute'
+            ? (statHeute ? [statHeute] : [])
+            : verlaufZr === 'woche'  ? (statWoche?.tage  ?? [])
+            : verlaufZr === 'monat'  ? monthAgg()
+            : verlaufZr === 'jahr'   ? statTage.filter(d => d.date.startsWith(thisYear))
+            :                          []
+
           const periodSum = verlaufZr === 'woche' ? statWoche
                           : verlaufZr === 'monat' ? sumFromDays(periodData)
-                          : verlaufZr === 'jahr'  ? (() => {
-                              const base = sumFromDays(periodData)
-                              // stats_service liefert korrigierte Jahreswerte per
-                              // Zählerdifferenz über den Jahreswechsel (via_zaehler-Flag)
-                              if (statJahr && statJahr.via_zaehler) {
-                                return { ...statJahr, tage: base.tage }
-                              }
-                              // Fallback: Live-Zählerstände (Victron + BKW inkl. Offset)
-                              const erzeugung = (pvMeterKwh ?? 0) + (bkwMeterKwh ?? 0)
-                              return {
-                                ...base,
-                                erzeugung_kwh: (pvMeterKwh !== null || bkwMeterKwh !== null) && erzeugung > 0
-                                  ? Math.round(erzeugung * 100) / 100 : base.erzeugung_kwh,
-                                solar_kwh:     pvMeterKwh ?? base.solar_kwh,
-                                bkw_kwh:       bkwMeterKwh ?? base.bkw_kwh,
-                                // Verbrauch: Tageswerte bevorzugen (Lebenszeit-Zähler wäre
-                                // für ein Jahr zu hoch); Zählerstand nur als Notnagel.
-                                verbrauch_kwh: base.verbrauch_kwh ?? netzMeterKwh ?? null,
-                              }
-                            })()
-                          : null
+                          : verlaufZr === 'jahr'  ? sumFromDays(statTage.filter(d => d.date.startsWith(thisYear))) : null
 
           const hasData = periodData.length > 0
 
@@ -1678,13 +1659,6 @@ function App() {
                       <div style={{ fontSize: 10, color: T.muted, fontFamily: T.fontMono }}>
                         BKW: {fkwh(periodSum.bkw_kwh)} · PV: {fkwh(periodSum.solar_kwh)}
                       </div>
-                      {verlaufZr === 'jahr' && (bkwDatenAb || pvDatenAb) && (
-                        <div style={{ fontSize: 9, color: T.muted, fontFamily: T.fontMono, marginTop: 4, lineHeight: 1.5, opacity: 0.85 }}>
-                          BKW-Tageswerte ab: {bkwDatenAb ?? '–'}<br/>
-                          PV-Tageswerte ab: {pvDatenAb ?? '–'}<br/>
-                          BKW-Wert via: {statJahr?.bkw_src ?? 'Tageswerte (lückenhaft)'}
-                        </div>
-                      )}
                     </Card>
                     <Card accentColor={bilCol}>
                       <CardLabel icon="⚖️" color={bilCol}>Bilanz</CardLabel>
@@ -1778,8 +1752,6 @@ function App() {
                 const cBarW = drillData ? 28
                   : verlaufZr === 'jahr' ? 8 : verlaufZr === 'monat' ? 14 : 28
                 const cTotalW = Math.max(chartData.length * (cBarW * 2 + barGap + 4), 300)
-                // Datenabdeckung: Tage mit mindestens einem Wert (Verbrauch oder Erzeugung)
-                const daysWithData = chartData.filter(d => d.verbrauch_kwh != null || d.erzeugung_kwh != null).length
 
                 // Drill-down Logik: Jahr→Monat, Monat→Woche, Woche→Tag
                 const handleBarClick = (d: StatDay) => {
@@ -1807,6 +1779,10 @@ function App() {
                     const d = new Date(s + 'T12:00:00')
                     return `${d.getDate()}.`
                   }
+                  if (s.length === 7) { // Monats-Bar YYYY-MM
+                    const [y, m] = s.split('-')
+                    return `${m}.${y.slice(2)}`
+                  }
                   return formatDate(s)
                 }
 
@@ -1826,11 +1802,8 @@ function App() {
                       <svg width={Math.max(cTotalW, 300)} height={chartH + 40} style={{ display: 'block' }}>
                         {chartData.map((d, i) => {
                           const x = i * (cBarW * 2 + barGap + 4)
-                          const hasV = d.verbrauch_kwh != null
-                          const hasE = d.erzeugung_kwh != null
-                          const hasAny = hasV || hasE
-                          const vH = hasV ? (d.verbrauch_kwh! / cMaxAll) * chartH : 0
-                          const eH = hasE ? (d.erzeugung_kwh! / cMaxAll) * chartH : 0
+                          const vH = d.verbrauch_kwh  ? (d.verbrauch_kwh  / cMaxAll) * chartH : 0
+                          const eH = d.erzeugung_kwh ? (d.erzeugung_kwh / cMaxAll) * chartH : 0
                           const isSelected = verlaufDetail?.date === d.date
                           const isHov = hoveredBar?.d.date === d.date
                           return (
@@ -1838,16 +1811,12 @@ function App() {
                               onClick={() => handleBarClick(d)}
                               onMouseEnter={() => setHoveredBar({ d, x: x + cBarW, y: Math.min(chartH - vH, chartH - eH) })}
                               onMouseLeave={() => setHoveredBar(null)}
-                              style={{ cursor: hasAny ? 'pointer' : 'default' }}>
-                              {!hasAny && (
-                                <rect x={x} y={chartH - 6} width={cBarW * 2 + 2} height={6}
-                                  fill="rgba(255,255,255,0.08)" rx={2} />
-                              )}
+                              style={{ cursor: 'pointer' }}>
                               <rect x={x} y={chartH - vH} width={cBarW} height={vH}
                                 fill={T.err} opacity={isSelected || isHov ? 1 : 0.75} rx={2} />
                               <rect x={x + cBarW + 2} y={chartH - eH} width={cBarW} height={eH}
                                 fill={T.ok} opacity={isSelected || isHov ? 1 : 0.75} rx={2} />
-                              {(isSelected || isHov) && hasAny && <rect x={x-1} y={0} width={cBarW*2+4} height={chartH}
+                              {(isSelected || isHov) && <rect x={x-1} y={0} width={cBarW*2+4} height={chartH}
                                 fill="rgba(255,255,255,0.04)" rx={2} />}
                               <text x={x + cBarW} y={chartH + 14} textAnchor="middle"
                                 fontSize={9} fill="rgba(224,234,255,0.4)" fontFamily={T.fontMono}>
@@ -1862,7 +1831,7 @@ function App() {
                           const tw   = 160
                           const tx   = Math.min(hoveredBar.x, Math.max(cTotalW,300) - tw - 5)
                           const ty   = Math.max(55, (hoveredBar.y ?? 20))
-                          const days = verlaufZr === 'woche' ? 1 : verlaufZr === 'monat' ? 1 : verlaufZr === 'jahr' ? 30 : 1
+                          const days = drillData ? 1 : (verlaufZr === 'jahr' || verlaufZr === 'monat') ? 30 : 1
                           const euro = calcEuro(td.verbrauch_kwh, td.erzeugung_kwh, days)
                           const netCol = euro.net >= 0 ? '#34d399' : '#f87171'
                           return (
@@ -1897,22 +1866,16 @@ function App() {
                         ))}
                       </svg>
                     </div>
-                    <div style={{ display: 'flex', gap: 16, marginTop: 6, fontSize: 10, fontFamily: T.fontMono, color: T.muted, flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', gap: 16, marginTop: 6, fontSize: 10, fontFamily: T.fontMono, color: T.muted }}>
                       <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                         <span style={{ width: 10, height: 10, background: T.err, borderRadius: 2, display: 'inline-block' }} />Verbrauch
                       </span>
                       <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                         <span style={{ width: 10, height: 10, background: T.ok, borderRadius: 2, display: 'inline-block' }} />Erzeugung
                       </span>
-                      {daysWithData < chartData.length && (
-                        <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                          <span style={{ width: 10, height: 10, background: 'rgba(255,255,255,0.08)', borderRadius: 2, display: 'inline-block' }} />
-                          {daysWithData} von {chartData.length} Tagen mit Daten
-                        </span>
-                      )}
                       <span style={{ marginLeft: 'auto' }}>
                         {!drillData && (verlaufZr === 'jahr' || verlaufZr === 'monat')
-                          ? 'Balken anklicken → Monatsdetail'
+                          ? 'Balken anklicken → Tagesdetail'
                           : 'Balken anklicken für Details'}
                       </span>
                     </div>
@@ -2008,31 +1971,32 @@ function App() {
                 const GAS_PREIS = 0.11
                 const gasKwhM3  = 10.0
                 const gChartH   = 120
-                // Für Jahr: nach Monat aggregieren
-                const gasBarData = verlaufZr === 'jahr'
-                  ? (() => {
-                      const months = Array.from(new Set(periodData.map(d => d.date.slice(0,7)))).sort()
-                      return months.map(m => {
-                        const days = periodData.filter(d => d.date.startsWith(m) && d.gas_m3 !== null)
-                        const sum  = days.reduce((s,d) => s + (d.gas_m3 ?? 0), 0)
-                        return { date: m, gas_m3: days.length > 0 ? Math.round(sum*1000)/1000 : null } as StatDay
-                      })
-                    })()
-                  : periodData
+                // periodData ist bei 'jahr'/'monat' bereits nach Monat aggregiert (7-stelliges Datum)
+                // drillGasData zeigt bei Klick die Tage des gewählten Monats
+                const gasBarData = drillData ?? periodData
                 const gasData  = gasBarData.filter(d => d.gas_m3 !== null)
                 const gasSum   = gasData.length > 0
                   ? Math.round(gasData.reduce((s,d) => s + (d.gas_m3 ?? 0), 0) * 1000) / 1000
                   : null
                 const maxGas   = Math.max(...gasBarData.map(d => d.gas_m3 ?? 0), 0.1)
-                const gBarW    = verlaufZr === 'jahr' ? 28 : verlaufZr === 'monat' ? 18 : 32
+                const gBarW    = drillData ? 24
+                  : verlaufZr === 'jahr' ? 28 : verlaufZr === 'monat' ? 18 : 32
                 const gTotalW  = Math.max(gasBarData.length * (gBarW + 8), 300)
-                const chartLabel = verlaufZr === 'jahr' ? 'Gasverbrauch · nach Monat'
-                  : verlaufZr === 'monat' ? 'Gasverbrauch · täglich'
+                const chartLabel = drillData ? drillLabel
+                  : verlaufZr === 'jahr' ? 'Gasverbrauch · nach Monat'
+                  : verlaufZr === 'monat' ? 'Gasverbrauch · nach Monat'
                   : 'Gasverbrauch · täglich'
                 const fmtGasDate = (s: string) => {
                   if (s.length === 7) return s.slice(5)
                   const d = new Date(s + 'T12:00:00')
-                  return verlaufZr === 'monat' ? `${d.getDate()}.` : ['So','Mo','Di','Mi','Do','Fr','Sa'][d.getDay()]
+                  return (drillData || verlaufZr === 'monat') ? `${d.getDate()}.` : ['So','Mo','Di','Mi','Do','Fr','Sa'][d.getDay()]
+                }
+                const handleGasBarClick = (d: StatDay) => {
+                  if (drillData) return // schon auf Tagesebene
+                  if ((verlaufZr === 'jahr' || verlaufZr === 'monat') && d.date.length === 7) {
+                    const days = statTage.filter(t => t.date.startsWith(d.date))
+                    if (days.length > 0) { setDrillData(days); setDrillLabel(`${d.date} – Tage`) }
+                  }
                 }
                 return (
                   <>
@@ -2070,7 +2034,16 @@ function App() {
                     {/* Gas Balkendiagramm */}
                     {gasData.length >= 1 && (
                       <Card accentColor={T.warn} style={{ marginBottom: 12, padding: '12px 13px' }}>
-                        <CardLabel icon="📊" color={T.warn}>{chartLabel}</CardLabel>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+                          <CardLabel icon="📊" color={T.warn}>{chartLabel}</CardLabel>
+                          {drillData && (
+                            <button onClick={() => { setDrillData(null); setDrillLabel(''); }} style={{
+                              marginLeft: 'auto', padding: '2px 10px', borderRadius: 12, fontSize: 10,
+                              fontFamily: T.fontLabel, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.15)',
+                              background: 'transparent', color: T.muted,
+                            }}>← zurück</button>
+                          )}
+                        </div>
                         <div style={{ overflowX: 'auto' }}>
                           <svg width={gTotalW} height={gChartH + 40} style={{ display: 'block' }}>
                             {gasBarData.map((d, i) => {
@@ -2083,12 +2056,7 @@ function App() {
                                 <g key={d.date}
                                   onMouseEnter={() => d.gas_m3 !== null && setHoveredBar({ d: {...d, verbrauch_kwh:null, erzeugung_kwh:null, bkw_kwh:null, solar_kwh:null, soc_min:null, soc_max:null, soc_avg:null}, x: x + gBarW/2, y: gChartH - h })}
                                   onMouseLeave={() => setHoveredBar(null)}
-                                  onClick={() => {
-                                    if (verlaufZr === 'jahr' && d.date.length === 7) {
-                                      const days = periodData.filter(t => t.date.startsWith(d.date) && t.gas_m3 !== null)
-                                      if (days.length > 0) { setDrillData(days); setDrillLabel(`${d.date} – Tage`); }
-                                    }
-                                  }}
+                                  onClick={() => handleGasBarClick(d)}
                                   style={{ cursor: 'pointer' }}>
                                   <rect x={x} y={gChartH - h} width={gBarW} height={h}
                                     fill={col} opacity={isHov ? 1 : 0.75} rx={2} />
@@ -2100,7 +2068,7 @@ function App() {
                               )
                             })}
                             {/* Hover-Tooltip */}
-                            {hoveredBar && periodData.some(d => d.date === hoveredBar.d.date) && (() => {
+                            {hoveredBar && gasBarData.some(d => d.date === hoveredBar.d.date) && (() => {
                               const td  = hoveredBar.d
                               const hx  = hoveredBar.x
                               const tx  = Math.min(hx + 8, gTotalW - 145)
@@ -2160,19 +2128,13 @@ function App() {
                 const solarTotal = (!isNaN(bkwGesamt) ? bkwGesamt : 0) + (!isNaN(pvGesamt) ? pvGesamt : 0)
 
                 // Jahres-Chart aus statTage – gruppiert nach Jahren
-                // Aktuelles Jahr: lückenhafte Tages-Summe durch Live-Zählerstände ersetzen
-                const thisYearFull = new Date().getFullYear().toString()
                 const years = Array.from(new Set(statTage.map(d => d.date.slice(0,4)))).sort()
                 const yearData = years.map(y => {
                   const days = statTage.filter(d => d.date.startsWith(y))
                   const vSum = days.reduce((s,d) => s + (d.verbrauch_kwh ?? 0), 0)
                   const eSum = days.reduce((s,d) => s + (d.erzeugung_kwh ?? 0), 0)
-                  const bkwSum = days.reduce((s,d) => s + (d.bkw_kwh ?? 0), 0)
-                  const eFinal = y === thisYearFull && (pvMeterKwh !== null || bkwMeterKwh !== null)
-                    ? (pvMeterKwh ?? 0) + (bkwMeterKwh ?? 0)
-                    : eSum
                   return { date: y, verbrauch_kwh: vSum > 0 ? Math.round(vSum*100)/100 : null,
-                           erzeugung_kwh: eFinal > 0 ? Math.round(eFinal*100)/100 : null,
+                           erzeugung_kwh: eSum > 0 ? Math.round(eSum*100)/100 : null,
                            bkw_kwh: null, solar_kwh: null, soc_min: null, soc_max: null, soc_avg: null }
                 })
                 const maxYV = Math.max(...yearData.map(d => d.verbrauch_kwh ?? 0), 1)
