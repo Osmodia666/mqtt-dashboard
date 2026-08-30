@@ -383,10 +383,11 @@ function App() {
   }
 
   // Batterie-Lebensdauer-Schätzung (Pylontech US3000C)
-  const BAT_CAPACITY_KWH = 3.5    // nutzbare Kapazität kWh
-  const BAT_DOD          = 0.80   // Depth of Discharge laut Datenblatt
-  const BAT_CYCLES_MAX   = 6000   // Zyklen bei 80% DoD laut Pylontech-Datenblatt
-  const BAT_KWH_TOTAL    = BAT_CYCLES_MAX * BAT_CAPACITY_KWH * BAT_DOD  // ~16800 kWh Gesamtdurchsatz
+  const BAT_CAPACITY_KWH  = 3.5    // nutzbare Kapazität kWh
+  const BAT_DOD           = 0.80   // Depth of Discharge laut Datenblatt
+  const BAT_CYCLES_MAX    = 6000   // Zyklen bei 80% DoD laut Pylontech-Datenblatt
+  const BAT_KWH_TOTAL     = BAT_CYCLES_MAX * BAT_CAPACITY_KWH * BAT_DOD  // ~16800 kWh Gesamtdurchsatz
+  const BAT_CALENDAR_LIFE = 12     // Jahre – kalendarische Alterung laut Datenblatt, unabhängig von Zyklen
 
   const calcBatteryLife = () => {
     // Methode: täglicher Energie-Durchsatz = SOC-Hub (max-min) * Kapazität
@@ -408,19 +409,24 @@ function App() {
     const dailyCycles    = dailyThroughputKwh / kwhPerCycle
     const cyclesPerYear  = dailyCycles * 365
 
-    const cyclesUsed      = totalCycles
-    const cyclesRemaining = Math.max(0, BAT_CYCLES_MAX - cyclesUsed)
-    const yearsRemaining  = dailyCycles > 0 ? cyclesRemaining / cyclesPerYear : null
-    const pctUsed          = (cyclesUsed / BAT_CYCLES_MAX) * 100
+    const cyclesUsed        = totalCycles
+    const cyclesRemaining   = Math.max(0, BAT_CYCLES_MAX - cyclesUsed)
+    const yearsFromCycles   = dailyCycles > 0 ? cyclesRemaining / cyclesPerYear : null
+    // Begrenzung durch kalendarische Alterung – Batterien altern auch ohne Nutzung
+    const yearsCappedByAge  = yearsFromCycles !== null ? Math.min(yearsFromCycles, BAT_CALENDAR_LIFE) : null
+    const limitedByCalendar = yearsFromCycles !== null && yearsFromCycles > BAT_CALENDAR_LIFE
+    const pctUsed            = (cyclesUsed / BAT_CYCLES_MAX) * 100
 
     return {
       cyclesUsed:          Math.round(cyclesUsed * 10) / 10,
       cyclesRemaining:     Math.round(cyclesRemaining),
       pctUsed:             Math.round(pctUsed * 100) / 100,
+      limitedByCalendar,
+      yearsFromCycles:     yearsFromCycles ? Math.round(yearsFromCycles * 10) / 10 : null,
       dailyCycles:         Math.round(dailyCycles * 1000) / 1000,
       dailyThroughputKwh:  Math.round(dailyThroughputKwh * 100) / 100,
       cyclesPerYear:       Math.round(cyclesPerYear * 10) / 10,
-      yearsRemaining:      yearsRemaining ? Math.round(yearsRemaining * 10) / 10 : null,
+      yearsRemaining:      yearsCappedByAge !== null ? Math.round(yearsCappedByAge * 10) / 10 : null,
       dailyAvgKwh:         Math.round(dailyThroughputKwh * 100) / 100, // Kompatibilität mit altem Feldnamen
       daysTracked,
     }
@@ -1264,7 +1270,9 @@ function App() {
                   <StatRow label="Ø Durchsatz/Tag" value={`${batLife.dailyAvgKwh} kWh`} />
                   <div style={{ fontSize: 10, color: T.muted, fontFamily: T.fontMono, marginTop: 5, lineHeight: 1.5 }}>
                     Pylontech US3000C · {BAT_CYCLES_MAX} Zyklen bei {BAT_DOD*100}% DoD<br/>
-                    Basis: {batLife.daysTracked} Tage Messdaten (wird genauer mit der Zeit)
+                    {batLife.limitedByCalendar
+                      ? <>Zyklisch reichten ~{batLife.yearsFromCycles} Jahre – begrenzt auf {BAT_CALENDAR_LIFE} Jahre kalendarische Alterung</>
+                      : <>Basis: {batLife.daysTracked} Tage Messdaten (wird genauer mit der Zeit)</>}
                   </div>
                 </Card>
               )}
