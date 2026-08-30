@@ -1561,9 +1561,30 @@ function App() {
             : verlaufZr === 'jahr'   ? statTage.filter(d => d.date.startsWith(thisYear))
             :                          []
 
+          // Live-Zählerstände (korrekt, unabhängig von Tageslücken)
+          const bkwRawLive    = parseFloat(values['tele/Balkonkraftwerk/SENSOR.ENERGY.EnergyPTotal.0'] ?? 'NaN')
+          const bkwGesamtLive = !isNaN(bkwRawLive) ? bkwRawLive + 178.779 : NaN
+          const pvGesamtLive  = parseFloat(values[V('solarcharger/288/Yield/System')] ?? 'NaN')
+          const VICTRON_INCEPTION_YEAR = '2026' // Victron in Betrieb seit 13.04.2026
+
+          // Für das Inbetriebnahme-Jahr: Victron-Anteil aus Live-Zähler statt lückenhafter Tagessumme
+          // (BKW-Anteil bleibt Tagessumme, da BKW schon seit 2023 läuft und nicht 1:1 diesem Jahr zuordenbar ist)
+          const yearSumWithLiveVictron = (days: StatDay[], year: string) => {
+            const base = sumFromDays(days)
+            if (year === VICTRON_INCEPTION_YEAR && !isNaN(pvGesamtLive)) {
+              const bkwSum = days.reduce((s,d) => s+(d.bkw_kwh??0),0)
+              return {
+                ...base,
+                solar_kwh:     Math.round(pvGesamtLive * 100) / 100,
+                erzeugung_kwh: Math.round((bkwSum + pvGesamtLive) * 100) / 100,
+              }
+            }
+            return base
+          }
+
           const periodSum = verlaufZr === 'woche' ? statWoche
                           : verlaufZr === 'monat' ? sumFromDays(periodData)
-                          : verlaufZr === 'jahr'  ? sumFromDays(statTage.filter(d => d.date.startsWith(thisYear))) : null
+                          : verlaufZr === 'jahr'  ? yearSumWithLiveVictron(statTage.filter(d => d.date.startsWith(thisYear)), thisYear) : null
 
           const hasData = periodData.length > 0
 
@@ -2128,11 +2149,16 @@ function App() {
                 const solarTotal = (!isNaN(bkwGesamt) ? bkwGesamt : 0) + (!isNaN(pvGesamt) ? pvGesamt : 0)
 
                 // Jahres-Chart aus statTage – gruppiert nach Jahren
+                // Für 2026 (Victron-Inbetriebnahmejahr): Victron-Anteil aus Live-Zähler statt Tagessumme
                 const years = Array.from(new Set(statTage.map(d => d.date.slice(0,4)))).sort()
                 const yearData = years.map(y => {
                   const days = statTage.filter(d => d.date.startsWith(y))
-                  const vSum = days.reduce((s,d) => s + (d.verbrauch_kwh ?? 0), 0)
-                  const eSum = days.reduce((s,d) => s + (d.erzeugung_kwh ?? 0), 0)
+                  const vSum   = days.reduce((s,d) => s + (d.verbrauch_kwh ?? 0), 0)
+                  const bkwSum = days.reduce((s,d) => s + (d.bkw_kwh ?? 0), 0)
+                  let eSum = days.reduce((s,d) => s + (d.erzeugung_kwh ?? 0), 0)
+                  if (y === '2026' && !isNaN(pvGesamt)) {
+                    eSum = bkwSum + pvGesamt // Victron-Lebenszeitertrag komplett 2026 zurechenbar
+                  }
                   return { date: y, verbrauch_kwh: vSum > 0 ? Math.round(vSum*100)/100 : null,
                            erzeugung_kwh: eSum > 0 ? Math.round(eSum*100)/100 : null,
                            bkw_kwh: null, solar_kwh: null, soc_min: null, soc_max: null, soc_avg: null }
