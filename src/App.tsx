@@ -1773,7 +1773,9 @@ function App() {
               {/* Balken-Chart mit Drill-Down */}
               {hasData && verlaufZr !== 'heute' && verlaufZr !== 'gesamt' && (() => {
                 // Drill-down: wenn drillData gesetzt, dieses anzeigen
-                const chartData = drillData ?? periodData
+                const chartData = (drillData ?? periodData)
+                  .filter(d => d.verbrauch_kwh !== null || d.erzeugung_kwh !== null)
+                  .slice().reverse()
                 const cLabel    = drillData ? drillLabel : 'Verbrauch vs. Erzeugung'
                 const cMaxV = Math.max(...chartData.map(d => d.verbrauch_kwh  ?? 0), 1)
                 const cMaxE = Math.max(...chartData.map(d => d.erzeugung_kwh ?? 0), 1)
@@ -2002,7 +2004,9 @@ function App() {
                 const gChartH   = 120
                 // periodData ist bei 'jahr'/'monat' bereits nach Monat aggregiert (7-stelliges Datum)
                 // drillGasData zeigt bei Klick die Tage des gewählten Monats
-                const gasBarData = drillData ?? periodData
+                const gasBarData = (drillData ?? periodData)
+                  .filter(d => d.gas_m3 !== null)
+                  .slice().reverse()
                 const gasData  = gasBarData.filter(d => d.gas_m3 !== null)
                 const gasSum   = gasData.length > 0
                   ? Math.round(gasData.reduce((s,d) => s + (d.gas_m3 ?? 0), 0) * 1000) / 1000
@@ -2196,7 +2200,9 @@ function App() {
                           )}
                         </div>
                         {(() => {
-                          const cData  = drillData ?? yearData
+                          const cData  = (drillData ?? yearData)
+                            .filter(d => d.verbrauch_kwh !== null || d.erzeugung_kwh !== null)
+                            .slice().reverse()
                           const cMaxV  = Math.max(...cData.map(d => d.verbrauch_kwh ?? 0), 1)
                           const cMaxE  = Math.max(...cData.map(d => d.erzeugung_kwh ?? 0), 1)
                           const cMaxA  = Math.max(cMaxV, cMaxE, 1)
